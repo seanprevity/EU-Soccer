@@ -1,0 +1,1144 @@
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "prevId": "",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.odds": {
+      "name": "odds",
+      "schema": "",
+      "columns": {
+        "bookmaker": {
+          "name": "bookmaker",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "market_type": {
+          "name": "market_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'h2h'"
+        },
+        "odds_home": {
+          "name": "odds_home",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "odds_draw": {
+          "name": "odds_draw",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "odds_away": {
+          "name": "odds_away",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "match": {
+          "name": "match",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "odds_match_fkey": {
+          "name": "odds_match_fkey",
+          "tableFrom": "odds",
+          "tableTo": "upcomingMatches",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "match"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "odds_bookmaker_match_unique": {
+          "columns": [
+            "bookmaker",
+            "match"
+          ],
+          "nullsNotDistinct": false,
+          "name": "odds_bookmaker_match_unique"
+        }
+      },
+      "checkConstraints": {},
+      "policies": {
+        "Allow public read": {
+          "name": "Allow public read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ],
+          "using": "true"
+        },
+        "Service role full write": {
+          "name": "Service role full write",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.teams": {
+      "name": "teams",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "team_name": {
+          "name": "team_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "teams_team_name_key1": {
+          "columns": [
+            "team_name"
+          ],
+          "nullsNotDistinct": false,
+          "name": "teams_team_name_key1"
+        }
+      },
+      "checkConstraints": {},
+      "policies": {
+        "Allow public read": {
+          "name": "Allow public read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ],
+          "using": "true"
+        },
+        "Service role full write": {
+          "name": "Service role full write",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.leagues": {
+      "name": "leagues",
+      "schema": "",
+      "columns": {
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "country": {
+          "name": "country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "leagues_name_key": {
+          "columns": [
+            "name"
+          ],
+          "nullsNotDistinct": false,
+          "name": "leagues_name_key"
+        }
+      },
+      "checkConstraints": {},
+      "policies": {
+        "Allow public read": {
+          "name": "Allow public read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ],
+          "using": "true"
+        },
+        "Service role full write": {
+          "name": "Service role full write",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.players": {
+      "name": "players",
+      "schema": "",
+      "columns": {
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {
+        "Service role full write": {
+          "name": "Service role full write",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "withCheck": "(auth.role() = 'service_role'::text)",
+          "using": "(auth.role() = 'service_role'::text)"
+        },
+        "Allow public read": {
+          "name": "Allow public read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.upcomingMatches": {
+      "name": "upcomingMatches",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "upcoming_matches_id_seq",
+            "increment": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "startWith": "1",
+            "cache": "1",
+            "cycle": false,
+            "schema": "public"
+          }
+        },
+        "MatchDate": {
+          "name": "MatchDate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "HomeTeam": {
+          "name": "HomeTeam",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "AwayTeam": {
+          "name": "AwayTeam",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "League": {
+          "name": "League",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "upcoming_matches_AwayTeam_fkey": {
+          "name": "upcoming_matches_AwayTeam_fkey",
+          "tableFrom": "upcomingMatches",
+          "tableTo": "teams",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "AwayTeam"
+          ],
+          "columnsTo": [
+            "team_name"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        },
+        "upcoming_matches_HomeTeam_fkey": {
+          "name": "upcoming_matches_HomeTeam_fkey",
+          "tableFrom": "upcomingMatches",
+          "tableTo": "teams",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "HomeTeam"
+          ],
+          "columnsTo": [
+            "team_name"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        },
+        "upcoming_matches_League_fkey": {
+          "name": "upcoming_matches_League_fkey",
+          "tableFrom": "upcomingMatches",
+          "tableTo": "leagues",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "League"
+          ],
+          "columnsTo": [
+            "name"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "upcoming_match_unique_idx": {
+          "columns": [
+            "MatchDate",
+            "HomeTeam",
+            "AwayTeam"
+          ],
+          "nullsNotDistinct": false,
+          "name": "upcoming_match_unique_idx"
+        }
+      },
+      "checkConstraints": {},
+      "policies": {
+        "Allow public read": {
+          "name": "Allow public read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ],
+          "using": "true"
+        },
+        "Service role full write": {
+          "name": "Service role full write",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.matchStats": {
+      "name": "matchStats",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "match_stats_id_seq",
+            "increment": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "startWith": "1",
+            "cache": "1",
+            "cycle": false,
+            "schema": "public"
+          }
+        },
+        "HomeTeam": {
+          "name": "HomeTeam",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "AwayTeam": {
+          "name": "AwayTeam",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "MatchDate": {
+          "name": "MatchDate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "FTR": {
+          "name": "FTR",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "HS": {
+          "name": "HS",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "AS": {
+          "name": "AS",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "HST": {
+          "name": "HST",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "AST": {
+          "name": "AST",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "HC": {
+          "name": "HC",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "AC": {
+          "name": "AC",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "FTHG": {
+          "name": "FTHG",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "FTAG": {
+          "name": "FTAG",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "HY": {
+          "name": "HY",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "AY": {
+          "name": "AY",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "HR": {
+          "name": "HR",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "AR": {
+          "name": "AR",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "HF": {
+          "name": "HF",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "AF": {
+          "name": "AF",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "League": {
+          "name": "League",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "match_stats_AwayTeam_fkey": {
+          "name": "match_stats_AwayTeam_fkey",
+          "tableFrom": "matchStats",
+          "tableTo": "teams",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "AwayTeam"
+          ],
+          "columnsTo": [
+            "team_name"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        },
+        "match_stats_HomeTeam_fkey": {
+          "name": "match_stats_HomeTeam_fkey",
+          "tableFrom": "matchStats",
+          "tableTo": "teams",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "HomeTeam"
+          ],
+          "columnsTo": [
+            "team_name"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        },
+        "match_stats_League_fkey": {
+          "name": "match_stats_League_fkey",
+          "tableFrom": "matchStats",
+          "tableTo": "leagues",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "League"
+          ],
+          "columnsTo": [
+            "name"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {
+        "Allow public read": {
+          "name": "Allow public read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ],
+          "using": "true"
+        },
+        "Service role full write": {
+          "name": "Service role full write",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.standings": {
+      "name": "standings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "standings_id_seq",
+            "increment": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "startWith": "1",
+            "cache": "1",
+            "cycle": false,
+            "schema": "public"
+          }
+        },
+        "league": {
+          "name": "league",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "season": {
+          "name": "season",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "played": {
+          "name": "played",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "won": {
+          "name": "won",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "draw": {
+          "name": "draw",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lost": {
+          "name": "lost",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "goalsAgainst": {
+          "name": "goalsAgainst",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "goalsFor": {
+          "name": "goalsFor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "goalDifference": {
+          "name": "goalDifference",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "points": {
+          "name": "points",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "form": {
+          "name": "form",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recentGf": {
+          "name": "recentGf",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recentGa": {
+          "name": "recentGa",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "standings_league_fkey": {
+          "name": "standings_league_fkey",
+          "tableFrom": "standings",
+          "tableTo": "leagues",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "league"
+          ],
+          "columnsTo": [
+            "name"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "standings_name_fkey": {
+          "name": "standings_name_fkey",
+          "tableFrom": "standings",
+          "tableTo": "teams",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "name"
+          ],
+          "columnsTo": [
+            "team_name"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "standings_name_season_type_unique": {
+          "columns": [
+            "name",
+            "season",
+            "type"
+          ],
+          "nullsNotDistinct": false,
+          "name": "standings_name_season_type_unique"
+        }
+      },
+      "checkConstraints": {},
+      "policies": {
+        "Allow public read": {
+          "name": "Allow public read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ],
+          "using": "true"
+        },
+        "Service role full write": {
+          "name": "Service role full write",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.goalScorers": {
+      "name": "goalScorers",
+      "schema": "",
+      "columns": {
+        "player": {
+          "name": "player",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "goals": {
+          "name": "goals",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "season": {
+          "name": "season",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "team": {
+          "name": "team",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "league": {
+          "name": "league",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imageUrl": {
+          "name": "imageUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "goalScorers_league_fkey": {
+          "name": "goalScorers_league_fkey",
+          "tableFrom": "goalScorers",
+          "tableTo": "leagues",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "league"
+          ],
+          "columnsTo": [
+            "name"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        },
+        "goalScorers_player_fkey": {
+          "name": "goalScorers_player_fkey",
+          "tableFrom": "goalScorers",
+          "tableTo": "players",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "player"
+          ],
+          "columnsTo": [
+            "name"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        },
+        "goalScorers_team_fkey": {
+          "name": "goalScorers_team_fkey",
+          "tableFrom": "goalScorers",
+          "tableTo": "teams",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "team"
+          ],
+          "columnsTo": [
+            "team_name"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "goalscorers_name_season_unique": {
+          "columns": [
+            "player",
+            "season"
+          ],
+          "nullsNotDistinct": false,
+          "name": "goalscorers_name_season_unique"
+        }
+      },
+      "checkConstraints": {},
+      "policies": {
+        "Service role full write": {
+          "name": "Service role full write",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ],
+          "withCheck": "(auth.role() = 'service_role'::text)",
+          "using": "(auth.role() = 'service_role'::text)"
+        },
+        "Allow public read": {
+          "name": "Allow public read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.squad": {
+      "name": "squad",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "squad_id_seq",
+            "increment": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "startWith": "1",
+            "cache": "1",
+            "cycle": false,
+            "schema": "public"
+          }
+        },
+        "player": {
+          "name": "player",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "position": {
+          "name": "position",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "number": {
+          "name": "number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "team": {
+          "name": "team",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "squad_player_fkey": {
+          "name": "squad_player_fkey",
+          "tableFrom": "squad",
+          "tableTo": "players",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "player"
+          ],
+          "columnsTo": [
+            "name"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        },
+        "squad_team_fkey": {
+          "name": "squad_team_fkey",
+          "tableFrom": "squad",
+          "tableTo": "teams",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "team"
+          ],
+          "columnsTo": [
+            "team_name"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "squad_team_player_unique": {
+          "columns": [
+            "player",
+            "team"
+          ],
+          "nullsNotDistinct": false,
+          "name": "squad_team_player_unique"
+        }
+      },
+      "checkConstraints": {},
+      "policies": {
+        "Allow public read": {
+          "name": "Allow public read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ],
+          "using": "true"
+        },
+        "Service role full write": {
+          "name": "Service role full write",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.head2head": {
+      "name": "head2head",
+      "schema": "",
+      "columns": {
+        "team1": {
+          "name": "team1",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "team2": {
+          "name": "team2",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "MP": {
+          "name": "MP",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "team1_wins": {
+          "name": "team1_wins",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "team2_wins": {
+          "name": "team2_wins",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "draws": {
+          "name": "draws",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "last5": {
+          "name": "last5",
+          "type": "integer[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{RAY}'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "head2head_team1_fkey": {
+          "name": "head2head_team1_fkey",
+          "tableFrom": "head2head",
+          "tableTo": "teams",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "team1"
+          ],
+          "columnsTo": [
+            "team_name"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "head2head_team2_fkey": {
+          "name": "head2head_team2_fkey",
+          "tableFrom": "head2head",
+          "tableTo": "teams",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "team2"
+          ],
+          "columnsTo": [
+            "team_name"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "head_to_head_pkey": {
+          "name": "head_to_head_pkey",
+          "columns": [
+            "team1",
+            "team2"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "unique_teams": {
+          "columns": [
+            "team1",
+            "team2"
+          ],
+          "nullsNotDistinct": false,
+          "name": "unique_teams"
+        }
+      },
+      "checkConstraints": {},
+      "policies": {
+        "Allow public read": {
+          "name": "Allow public read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "public"
+          ],
+          "using": "true"
+        },
+        "Service role full write": {
+          "name": "Service role full write",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "public"
+          ]
+        }
+      },
+      "isRLSEnabled": true
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "tables": {
+      "head2head": {
+        "columns": {
+          "last5": {
+            "isArray": true,
+            "dimensions": 1,
+            "rawType": "integer"
+          }
+        }
+      }
+    }
+  }
+}
