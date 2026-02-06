@@ -1,6 +1,75 @@
-Installed currently is a Next.js Frontend with Tailwind, Lucide, and shadcn, a backend with Express + Drizzle for PostgreSQL, and a root directory setup. 
-Helmet, morgan, bcrypt, jsonwebtoken have been installed, hook react forms and zod as well. 
+# European Football Stats App
 
-No libs have been imported for design, nothing for AWS auth.
+A full-stack data and analytics platform for the top five European football leagues, designed to support historical analysis, match previews, and probabilistic outcome predictions. The project focuses on large-scale data ingestion, normalization, and analytics over long time horizons.
 
-rafce shortcut, npx drizzle-kit introspect, use SUPABASE_URL .env for direct connection - easiest
+---
+
+## Overview
+
+This application aggregates and analyzes football data across **20+ seasons** for the top five European leagues (Premier League, La Liga, Serie A, Bundesliga, Ligue 1). It provides structured access to teams, players, matches, standings, and odds while supporting analytical queries and predictive modeling.
+
+---
+
+## Key Features
+
+* **Large-Scale Football Dataset**
+
+  * 200+ teams
+  * 3,000+ players
+  * 35,000+ matches
+  * 20+ years of historical league data
+
+* **Automated Data Pipelines**
+
+  * Periodic ingestion of live match data, odds feeds, and historical records
+  * PostgreSQL upsert and conflict-resolution logic to handle duplicate and evolving records
+
+* **Predictive Analytics**
+
+  * Monte Carlo simulation model for match outcome probabilities
+  * Uses team form, historical performance, and contextual match data
+
+* **Analytics & Insights**
+
+  * Match previews and historical comparisons
+  * Team and player performance trends
+
+---
+
+## Tech Stack
+
+**Frontend**
+
+* Next.js
+* React
+
+**Backend**
+
+* Node.js
+* Express.js
+
+**Database**
+
+* PostgreSQL (Supabase)
+
+**Data & Analytics**
+
+* Monte Carlo simulations
+* Historical feature engineering
+
+**Infrastructure & Tooling**
+
+* Supabase scheduled jobs
+* Git & GitHub
+
+---
+
+## Author
+
+**Sean Previty**
+MS Computer Science, University of Central Florida
+GitHub: [https://github.com/seanprevity](https://github.com/seanprevity)
+
+---
+
+*This project is intended for educational and exploratory purposes and is not affiliated with any football leagues or organizations.*
