@@ -52,6 +52,14 @@ This application aggregates and analyzes football data across **20+ seasons** fo
 
 * PostgreSQL (Supabase)
 
+**Technologies**
+
+* Redux
+* Drizzle ORM
+* Sonner Toast (Notifications)
+* Multiple Football APIs and public CSV files
+* Tailwind CSS v4.0
+
 ---
 
 ## Author
