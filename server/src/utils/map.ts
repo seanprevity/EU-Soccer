@@ -404,7 +404,6 @@ export const skip_coaches = [
   "M. Schmidt",
   "G. Seoane",
   "Sérgio Conceição",
-  "I. Tudor",
   "L. Apolloni",
   "S. Morrone",
 ];
