@@ -6,7 +6,7 @@ A full-stack data and analytics platform for the top five European football leag
 
 ## Overview
 
-This application aggregates and analyzes football data across **20+ seasons** for the top five European leagues (Premier League, La Liga, Serie A, Bundesliga, Ligue 1). It provides structured access to teams, players, matches, standings, and odds while supporting analytical queries and predictive modeling.
+This application aggregates and analyzes football data across **20+ seasons** for the top five European leagues (Premier League, La Liga, Serie A, Bundesliga, Ligue 1). It provides structured access to teams, players, matches, standings, and odds while supporting analytical endeavors and predictive modeling.
 
 ---
 
@@ -21,7 +21,7 @@ This application aggregates and analyzes football data across **20+ seasons** fo
 
 * **Automated Data Pipelines**
 
-  * Periodic ingestion of live match data, odds feeds, and historical records
+  * Periodic ingestion of data for recently played matches, upcoming matches and odds, and standings
   * PostgreSQL upsert and conflict-resolution logic to handle duplicate and evolving records
 
 * **Predictive Analytics**
@@ -52,15 +52,13 @@ This application aggregates and analyzes football data across **20+ seasons** fo
 
 * PostgreSQL (Supabase)
 
-**Data & Analytics**
+**Technologies**
 
-* Monte Carlo simulations
-* Historical feature engineering
-
-**Infrastructure & Tooling**
-
-* Supabase scheduled jobs
-* Git & GitHub
+* Redux
+* Drizzle ORM
+* Sonner Toast (Notifications)
+* Multiple Football APIs and public CSV files
+* Tailwind CSS v4.0
 
 ---
 
@@ -69,7 +67,4 @@ This application aggregates and analyzes football data across **20+ seasons** fo
 **Sean Previty**
 MS Computer Science, University of Central Florida
 GitHub: [https://github.com/seanprevity](https://github.com/seanprevity)
-
----
-
-*This project is intended for educational and exploratory purposes and is not affiliated with any football leagues or organizations.*
+LinkedIn: [https://www.linkedin.com/in/sean-previty-64439b2b9/](https://www.linkedin.com/in/sean-previty-64439b2b9/)
