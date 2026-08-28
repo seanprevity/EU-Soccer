@@ -5,7 +5,8 @@ export const competition_codes = ["PL", "BL1", "FL1", "SA", "PD"];
 
 export const csv_urls = [
   `https://www.football-data.co.uk/mmz4281/${urlSeason}/E0.csv`,
-  `https://www.football-data.co.uk/mmz4281/${urlSeason}/D1.csv`,
+  `https://www.football-data.co.uk/mmz4281/${urlSeason}/E0.csv`,
+  // `https://www.football-data.co.uk/mmz4281/${urlSeason}/D1.csv`, commented out because league has not started
   `https://www.football-data.co.uk/mmz4281/${urlSeason}/F1.csv`,
   `https://www.football-data.co.uk/mmz4281/${urlSeason}/I1.csv`,
   `https://www.football-data.co.uk/mmz4281/${urlSeason}/SP1.csv`,

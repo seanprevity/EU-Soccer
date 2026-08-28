@@ -67,8 +67,8 @@ export const UNDERSTAT_MAP = new Map<string, string>([
   ["Nottm Forest", "Nottingham Forest"],
 ]);
 
-// this normalizes team standings - not necessary anymore since I use my own algo
-export const standings_map = new Map<string, string>([
+// this normalizes team names from the upcoming matches API that calls football-data.org
+export const upcoming_map = new Map<string, string>([
   ["Brighton Hove", "Brighton"],
   ["Nottingham", "Nott'm Forest"],
   ["Wolverhampton", "Wolves"],
@@ -99,6 +99,14 @@ export const standings_map = new Map<string, string>([
   ["Cádiz CF", "Cadiz"],
   ["Almería", "Almeria"],
   ["Ipswich", "Ipswich Town"],
+  ["Coventry City", "Coventry"],
+  ["Hull City", "Hull"],
+  ["SC Paderborn", "Paderborn"],
+  ["Elversberg", "SV Elversberg"],
+  ["Schalke", "Schalke 04"],
+  ["Venezia FC", "Venezia"],
+  ["Málaga", "Malaga"],
+  ["Santander", "Racing Santander"],
 ]);
 
 // this normalizes the-odds-api team names
@@ -151,7 +159,7 @@ export const exception_teams = new Map<string, string>([
   ["La Coruna", "Deportivo"],
   ["Ath Madrid", "Atletico Madrid"],
   ["Espanol", "Espanyol"],
-  ["Santander", "Racing"],
+  ["Santander", "Racing Santander"],
   // Bundesliga
   ["Stuttgart", "VfB Stuttgart"],
   ["Freiburg", "SC Freiburg"],
@@ -413,7 +421,7 @@ export const normalize_name = (name: string): string => {
 };
 
 export const map_team = (full_name: string): string => {
-  return standings_map.get(full_name) ?? full_name;
+  return upcoming_map.get(full_name) ?? full_name;
 };
 
 export const map_team_name = (full_name: string): string => {
@@ -429,5 +437,5 @@ export const get_team_to_id_new = (team: string): number => {
   return team_to_id_new.get(team) ?? -1;
 };
 
-export const curSeason = "2025";
-export const urlSeason = "2526";
+export const curSeason = "2026";
+export const urlSeason = "2627";

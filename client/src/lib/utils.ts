@@ -36,7 +36,7 @@ export const LEAGUES = [
   "La Liga",
 ];
 
-export const currentSeason = "2025";
+export const currentSeason = "2026";
 export function generateSeasons() {
   const seasons = [];
   for (let start = 2005; start <= Number(currentSeason); start++) {
