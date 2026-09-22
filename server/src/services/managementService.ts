@@ -78,15 +78,15 @@ export const updateMatchStatsService = async (url: string, league: string) => {
           month,
           day,
           parseInt(hourStr, 10),
-          parseInt(minuteStr, 10)
-        )
+          parseInt(minuteStr, 10),
+        ),
       );
 
       if (isNaN(matchDate.getTime())) {
         console.warn(
           `⚠️ Invalid match date parsed — raw: "${row["Date"]}", time: "${
             row["Time"]
-          }" → fullYear=${fullYear}, month=${month + 1}, day=${day}`
+          }" → fullYear=${fullYear}, month=${month + 1}, day=${day}`,
         );
         console.warn("Full row:", row);
         continue; // Skip bad rows
@@ -115,7 +115,7 @@ export const updateMatchStatsService = async (url: string, league: string) => {
 
       if (existingMatch) {
         console.log(
-          `⏩ Skipped duplicate: ${homeTeamName} vs ${awayTeamName} (${matchDate.toISOString()})`
+          `⏩ Skipped duplicate: ${homeTeamName} vs ${awayTeamName} (${matchDate.toISOString()})`,
         );
         continue;
       }
@@ -139,6 +139,8 @@ export const updateMatchStatsService = async (url: string, league: string) => {
         ar: toInt(row["AR"]),
         hf: toInt(row["HF"]),
         af: toInt(row["AF"]),
+        hxg: parseFloat(row["HxG"]),
+        axg: parseFloat(row["AxG"]),
         league: league,
       });
     }
@@ -152,7 +154,7 @@ export const updateMatchStatsService = async (url: string, league: string) => {
 // adds next 10 days of upcoming matches to table
 export const updateFutureMatchesService = async (
   competition: string,
-  league: string
+  league: string,
 ) => {
   try {
     const today = new Date();
@@ -220,8 +222,8 @@ export const updateH2HService = async (teamA: string, teamB: string) => {
       .where(
         or(
           and(eq(matchStats.homeTeam, team1), eq(matchStats.awayTeam, team2)),
-          and(eq(matchStats.homeTeam, team2), eq(matchStats.awayTeam, team1))
-        )
+          and(eq(matchStats.homeTeam, team2), eq(matchStats.awayTeam, team1)),
+        ),
       )
       .orderBy(desc(matchStats.matchDate));
 
@@ -315,8 +317,8 @@ export const updateRecentFormService = async (team: string, season: number) => {
         and(
           or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)),
           gt(matchStats.matchDate, startDate.toISOString()),
-          lt(matchStats.matchDate, endDate.toISOString())
-        )
+          lt(matchStats.matchDate, endDate.toISOString()),
+        ),
       )
       .orderBy(desc(matchStats.matchDate));
     if (!matches.length) return;
@@ -351,8 +353,8 @@ export const updateRecentFormService = async (team: string, season: number) => {
           and(
             eq(standings.name, team),
             eq(standings.season, String(season)),
-            eq(standings.type, type)
-          )
+            eq(standings.type, type),
+          ),
         );
     };
 
@@ -370,7 +372,7 @@ export const updateRecentFormService = async (team: string, season: number) => {
 // updates standings for a league/season, gives home standings, away standings, total standings
 export const updateStandingsService = async (
   league: string,
-  season: string
+  season: string,
 ) => {
   // Fetch all matches for this league + season
   const startDate = new Date(Date.UTC(Number(season), 7, 1)); // aug 1
@@ -382,8 +384,8 @@ export const updateStandingsService = async (
       and(
         eq(matchStats.league, league),
         gt(matchStats.matchDate, startDate.toISOString()),
-        lt(matchStats.matchDate, endDate.toISOString())
-      )
+        lt(matchStats.matchDate, endDate.toISOString()),
+      ),
     );
 
   // Initialize table per team
@@ -531,8 +533,8 @@ export const updateStandingsService = async (
         and(
           eq(standings.league, league),
           eq(standings.season, season),
-          eq(standings.type, type)
-        )
+          eq(standings.type, type),
+        ),
       );
     // Sort and update positions
     standingsRows.sort((a, b) => {
@@ -547,16 +549,16 @@ export const updateStandingsService = async (
         db
           .update(standings)
           .set({ position: i + 1 })
-          .where(eq(standings.id, row.id))
-      )
+          .where(eq(standings.id, row.id)),
+      ),
     );
   }
 
   // update every teams recent form
   await Promise.all(
     Object.keys(table).map((team) =>
-      updateRecentFormService(team, Number(season))
-    )
+      updateRecentFormService(team, Number(season)),
+    ),
   );
   return { success: true };
 };
@@ -565,7 +567,7 @@ export const updateStandingsService = async (
 export const updateTopGoalScorer = async (
   league: string,
   competition: string,
-  season: string
+  season: string,
 ) => {
   try {
     const url = `${football_url}/competitions/${competition}/scorers?season=${season}`;
@@ -575,7 +577,7 @@ export const updateTopGoalScorer = async (
     await db
       .delete(goalScorers)
       .where(
-        and(eq(goalScorers.season, season), eq(goalScorers.league, league))
+        and(eq(goalScorers.season, season), eq(goalScorers.league, league)),
       );
 
     for (const scorer of data["scorers"]) {
@@ -603,14 +605,11 @@ export const updateTopGoalScorer = async (
           },
         });
     }
-
-    return;
-    {
-      success: true;
-    }
+    return { success: true };
   } catch (err: any) {
     console.log(`Error updating top goal scorer in ${league}. `, err.message);
-    throw new err();
+    console.log("cause:", err.cause);
+    throw err;
   }
 };
 
@@ -626,22 +625,22 @@ export const updatePlayerInfo = async (name: string) => {
       return;
     }
     const url = `https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=${encodeURIComponent(
-      name
+      name,
     )}`;
     const res = await axios.get(url);
     const player = res.data.player?.[0];
-    //console.log(player);
-    //console.log(player["strCutout"]);
+    const imageUrl = player?.strCutout ?? null;
+
+    if (!player) {
+      console.log(`${name} not found on TheSportsDB — inserting without image`);
+    }
     await db
       .insert(players)
-      .values({
-        name: name,
-        imageUrl: player["strCutout"],
-      })
+      .values({ name, imageUrl })
       .onConflictDoUpdate({
         target: [players.name],
         set: {
-          imageUrl: player["strCutout"],
+          imageUrl: sql`coalesce(excluded.image_url, ${players.imageUrl})`,
         },
       });
     return { success: true };
@@ -655,7 +654,7 @@ export const updatePlayerInfo = async (name: string) => {
 export const importHistoricalGoalScorers = async (
   fileName: string, // PL_2005.csv, move utils/stats folder into services folder before using
   // season: string,
-  league: string
+  league: string,
 ) => {
   try {
     const filePath = path.join(__dirname, "stats", fileName);
@@ -726,17 +725,17 @@ export const updateOddsService = async (sport: string) => {
     for (const item of data) {
       // normalize names to db names
       const normalizedHome = map_team_name(
-        ODDS_MAP.get(item["home_team"]) ?? item["home_team"]
+        ODDS_MAP.get(item["home_team"]) ?? item["home_team"],
       );
       const normalizedAway = map_team_name(
-        ODDS_MAP.get(item["away_team"]) ?? item["away_team"]
+        ODDS_MAP.get(item["away_team"]) ?? item["away_team"],
       );
 
       // Step 2: find corresponding match in DB
       const match = await db.query.upcomingMatches.findFirst({
         where: and(
           eq(upcomingMatches.homeTeam, normalizedHome),
-          eq(upcomingMatches.awayTeam, normalizedAway)
+          eq(upcomingMatches.awayTeam, normalizedAway),
         ),
         orderBy: (m: any) => m.matchDate,
       });
@@ -755,7 +754,7 @@ export const updateOddsService = async (sport: string) => {
         if (!h2hMarket) continue;
 
         const outcomes = Object.fromEntries(
-          h2hMarket["outcomes"].map((o: any) => [o["name"], o["price"]])
+          h2hMarket["outcomes"].map((o: any) => [o["name"], o["price"]]),
         );
 
         // Step 4: upsert odds into DB
@@ -780,7 +779,7 @@ export const updateOddsService = async (sport: string) => {
               },
             });
           console.log(
-            `Stored odds for ${normalizedHome}-${normalizedAway} (${bk["title"]})`
+            `Stored odds for ${normalizedHome}-${normalizedAway} (${bk["title"]})`,
           );
         } catch (err) {
           console.error(`DB error on ${matchId} (${bk["title"]}):`, err);
@@ -805,9 +804,9 @@ export const updateGSImageUrlService = async (season: string) => {
           .update(goalScorers)
           .set({ imageUrl: p.imageUrl })
           .where(
-            and(eq(goalScorers.player, p.name), eq(goalScorers.season, season))
-          )
-      )
+            and(eq(goalScorers.player, p.name), eq(goalScorers.season, season)),
+          ),
+      ),
     );
   } catch (err) {
     console.error(`DB error on updating image URLs:`, err);

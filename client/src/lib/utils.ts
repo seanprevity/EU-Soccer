@@ -213,6 +213,7 @@ export const getResultColors = (result: string) => {
 };
 
 export const statsKeys = [
+  { key: "hxg", label: "Expected Goals"},
   { key: "hs", label: "Shots" },
   { key: "hst", label: "Shots on Target" },
   { key: "hc", label: "Corners" },

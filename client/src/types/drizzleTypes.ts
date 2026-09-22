@@ -70,6 +70,8 @@ export interface matchStats {
   hf: number | null;
   af: number | null;
   league: string;
+  hxg: number | null;
+  axg : number | null;
 }
 
 export type MatchBase = {

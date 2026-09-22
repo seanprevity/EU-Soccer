@@ -39,7 +39,7 @@ export function PastMatchesList({ matches }: Props) {
                 setExpandedMatchId((prev) =>
                   prev.includes(m.id)
                     ? prev.filter((id) => id !== m.id)
-                    : [...prev, m.id]
+                    : [...prev, m.id],
                 )
               }
               className={`relative w-full flex items-center p-2 sm:p-3
@@ -168,20 +168,26 @@ export function PastMatchesList({ matches }: Props) {
                       const getStatValue = (
                         side: "h" | "a",
                         statKey: string,
-                        match: matchStats
+                        match: matchStats,
                       ): number => {
                         const fullKey = `${side}${statKey.slice(
-                          1
+                          1,
                         )}` as keyof matchStats;
                         const value = match[fullKey];
                         return typeof value === "number" ? value : 0;
                       };
+                      const homeVal = getStatValue("h", key, m);
+                      const awayVal = getStatValue("a", key, m);
+
+                      if (key == "xG" && homeVal == 0 && awayVal == 0)
+                        return null;
+
                       return (
                         <StatBar
                           key={key}
                           label={label}
-                          homeValue={getStatValue("h", key, m)}
-                          awayValue={getStatValue("a", key, m)}
+                          homeValue={homeVal}
+                          awayValue={awayVal}
                         />
                       );
                     })}

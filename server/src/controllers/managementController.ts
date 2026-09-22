@@ -58,7 +58,7 @@ export const updateAll = async (req: Request, res: Response): Promise<void> => {
 // updates standings and recent form for teams - total , home , and away
 export const updateStandings = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     for (let i = 0; i < 5; i++)
@@ -72,7 +72,7 @@ export const updateStandings = async (
 // updates match stats from csv urls
 export const updateMatchStats = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     for (let i = 0; i < 5; i++)
@@ -86,7 +86,7 @@ export const updateMatchStats = async (
 // updates future matches and h2h records
 export const updateFutureMatches = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     for (let i = 0; i < 5; i++)
@@ -99,7 +99,7 @@ export const updateFutureMatches = async (
 
 export const updateGoalScorers = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     for (let i = 0; i < 5; i++)
@@ -114,7 +114,7 @@ export const updateGoalScorers = async (
 
 export const updateOdds = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     for (let i = 0; i < 5; i++) await updateOddsService(odds_sports[i]);
@@ -126,7 +126,7 @@ export const updateOdds = async (
 
 export const updateImageUrls = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     await updateGSImageUrlService(curSeason);
@@ -138,7 +138,7 @@ export const updateImageUrls = async (
 
 export const updateSquad = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     await updateSquadService("Torino", get_team_to_id_new("Torino"));

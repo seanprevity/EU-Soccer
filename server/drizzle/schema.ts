@@ -1,4 +1,4 @@
-import { pgTable, foreignKey, unique, pgPolicy, text, numeric, timestamp, bigint, serial, integer, primaryKey } from "drizzle-orm/pg-core"
+import { pgTable, foreignKey, unique, pgPolicy, text, numeric, timestamp, bigint, serial, integer, primaryKey, doublePrecision } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
@@ -99,6 +99,8 @@ export const matchStats = pgTable("matchStats", {
 	hf: integer("HF"),
 	af: integer("AF"),
 	league: text("League").notNull(),
+	hxg: doublePrecision("HxG"),
+	axg: doublePrecision("AxG"),
 }, (table) => [
 	foreignKey({
 			columns: [table.awayTeam],
