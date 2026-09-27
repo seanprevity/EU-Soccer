@@ -19,12 +19,14 @@ const calculateStats = (
   let corners = 0;
   let yellows = 0;
   let reds = 0;
+  let xg = 0;
 
   for (const match of matches) {
     const isHome = match.homeTeam === team;
     corners += isHome ? match.hc ?? 0 : match.ac ?? 0;
     yellows += isHome ? match.hy ?? 0 : match.ay ?? 0;
     reds += isHome ? match.hr ?? 0 : match.ar ?? 0;
+    xg += isHome ? match.hxg ?? 0 : match.axg ?? 0;
 
     if (isHome) {
       shots += match.hs ?? 0;
@@ -43,6 +45,7 @@ const calculateStats = (
     gf: standing?.goalsFor ?? 0,
     ga: standing?.goalsAgainst ?? 0,
     gd: standing?.goalDifference ?? 0,
+    xg,
     shots,
     shotsOnTarget,
     corners,
@@ -69,6 +72,7 @@ const calculateLast5Stats = (
   let corners = 0;
   let yellows = 0;
   let reds = 0;
+  let xg = 0;
 
   for (const match of matches) {
     const isHome = match.homeTeam === team;
@@ -78,6 +82,7 @@ const calculateLast5Stats = (
     yellows += isHome ? match.hy ?? 0 : match.ay ?? 0;
     reds += isHome ? match.hr ?? 0 : match.ar ?? 0;
     corners += isHome ? match.hc ?? 0 : match.ac ?? 0;
+    xg += isHome ? match.hxg ?? 0 : match.axg ?? 0;
 
     if (match.ftr === "H" && isHome) wins++;
     else if (match.ftr === "A" && !isHome) wins++;
@@ -96,6 +101,7 @@ const calculateLast5Stats = (
     gf,
     ga,
     gd: gf - ga,
+    xg,
     shots,
     shotsOnTarget,
     corners,
@@ -160,7 +166,7 @@ export const getLast5TeamStatsService = async (
   const last5Team2 = await getLast5MatchesService(team2);
 
   return [
-    calculateLast5Stats(team1, last5Team1),
-    calculateLast5Stats(team2, last5Team2),
+    calculateLast5Stats(team1, last5Team1.matches),
+    calculateLast5Stats(team2, last5Team2.matches),
   ];
 };

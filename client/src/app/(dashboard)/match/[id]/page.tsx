@@ -1,8 +1,6 @@
 "use client";
 
 import TeamStats from "../teamStats";
-import H2H from "../H2H";
-import H2HStats from "../h2hstats";
 import HomeAwayRecord from "../homeAwayRecord";
 import Odds from "../odds";
 import { emptyH2H } from "@/lib/utils";
@@ -14,20 +12,21 @@ import {
 import React from "react";
 import Teams from "../teams";
 import RecentForm from "../recentForm";
+import Head2Head from "../Head2Head";
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const { data: match, isLoading: matchLoading } = useGetUpcomingMatchByIdQuery(
     {
       id,
-    }
+    },
   );
   const { data: h2h, isLoading: h2hLoading } = useGetHead2HeadQuery(
     {
       team1: match?.homeTeam ?? "",
       team2: match?.awayTeam ?? "",
     },
-    { skip: !match?.homeTeam || !match?.awayTeam }
+    { skip: !match?.homeTeam || !match?.awayTeam },
   );
   const { data: standings, isLoading: standingsLoading } =
     useGetTeamStandingsQuery(
@@ -35,7 +34,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         team1: match?.homeTeam ?? "",
         team2: match?.awayTeam ?? "",
       },
-      { skip: !match?.homeTeam || !match?.awayTeam }
+      { skip: !match?.homeTeam || !match?.awayTeam },
     );
 
   if (matchLoading || !match || h2hLoading || standingsLoading)
@@ -44,13 +43,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         Loading match details…
       </div>
     );
-
-  const hasValidH2H =
-    h2h &&
-    h2h !== emptyH2H &&
-    h2h.last5 &&
-    Array.isArray(h2h.last5) &&
-    h2h.last5.length > 0;
 
   return (
     <div className="w-full font-sans">
@@ -70,12 +62,12 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         awayTeam={match.awayTeam}
         homeForm={
           standings?.find(
-            (team) => team.name === match.homeTeam && team.type === "TOTAL"
+            (team) => team.name === match.homeTeam && team.type === "TOTAL",
           )?.form ?? null
         }
         awayForm={
           standings?.find(
-            (team) => team.name === match.awayTeam && team.type === "TOTAL"
+            (team) => team.name === match.awayTeam && team.type === "TOTAL",
           )?.form ?? null
         }
       />
@@ -88,8 +80,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         />
       </div>
       <div className="px-4 sm:px-8 md:px-16 lg:px-24">
-        <H2H h2h={h2h || emptyH2H} homeTeam={match.homeTeam || ""} />
-        {hasValidH2H && <H2HStats data={h2h} homeTeam={match.homeTeam || ""} />}
+        <Head2Head h2h={h2h || emptyH2H} homeTeam={match.homeTeam || ""} />
       </div>
     </div>
   );

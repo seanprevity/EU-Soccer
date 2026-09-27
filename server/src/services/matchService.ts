@@ -1,6 +1,6 @@
 import { matchStats, odds, upcomingMatches } from "../../drizzle/schema";
 import { db } from "../lib/db";
-import { eq, or, and, lt, gt, desc } from "drizzle-orm";
+import { eq, or, and, lt, gt, desc, count } from "drizzle-orm";
 import { curSeason } from "../utils/map";
 import {
   computeFormScore,
@@ -10,6 +10,9 @@ import {
   getHeadToHeadBias,
   poissonRandom,
 } from "../utils/simulation";
+
+export const PAGE_SIZE = 5;
+export type MatchRow = typeof matchStats.$inferSelect;
 
 type SimulationResult = {
   home_team: string;
@@ -58,8 +61,8 @@ export const getTeamMatchStatsService = async (team: string) => {
       and(
         lt(matchStats.matchDate, endDate.toISOString()),
         gt(matchStats.matchDate, startDate.toISOString()),
-        or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team))
-      )
+        or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)),
+      ),
     );
 };
 
@@ -70,18 +73,34 @@ export const getUpcomingMatchByIdService = async (id: number) => {
     .where(eq(upcomingMatches.id, id));
 };
 
-export const getLast5MatchesService = async (team: string) => {
-  return await db
+export const getLast5MatchesService = async (
+  team: string,
+  page = 0,
+): Promise<{ matches: MatchRow[]; total: number }> => {
+  const where = or(
+    eq(matchStats.homeTeam, team),
+    eq(matchStats.awayTeam, team),
+  );
+
+  const matches = await db
     .select()
     .from(matchStats)
-    .where(or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)))
+    .where(where)
     .orderBy(desc(matchStats.matchDate))
-    .limit(5);
+    .limit(PAGE_SIZE)
+    .offset(page * PAGE_SIZE);
+
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(matchStats)
+    .where(where);
+
+  return { matches, total };
 };
 
 export const getRecentMatchesService = async (
   team: string,
-  endDate: string
+  endDate: string,
 ) => {
   return await db
     .select()
@@ -89,8 +108,8 @@ export const getRecentMatchesService = async (
     .where(
       and(
         or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)),
-        lt(matchStats.matchDate, endDate)
-      )
+        lt(matchStats.matchDate, endDate),
+      ),
     )
     .orderBy(desc(matchStats.matchDate));
   //.limit(20);
@@ -101,7 +120,7 @@ export const getSimulationService = async (
   homeTeam: string,
   awayTeam: string,
   season: string = curSeason,
-  nSimulations: number = 10000
+  nSimulations: number = 10000,
 ): Promise<SimulationResult> => {
   // Fetch stats and standings
   const matches = await get_team_data(homeTeam, awayTeam);

@@ -1,4 +1,4 @@
-import { Standings, teamStats } from "@/types/drizzleTypes";
+import { GoalEvent, Standings, teamStats } from "@/types/drizzleTypes";
 import React from "react";
 import { calculatePercentage, cn, getLogoFile } from "./utils";
 import Image from "next/image";
@@ -52,14 +52,14 @@ export const StatBar = ({
     homeValue > awayValue && !isNegative
       ? "bg-green-500"
       : homeValue < awayValue && isNegative
-      ? "bg-green-500"
-      : "bg-gray-400";
+        ? "bg-green-500"
+        : "bg-gray-400";
   const awayColor =
     awayValue > homeValue && !isNegative
       ? "bg-green-500"
       : awayValue < homeValue && isNegative
-      ? "bg-green-500"
-      : "bg-gray-400";
+        ? "bg-green-500"
+        : "bg-gray-400";
   return (
     <div className="mb-3 md:mb-4">
       <div className="flex justify-between text-xs sm:text-sm md:text-base font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -111,7 +111,7 @@ export function RenderCard({
       className={cn(
         "flex-1 p-6 bg-gradient-to-br rounded-xl shadow-lg border border-white/20",
         modeColor,
-        className
+        className,
       )}
     >
       <div className="bg-gray-400 dark:bg-gray-700 backdrop-blur-sm rounded-lg p-4 mb-4 flex justify-between items-center">
@@ -155,7 +155,7 @@ function StatRow({
       <span
         className={cn(
           "text-white/90",
-          large ? "text-base font-semibold" : "text-sm"
+          large ? "text-base font-semibold" : "text-sm",
         )}
       >
         {label}
@@ -163,7 +163,7 @@ function StatRow({
       <span
         className={cn(
           valueColor,
-          large ? "text-2xl font-bold" : "text-lg font-semibold"
+          large ? "text-2xl font-bold" : "text-lg font-semibold",
         )}
       >
         {value}
@@ -217,40 +217,45 @@ export function TeamStatsCard({
   const avgGpg = Number((teamStandings.gf / teamStandings.played).toFixed(2));
   const avgGaPg = Number((teamStandings.ga / teamStandings.played).toFixed(2));
   const avgShotsPg = Number(
-    (teamStandings.shots / teamStandings.played).toFixed(2)
+    (teamStandings.shots / teamStandings.played).toFixed(2),
   );
   const avgShotsOnTargetPg = Number(
-    (teamStandings.shotsOnTarget / teamStandings.played).toFixed(2)
+    (teamStandings.shotsOnTarget / teamStandings.played).toFixed(2),
   );
   const avgCornerPg = Number(
-    (teamStandings.corners / teamStandings.played).toFixed(2)
-  );
-  const avgRedsPg = Number(
-    (teamStandings.reds / teamStandings.played).toFixed(2)
+    (teamStandings.corners / teamStandings.played).toFixed(2),
   );
   const avgYellowsPg = Number(
-    (teamStandings.yellows / teamStandings.played).toFixed(2)
+    (teamStandings.yellows / teamStandings.played).toFixed(2),
   );
+  const avgRedsPg = Number(
+    (teamStandings.reds / teamStandings.played).toFixed(2),
+  );
+  const avgXgPg = Number((teamStandings.xg / teamStandings.played).toFixed(2));
+
   const oppAvgGpg = Number(
-    (opponentStats.gf / opponentStats.played).toFixed(2)
+    (opponentStats.gf / opponentStats.played).toFixed(2),
   );
   const oppAvgGaPg = Number(
-    (opponentStats.ga / opponentStats.played).toFixed(2)
+    (opponentStats.ga / opponentStats.played).toFixed(2),
   );
   const oppAvgShotsPg = Number(
-    (opponentStats.shots / opponentStats.played).toFixed(2)
+    (opponentStats.shots / opponentStats.played).toFixed(2),
   );
   const oppAvgShotsOnTargetPg = Number(
-    (opponentStats.shotsOnTarget / opponentStats.played).toFixed(2)
+    (opponentStats.shotsOnTarget / opponentStats.played).toFixed(2),
   );
   const oppAvgCornersPg = Number(
-    (opponentStats.corners / opponentStats.played).toFixed(2)
-  );
-  const oppAvgRedsPg = Number(
-    (opponentStats.reds / opponentStats.played).toFixed(2)
+    (opponentStats.corners / opponentStats.played).toFixed(2),
   );
   const oppAvgYellowsPg = Number(
-    (opponentStats.yellows / opponentStats.played).toFixed(2)
+    (opponentStats.yellows / opponentStats.played).toFixed(2),
+  );
+  const oppAvgRedsPg = Number(
+    (opponentStats.reds / opponentStats.played).toFixed(2),
+  );
+  const oppAvgXgPg = Number(
+    (opponentStats.xg / opponentStats.played).toFixed(2),
   );
 
   const goalsScoredPercentage = calculatePercentage(avgGpg, oppAvgGpg);
@@ -258,11 +263,14 @@ export function TeamStatsCard({
   const shotsPercentage = calculatePercentage(avgShotsPg, oppAvgShotsPg);
   const shotsOnTargetPercentage = calculatePercentage(
     avgShotsOnTargetPg,
-    oppAvgShotsOnTargetPg
+    oppAvgShotsOnTargetPg,
   );
   const cornersPercentage = calculatePercentage(avgCornerPg, oppAvgCornersPg);
   const yellowsPercentage = calculatePercentage(avgYellowsPg, oppAvgYellowsPg);
   const redsPercentage = calculatePercentage(avgRedsPg, oppAvgRedsPg);
+  const xgPercentage = calculatePercentage(avgXgPg, oppAvgXgPg);
+  const xgTotal = teamStandings.xg;
+  const goalsMinusXg = teamStandings.gf - teamStandings.xg;
   return (
     <div
       className={`flex flex-col gap-2 min-w-[250px] max-w-[350px] flex-1 p-6 rounded-xl shadow-md bg-blue-500/5 dark:bg-blue-900/20`}
@@ -301,21 +309,25 @@ export function TeamStatsCard({
 
       {teamStandings.form && (
         <div className="flex flex-col items-center mb-2">
-          <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-            Recent Form
-          </div>
           <span className="px-1 py-2 justify-center gap-[2px] flex">
             {renderForm(teamStandings.form)}
           </span>
         </div>
       )}
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <TeamStatsRow
           label="Goals (per game)"
           value={avgGpg}
           percentage={goalsScoredPercentage}
           isPositive={avgGpg >= oppAvgGpg}
+        />
+
+        <TeamStatsRow
+          label="Expected Goals (xG)"
+          value={avgXgPg}
+          percentage={xgPercentage}
+          isPositive={avgXgPg >= oppAvgXgPg}
         />
 
         <TeamStatsRow
@@ -361,7 +373,6 @@ export function TeamStatsCard({
         />
       </div>
 
-      {/* Goal Statistics */}
       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
         <div className="flex justify-between items-center gap-2">
           <div className="text-center flex-1">
@@ -388,13 +399,46 @@ export function TeamStatsCard({
             </div>
             <div
               className={`text-base font-bold ${
-                teamStandings.gd >= 0
+                teamStandings.gd > 0
                   ? "text-emerald-500 dark:text-emerald-400"
-                  : "text-red-500 dark:text-red-400"
+                  : teamStandings.gd == 0
+                    ? "dark:text-gray-200"
+                    : "text-red-500 dark:text-red-400"
               }`}
             >
               {teamStandings.gd > 0 ? "+" : ""}
               {teamStandings.gd}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between items-center gap-2 mt-3">
+          <div className="text-center flex-1">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
+              xG
+            </div>
+            <div className="text-base font-semibold dark:text-gray-200">
+              {xgTotal.toFixed(2)}
+            </div>
+          </div>
+
+          <div className="flex-1" />
+
+          <div className="text-center flex-1">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
+              GF − xG
+            </div>
+            <div
+              className={`text-base font-bold ${
+                goalsMinusXg > 0
+                  ? "text-emerald-500 dark:text-emerald-400"
+                  : goalsMinusXg == 0
+                    ? "dark:text-gray-200"
+                    : "text-red-500 dark:text-red-400"
+              }`}
+            >
+              {goalsMinusXg > 0 ? "+" : ""}
+              {goalsMinusXg.toFixed(2)}
             </div>
           </div>
         </div>
@@ -427,3 +471,138 @@ export const getBorderLabel = (borderColor: string): string => {
   }
   return "";
 };
+
+export function RedCardBadge({ count }: { count: number | null | undefined }) {
+  if (typeof count !== "number" || count <= 0) return null;
+  return (
+    <div className="absolute -right-1 -top-1 flex h-[10px] w-[10px] items-center justify-center">
+      <Image
+        src="/Red.svg"
+        alt="Red card"
+        width={10}
+        height={10}
+        className="object-contain"
+      />
+      {count > 1 && (
+        <span className="absolute text-[11px] font-bold leading-none text-black">
+          {count}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const formatMinute = (g: GoalEvent) =>
+  g.minute == null
+    ? ""
+    : `${g.minute}${g.extraMinute ? `+${g.extraMinute}` : ""}'`;
+
+function GoalIcon({ kind }: { kind: GoalEvent["kind"] }) {
+  if (kind === "penalty")
+    return (
+      <span
+        title="Penalty"
+        className="inline-flex h-4 shrink-0 items-center justify-center rounded bg-gray-200 px-1 text-[10px] font-bold leading-none text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+      >
+        PEN
+      </span>
+    );
+  if (kind === "own_goal")
+    return (
+      <span
+        title="Own goal"
+        className="inline-flex h-4 shrink-0 items-center justify-center rounded bg-red-100 px-1 text-[10px] font-bold leading-none text-red-700 dark:bg-red-900/40 dark:text-red-300"
+      >
+        OG
+      </span>
+    );
+  return (
+    <span
+      title="Goal"
+      aria-label="Goal"
+      className="shrink-0 text-sm leading-none"
+    >
+      ⚽
+    </span>
+  );
+}
+
+function GoalDetail({
+  goal,
+  align,
+}: {
+  goal: GoalEvent;
+  align: "left" | "right";
+}) {
+  return (
+    <div className={cn("min-w-0", align === "right" && "text-right")}>
+      <div
+        className={cn(
+          "flex items-center gap-1.5",
+          align === "right" && "flex-row-reverse",
+        )}
+      >
+        <GoalIcon kind={goal.kind} />
+        <span className="truncate font-medium text-gray-900 dark:text-gray-100">
+          {goal.player}
+        </span>
+      </div>
+      {goal.assist && (
+        <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+          Assist: {goal.assist}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Home goals on the left, away goals on the right, minute and running score in the middle.
+// goals === null means the timeline hasn't been synced yet, so nothing renders.
+export function GoalTimeline({
+  goals,
+}: {
+  goals: GoalEvent[] | null | undefined;
+}) {
+  if (!goals) return null;
+  if (!goals.length)
+    return (
+      <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+        No goals
+      </p>
+    );
+
+  let home = 0;
+  let away = 0;
+  const rows = goals.map((goal) => {
+    const side = goal.side;
+    if (side === "home") home++;
+    else if (side === "away") away++;
+    return { goal, side, score: `${home}–${away}` };
+  });
+
+  return (
+    <ol className="space-y-2">
+      {rows.map(({ goal, side, score }, i) => (
+        <li
+          key={i}
+          className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-sm"
+        >
+          <div>
+            {side === "home" && <GoalDetail goal={goal} align="right" />}
+          </div>
+          <div className="flex w-12 flex-col items-center tabular-nums leading-tight">
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {formatMinute(goal)}
+            </span>
+            <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+              {score}
+            </span>
+          </div>
+          <div>
+            {side === "away" && <GoalDetail goal={goal} align="left" />}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}

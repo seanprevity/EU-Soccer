@@ -1,7 +1,8 @@
-import { head2Head } from "../../drizzle/schema";
-import { eq, and, or } from "drizzle-orm";
+import { head2Head, matchStats } from "../../drizzle/schema";
+import { eq, and, or, desc, count } from "drizzle-orm";
 import { db } from "../lib/db";
 import { upcomingMatches } from "../../drizzle/schema";
+import { MatchRow, PAGE_SIZE } from "./matchService";
 
 export const getH2HService = async (teamA: string, teamB: string) => {
   const [team1, team2] = [teamA, teamB].sort();
@@ -9,6 +10,26 @@ export const getH2HService = async (teamA: string, teamB: string) => {
     .select()
     .from(head2Head)
     .where(and(eq(head2Head.team1, team1), eq(head2Head.team2, team2)));
+};
+
+export const get5H2HMatchesService = async (
+  teamA: string,
+  teamB: string,
+  page = 0,
+): Promise<{ matches: MatchRow[] }> => {
+  const [team1, team2] = [teamA, teamB].sort();
+  const where = or(
+    and(eq(matchStats.homeTeam, team1), eq(matchStats.awayTeam, team2)),
+    and(eq(matchStats.homeTeam, team2), eq(matchStats.awayTeam, team1)),
+  );
+  const matches = await db
+    .select()
+    .from(matchStats)
+    .where(where)
+    .orderBy(desc(matchStats.matchDate))
+    .limit(PAGE_SIZE)
+    .offset(page * PAGE_SIZE);
+  return { matches };
 };
 
 export const getUpcomingH2HService = async (matchId: number) => {

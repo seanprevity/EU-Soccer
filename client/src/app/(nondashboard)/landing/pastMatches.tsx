@@ -4,7 +4,7 @@ import { matchStats } from "@/types/drizzleTypes";
 import { getLogoFile, statsKeys } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { StatBar } from "@/lib/uiUtils";
+import { GoalTimeline, StatBar } from "@/lib/uiUtils";
 
 type Props = {
   matches?: matchStats[];
@@ -146,6 +146,12 @@ export function PastMatchesList({ matches }: Props) {
                           </Link>
                         </span>
                       </div>
+
+                      {/* final score */}
+                      <span className="px-2 text-xl sm:text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+                        {m.fthg ?? "–"} – {m.ftag ?? "–"}
+                      </span>
+
                       <div className="flex items-center gap-1.5 sm:gap-2 text-right">
                         <span className="text-sm sm:text-base">
                           <Link
@@ -164,6 +170,14 @@ export function PastMatchesList({ matches }: Props) {
                         />
                       </div>
                     </div>
+
+                    {/* goal timeline (hidden until the match has been synced) */}
+                    {m.goalEvents && (
+                      <div className="mb-3 border-b border-gray-200 pb-3 dark:border-gray-700">
+                        <GoalTimeline goals={m.goalEvents} />
+                      </div>
+                    )}
+
                     {statsKeys.map(({ key, label }) => {
                       const getStatValue = (
                         side: "h" | "a",
@@ -179,7 +193,7 @@ export function PastMatchesList({ matches }: Props) {
                       const homeVal = getStatValue("h", key, m);
                       const awayVal = getStatValue("a", key, m);
 
-                      if (key == "xG" && homeVal == 0 && awayVal == 0)
+                      if (key == "hxg" && homeVal == 0 && awayVal == 0)
                         return null;
 
                       return (

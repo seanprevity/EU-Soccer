@@ -1,7 +1,14 @@
-import { pgTable, foreignKey, unique, pgPolicy, text, numeric, timestamp, bigint, serial, integer, primaryKey, doublePrecision } from "drizzle-orm/pg-core"
+import { pgTable, foreignKey, unique, pgPolicy, text, numeric, timestamp, bigint, serial, integer, primaryKey, doublePrecision, jsonb } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
-
+export type GoalEvent = {
+  minute: number | null;
+  extraMinute: number | null;
+  side: "home" | "away" | null;
+  player: string | null;
+  assist: string | null;
+  kind: "goal" | "penalty" | "own_goal";
+};
 
 export const odds = pgTable("odds", {
 	bookmaker: text().notNull(),
@@ -101,6 +108,7 @@ export const matchStats = pgTable("matchStats", {
 	league: text("League").notNull(),
 	hxg: doublePrecision("HxG"),
 	axg: doublePrecision("AxG"),
+	goalEvents: jsonb("GoalEvents"),
 }, (table) => [
 	foreignKey({
 			columns: [table.awayTeam],

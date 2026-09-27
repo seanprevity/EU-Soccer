@@ -140,8 +140,8 @@ export const getLast5Matches = async (
   try {
     const team = req.query.team as string;
     const normalizedTeam = team.split("_").join(" ");
-    console.log(normalizedTeam);
-    const data = await getLast5MatchesService(normalizedTeam);
+    const page = Math.max(0, Number(req.query.page ?? 0));
+    const data = await getLast5MatchesService(normalizedTeam, page);
     res.json(data);
   } catch (err: any) {
     console.error("Failed to get last 5 matches: ", err);

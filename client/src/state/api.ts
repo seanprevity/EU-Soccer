@@ -220,11 +220,14 @@ export const api = createApi({
     }),
 
     // gets last 5 matches in league (not h2h)
-    getLast5Matches: build.query<matchStats[], { team: string }>({
-      query: ({ team }) => {
+    getLast5Matches: build.query<
+      { matches: matchStats[]; total: number },
+      { team: string; page?: number }
+    >({
+      query: ({ team, page = 0 }) => {
         const teamParams = team.split(" ").join("_");
         return {
-          url: `/matches/last5?team=${teamParams}`,
+          url: `/matches/last5?team=${teamParams}&page=${page}`,
           method: "GET",
         };
       },
@@ -262,6 +265,28 @@ export const api = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get head to head stats.",
+        });
+      },
+    }),
+
+    get5H2HMatches: build.query<
+      { matches: matchStats[] },
+      { team1: string; team2: string; page: number }
+    >({
+      query: ({ team1, team2, page = 0 }) => {
+        return {
+          url: "/h2h/matches",
+          method: "GET",
+          params: {
+            team1: team1.split(" ").join("_"),
+            team2: team2.split(" ").join("_"),
+            page,
+          },
+        };
+      },
+      async onQueryStarted(_, { queryFulfilled }) {
+        await withToast(queryFulfilled, {
+          error: "Failed to get H2H Matches.",
         });
       },
     }),
@@ -386,6 +411,7 @@ export const {
   useGetRecentTableStandingsQuery,
   useGetGoalScorersQuery,
   useGetHead2HeadQuery,
+  useGet5H2HMatchesQuery,
   useGetMatchStatsQuery,
   useGetOddsQuery,
   useGetUpcomingMatchesQuery,

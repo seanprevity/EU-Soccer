@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
-import { getH2HService, getUpcomingH2HService } from "../services/h2hService";
-import { head2Head } from "../../drizzle/schema";
+import {
+  getH2HService,
+  get5H2HMatchesService,
+  getUpcomingH2HService,
+} from "../services/h2hService";
 
 export const getH2H = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -22,9 +25,30 @@ export const getH2H = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+export const getH2HMatches = async (req: Request, res: Response) => {
+  try {
+    const team1 = req.query.team1 as string;
+    const team2 = req.query.team2 as string;
+    const normalizedTeam1 = team1.split("_").join(" ");
+    const normalizedTeam2 = team2.split("_").join(" ");
+    const page = Math.max(0, Number(req.query.page ?? 0));
+    const data = await get5H2HMatchesService(
+      normalizedTeam1,
+      normalizedTeam2,
+      page,
+    );
+    res.json(data);
+  } catch (err: any) {
+    console.error("Failed to get H2H Matches ", err);
+    res
+      .status(500)
+      .json({ message: `Error fetching H2H Matches: ${err.message}` });
+  }
+};
+
 export const getUpcomingH2H = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const idList = req.query.ids as string;

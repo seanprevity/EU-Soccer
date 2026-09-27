@@ -1,6 +1,6 @@
 "use client";
 
-import { StatBar } from "@/lib/uiUtils";
+import { RedCardBadge, StatBar } from "@/lib/uiUtils";
 import {
   getLogoFile,
   getMatchResult,
@@ -105,22 +105,7 @@ const History = ({ team }: { team: string }) => {
                             height={28}
                             className="object-contain w-5 h-5 sm:w-6 sm:h-6"
                           />
-                          {typeof m.hr === "number" && m.hr > 0 && (
-                            <div className="absolute -top-1 -right-1 w-[10px] h-[10px] flex items-center justify-center">
-                              <Image
-                                src="/Red.svg"
-                                alt="Red card"
-                                width={10}
-                                height={10}
-                                className="object-contain"
-                              />
-                              {m.hr > 1 && (
-                                <span className="absolute text-[11px] font-bold text-black leading-none">
-                                  {m.hr}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                          <RedCardBadge count={m.hr} />
                         </div>
                         <span className="text-xs sm:text-sm">{m.homeTeam}</span>
                       </div>
@@ -141,22 +126,7 @@ const History = ({ team }: { team: string }) => {
                             height={28}
                             className="object-contain w-5 h-5 sm:w-6 sm:h-6"
                           />
-                          {typeof m.ar === "number" && m.ar > 0 && (
-                            <div className="absolute -top-1 -right-1 w-[10px] h-[10px] flex items-center justify-center">
-                              <Image
-                                src="/Red.svg"
-                                alt="Red card"
-                                width={10}
-                                height={10}
-                                className="object-contain"
-                              />
-                              {m.ar > 1 && (
-                                <span className="absolute text-[11px] font-bold text-black leading-none">
-                                  {m.ar}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                          <RedCardBadge count={m.ar} />
                         </div>
                         <span className="text-xs sm:text-sm">{m.awayTeam}</span>
                       </div>
