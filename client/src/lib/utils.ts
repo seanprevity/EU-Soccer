@@ -14,7 +14,7 @@ type MutationMessages = {
 
 export const withToast = async <T>(
   mutationFn: Promise<T>,
-  messages: Partial<MutationMessages>
+  messages: Partial<MutationMessages>,
 ) => {
   const { success, error } = messages;
 
@@ -73,7 +73,7 @@ export function getCountryFile(country: string) {
 
 export function normalizeTeams(teamA: string, teamB: string): string {
   const [a, b] = [teamA.trim(), teamB.trim()].sort((x, y) =>
-    x.toLowerCase().localeCompare(y.toLowerCase())
+    x.toLowerCase().localeCompare(y.toLowerCase()),
   );
   return `${a}_${b}`;
 }
@@ -92,14 +92,14 @@ export function getChartData(
   data: head2Head | null,
   last5Matches: matchStats[] | null,
   homeTeam: string,
-  awayTeam: string
+  awayTeam: string,
 ) {
   if (!last5Matches || !data) return [];
 
   const sumStat = (
     statHome: keyof matchStats,
     statAway: keyof matchStats,
-    team: string
+    team: string,
   ) =>
     last5Matches.reduce((sum, m) => {
       const homeValue =
@@ -122,7 +122,7 @@ export function getChartData(
       }
       return acc;
     },
-    { homeWins: 0, awayWins: 0 }
+    { homeWins: 0, awayWins: 0 },
   );
 
   const homeGF = sumStat("fthg", "ftag", homeTeam);
@@ -213,13 +213,13 @@ export const getResultColors = (result: string) => {
 };
 
 export const statsKeys = [
-  { key: "hxg", label: "Expected Goals"},
+  { key: "hxg", label: "Expected Goals" },
+  { key: "hposs", label: "Possession" },
   { key: "hs", label: "Shots" },
   { key: "hst", label: "Shots on Target" },
   { key: "hc", label: "Corners" },
   { key: "hf", label: "Fouls" },
   { key: "hy", label: "Yellow Cards" },
-  { key: "hr", label: "Red Cards" },
 ];
 
 export const HEADER_CONFIG = [

@@ -109,6 +109,30 @@ export const upcoming_map = new Map<string, string>([
   ["Santander", "Racing Santander"],
 ]);
 
+export const ESPN_MAP = new Map<string, string>([
+  // ["ESPN team name", "your team name"],
+  ["Hull City", "Hull"],
+  ["Coventry City", "Coventry"],
+  ["Brighton & Hove Albion", "Brighton"],
+  ["Newcastle United", "Newcastle"],
+  ["AFC Bournemouth", "Bournemouth"],
+  ["Nottingham Forest", "Nott'm Forest"],
+  ["Málaga", "Malaga"],
+  ["Hamburg SV", "Hamburger SV"],
+  ["1. FC Union Berlin", "Union Berlin"],
+  ["SV Elversberg", "Elversberg"],
+  ["FC Cologne", "FC Koln"],
+  ["SC Paderborn 07", "Paderborn"],
+  ["FC Augsburg", "Augsburg"],
+  ["Borussia Mönchengladbach", "M'gladbach"],
+  ["Paris Saint-Germain", "PSG"],
+  ["AJ Auxerre", "Auxerre"],
+  ["Le Havre AC", "Le Havre"],
+  ["AS Monaco", "Monaco"],
+  ["Stade Rennais", "Rennes"],
+  ["Internazionale", "Inter"],
+]);
+
 // this normalizes the-odds-api team names
 export const ODDS_MAP = new Map<string, string>([
   // Premier League

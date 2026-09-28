@@ -9,14 +9,20 @@ import {
   updateOddsService,
   updateGSImageUrlService,
   updateSquadService,
+  syncEspnMatchDataService,
+  backfillEspnMatchDataService,
 } from "../services/managementService";
 import {
   competition_codes,
   csv_urls,
+  espn_leagues,
   Leagues,
   odds_sports,
 } from "../config/arrays";
 import { curSeason, get_team_to_id_new, team_to_id } from "../utils/map";
+
+const DAILY_WINDOW_DAYS = 10;
+const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 
 export const updateAll = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -29,6 +35,15 @@ export const updateAll = async (req: Request, res: Response): Promise<void> => {
     console.log("Updating standings...");
     for (let i = 0; i < 5; i++)
       await updateStandingsService(Leagues[i], curSeason);
+
+    // NEW: goal timelines + possession for finished matches in the last 10 days
+    console.log("Updating goal timelines and possession...");
+    for (let i = 0; i < 5; i++)
+      await syncEspnMatchDataService(
+        Leagues[i],
+        espn_leagues[i],
+        daysAgo(DAILY_WINDOW_DAYS),
+      );
 
     // Update upcoming matches (and H2H)
     console.log("Updating upcoming matches...");
@@ -145,6 +160,49 @@ export const updateSquad = async (
     //for (const inst of team_to_id)
     //  await updateSquadService(inst[0], inst[1]);
     res.status(200).send("Updated squad successfully");
+  } catch (err: any) {
+    res.status(500).send(err.message);
+  }
+};
+
+// last 10 days, all leagues
+export const updateMatchEvents = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const results = [];
+    for (let i = 0; i < 5; i++)
+      results.push({
+        league: Leagues[i],
+        ...(await syncEspnMatchDataService(
+          Leagues[i],
+          espn_leagues[i],
+          daysAgo(DAILY_WINDOW_DAYS),
+        )),
+      });
+    res.status(200).json(results);
+  } catch (err: any) {
+    res.status(500).send(err.message);
+  }
+};
+
+// whole current season for ONE league, e.g. ?league=<a value from Leagues>
+export const backfillMatchEvents = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const i = Leagues.indexOf(String(req.query.league));
+    if (i === -1) {
+      res.status(400).send(`league must be one of: ${Leagues.join(", ")}`);
+      return;
+    }
+    const result = await backfillEspnMatchDataService(
+      Leagues[i],
+      espn_leagues[i],
+    );
+    res.status(200).json({ league: Leagues[i], ...result });
   } catch (err: any) {
     res.status(500).send(err.message);
   }

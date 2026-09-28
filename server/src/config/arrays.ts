@@ -19,6 +19,8 @@ export const Leagues = [
   "La Liga",
 ];
 
+export const espn_leagues = ["eng.1", "ger.1", "fra.1", "ita.1", "esp.1"];
+
 export const odds_sports = [
   "soccer_epl",
   "soccer_spain_la_liga",

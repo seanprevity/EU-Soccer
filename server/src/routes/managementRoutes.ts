@@ -8,6 +8,7 @@ import {
   updateOdds,
   updateImageUrls,
   updateSquad,
+  backfillMatchEvents,
 } from "../controllers/managementController";
 
 const router = express.Router();
@@ -20,5 +21,6 @@ router.get("/goal-scorers", updateGoalScorers);
 router.post("/odds", updateOdds);
 router.post("/images", updateImageUrls);
 router.post("/squad", updateSquad);
+router.post("/match-events", backfillMatchEvents);
 
 export default router;

@@ -1,6 +1,11 @@
 "use client";
 
-import { RedCardBadge, renderForm, StatBar } from "@/lib/uiUtils";
+import {
+  MatchTimeline,
+  RedCardBadge,
+  renderForm,
+  StatBar,
+} from "@/lib/uiUtils";
 import {
   getLogoFile,
   getResultColors,
@@ -183,10 +188,21 @@ function MatchCard({
                 <StatsTeam team={m.homeTeam} side="left" />
                 <StatsTeam team={m.awayTeam} side="right" />
               </div>
+
+              {m.events && (
+                <div className="mb-3 border-b border-gray-200 pb-3 dark:border-gray-600">
+                  <MatchTimeline events={m.events} />
+                </div>
+              )}
+
               {statsKeys.map(({ key, label }) => {
                 const homeValue = readStat(m, "h", key);
                 const awayValue = readStat(m, "a", key);
-                if (key === "hxg" && homeValue === 0 && awayValue === 0)
+                if (
+                  (key === "hxg" || key === "hposs") &&
+                  homeValue === 0 &&
+                  awayValue === 0
+                )
                   return null;
                 return (
                   <StatBar

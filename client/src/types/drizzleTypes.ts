@@ -49,13 +49,13 @@ export interface goalScorers {
   imageUrl: string | null;
 }
 
-export type GoalEvent = {
+export type MatchEvent = {
   minute: number | null;
   extraMinute: number | null;
   side: "home" | "away" | null;
   player: string | null;
   assist: string | null;
-  kind: "goal" | "penalty" | "own_goal";
+  kind: "goal" | "penalty" | "own_goal" | "yellow" | "red" | "second_yellow";
 };
 
 export interface matchStats {
@@ -81,7 +81,10 @@ export interface matchStats {
   league: string;
   hxg: number | null;
   axg: number | null;
-  goalEvents: GoalEvent[] | null;
+  espnId: string | null;
+  events: MatchEvent[] | null;
+  hposs: number | null;
+  aposs: number | null;
 }
 
 export type MatchBase = {

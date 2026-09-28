@@ -8,8 +8,9 @@ import {
   players,
   odds,
   squad,
+  MatchEvent,
 } from "../../drizzle/schema";
-import { and, eq, lt, or, desc, gt, sql } from "drizzle-orm";
+import { and, eq, lt, or, desc, gt, sql, isNull, gte } from "drizzle-orm";
 import { db } from "../lib/db";
 import fs from "fs";
 import path from "path";
@@ -25,6 +26,7 @@ import {
   ODDS_MAP,
   curSeason,
   skip_coaches,
+  ESPN_MAP,
 } from "../utils/map";
 import { StandingsStats, bookmakers } from "../config/arrays";
 
@@ -917,3 +919,243 @@ export const updateCoachService = async (team: string, id: number) => {
     throw err;
   }
 };
+
+const espn = axios.create({
+  baseURL: "https://site.web.api.espn.com/apis/site/v2/sports/soccer",
+  validateStatus: (s) => s < 500, // handle 4xx ourselves instead of throwing
+});
+
+const ESPN_DELAY_MS = 1000;
+
+type EspnMatch = {
+  id: string;
+  home: string; // mapped to DB names
+  away: string;
+  rawHome: string; // ESPN name
+  rawAway: string;
+  completed: boolean;
+  homePoss: number | null;
+  awayPoss: number | null;
+  events: MatchEvent[];
+};
+
+const isGoal = (kind: MatchEvent["kind"]) =>
+  kind === "goal" || kind === "penalty" || kind === "own_goal";
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// ESPN team name -> your DB team name. Unknown names fall through to map_team_name.
+const espnTeam = (name: string | undefined | null) =>
+  name ? map_team_name(ESPN_MAP.get(name) ?? name) : "";
+
+// "67'" -> 67, "45'+2'" -> 45 + 2
+const parseMinute = (display: string | undefined) => {
+  const m = /(\d+)'?\s*(?:\+\s*(\d+))?/.exec(display ?? "");
+  return {
+    minute: m ? Number(m[1]) : null,
+    extraMinute: m?.[2] ? Number(m[2]) : null,
+  };
+};
+
+// competitors[].statistics[] -> { name: "possessionPct", displayValue: "46.2" }
+const statValue = (competitor: any, name: string): number | null => {
+  const stat = competitor?.statistics?.find((s: any) => s.name === name);
+  const value = stat ? parseFloat(stat.displayValue) : NaN;
+  return Number.isFinite(value) ? value : null;
+};
+
+const flip = (side: MatchEvent["side"]): MatchEvent["side"] =>
+  side === "home" ? "away" : side === "away" ? "home" : null;
+
+// Only place that knows ESPN's event shape: events[] -> competitions[0] -> competitors[] + details[]
+const parseEspnEvent = (ev: any): EspnMatch | null => {
+  const comp = ev.competitions?.[0];
+  const home = comp?.competitors?.find((c: any) => c.homeAway === "home");
+  const away = comp?.competitors?.find((c: any) => c.homeAway === "away");
+  if (!home || !away) return null;
+
+  // ESPN team id -> side, used to place each goal
+  const sideById = new Map<string, "home" | "away">([
+    [String(home.team?.id), "home"],
+    [String(away.team?.id), "away"],
+  ]);
+
+  const events: MatchEvent[] = (comp.details ?? [])
+    .filter((d: any) => {
+      if (d.shootout) return false;
+      if (d.scoringPlay) return true;
+      // cards to coaches/staff show no player no skip
+      if (d.yellowCard || d.redCard)
+        return Boolean(d.athletesInvolved?.[0]?.displayName);
+      return false;
+    })
+    .map((d: any): MatchEvent => {
+      const player = d.athletesInvolved?.[0];
+      const eventSide = sideById.get(String(d.team?.id)) ?? null;
+      const minutes = parseMinute(d.clock?.displayValue);
+
+      if (!d.scoringPlay) {
+        // Card: side is the team of the carded player
+        const typeText = String(d.type?.text ?? "").toLowerCase();
+        return {
+          ...minutes,
+          side: eventSide,
+          player: player?.displayName ?? null,
+          assist: null,
+          kind: d.redCard
+            ? typeText.includes("second")
+              ? "second_yellow"
+              : "red"
+            : "yellow",
+        };
+      }
+
+      // store on side where the goal counted
+      const scorerSide = sideById.get(String(player?.team?.id)) ?? null;
+      return {
+        ...minutes,
+        side: d.ownGoal
+          ? scorerSide
+            ? flip(scorerSide)
+            : eventSide
+          : eventSide,
+        player: player?.displayName ?? null,
+        assist: d.athletesInvolved?.[1]?.displayName ?? null,
+        kind: d.ownGoal ? "own_goal" : d.penaltyKick ? "penalty" : "goal",
+      };
+    })
+    .sort(
+      (a: MatchEvent, b: MatchEvent) =>
+        (a.minute ?? 0) - (b.minute ?? 0) ||
+        (a.extraMinute ?? 0) - (b.extraMinute ?? 0),
+    );
+
+  const rawHome = home.team?.displayName ?? home.team?.name ?? "";
+  const rawAway = away.team?.displayName ?? away.team?.name ?? "";
+
+  return {
+    id: String(ev.id),
+    home: espnTeam(rawHome),
+    away: espnTeam(rawAway),
+    rawHome,
+    rawAway,
+    completed: ev.status?.type?.completed === true,
+    homePoss: statValue(home, "possessionPct"),
+    awayPoss: statValue(away, "possessionPct"),
+    events,
+  };
+};
+
+// One league, one date (YYYYMMDD). ESPN rejects date ranges for soccer.
+const fetchEspnDay = async (
+  espnLeague: string,
+  date: string,
+): Promise<EspnMatch[] | null> => {
+  const res = await espn.get(`/${espnLeague}/scoreboard`, {
+    params: { dates: date },
+  });
+  if (res.status !== 200) {
+    console.warn(`ESPN ${espnLeague} ${date} → ${res.status}`, res.data);
+    return null;
+  }
+  const events: any[] = res.data?.events ?? [];
+  return events.map(parseEspnEvent).filter((m): m is EspnMatch => m !== null);
+};
+
+// Run after the CSV import. One ESPN request per distinct match date.
+export const syncEspnMatchDataService = async (
+  league: string,
+  espnLeague: string,
+  since: Date,
+) => {
+  const pending = await db
+    .select()
+    .from(matchStats)
+    .where(
+      and(
+        eq(matchStats.league, league),
+        isNull(matchStats.events),
+        gte(matchStats.matchDate, since.toISOString()),
+        lt(matchStats.matchDate, new Date().toISOString()),
+      ),
+    );
+  if (!pending.length) return { updated: 0, remaining: 0 };
+
+  // Group by UTC date: European kickoffs fall on the same calendar day in ESPN's (US) day boundaries
+  const byDate = new Map<string, typeof pending>();
+  for (const row of pending) {
+    if (!row.matchDate) continue;
+    const date = row.matchDate.slice(0, 10).replace(/-/g, ""); // "20260920"
+    byDate.set(date, [...(byDate.get(date) ?? []), row]);
+  }
+
+  let updated = 0;
+
+  for (const [date, rows] of byDate) {
+    const day = await fetchEspnDay(espnLeague, date);
+    await sleep(ESPN_DELAY_MS);
+    if (!day) continue;
+
+    for (const row of rows) {
+      const hit = day.find(
+        (m) => m.home === row.homeTeam && m.away === row.awayTeam,
+      );
+      if (!hit) {
+        const onEspn =
+          day.map((m) => `${m.rawHome} vs ${m.rawAway}`).join("; ") || "none";
+        console.warn(
+          `ESPN: no match for ${row.homeTeam} vs ${row.awayTeam} (${date}) | ESPN fixtures that day: ${onEspn}`,
+        );
+        continue;
+      }
+      if (!hit.completed) {
+        console.warn(
+          `ESPN: ${row.homeTeam} vs ${row.awayTeam} not marked completed yet`,
+        );
+        continue;
+      }
+
+      // Goals credited to each side must equal the CSV score exactly
+      const goals = hit.events.filter((e) => isGoal(e.kind));
+      const homeGoals = goals.filter((g) => g.side === "home").length;
+      const awayGoals = goals.filter((g) => g.side === "away").length;
+      const fthg = row.fthg ?? 0;
+      const ftag = row.ftag ?? 0;
+      if (
+        hit.events.some((e) => e.side === null) ||
+        homeGoals !== fthg ||
+        awayGoals !== ftag
+      ) {
+        console.warn(
+          `ESPN: ${row.homeTeam} vs ${row.awayTeam} goals ${homeGoals}-${awayGoals} don't match score ${fthg}-${ftag}, skipped`,
+        );
+        continue;
+      }
+
+      await db
+        .update(matchStats)
+        .set({
+          espnId: hit.id,
+          events: hit.events,
+          hposs: hit.homePoss,
+          aposs: hit.awayPoss,
+        })
+        .where(eq(matchStats.id, row.id));
+      updated++;
+    }
+  }
+
+  console.log(`ESPN: updated ${updated}/${pending.length} ${league} matches`);
+  return { updated, remaining: pending.length - updated };
+};
+
+// Whole curSeason for one league
+export const backfillEspnMatchDataService = (
+  league: string,
+  espnLeague: string,
+) =>
+  syncEspnMatchDataService(
+    league,
+    espnLeague,
+    new Date(Date.UTC(Number(curSeason), 7, 1)),
+  );

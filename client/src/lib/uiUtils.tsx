@@ -1,4 +1,4 @@
-import { GoalEvent, Standings, teamStats } from "@/types/drizzleTypes";
+import { MatchEvent, Standings, teamStats } from "@/types/drizzleTypes";
 import React from "react";
 import { calculatePercentage, cn, getLogoFile } from "./utils";
 import Image from "next/image";
@@ -492,48 +492,99 @@ export function RedCardBadge({ count }: { count: number | null | undefined }) {
   );
 }
 
-const formatMinute = (g: GoalEvent) =>
-  g.minute == null
-    ? ""
-    : `${g.minute}${g.extraMinute ? `+${g.extraMinute}` : ""}'`;
+const isGoalKind = (kind: MatchEvent["kind"]) =>
+  kind === "goal" || kind === "penalty" || kind === "own_goal";
 
-function GoalIcon({ kind }: { kind: GoalEvent["kind"] }) {
-  if (kind === "penalty")
-    return (
-      <span
-        title="Penalty"
-        className="inline-flex h-4 shrink-0 items-center justify-center rounded bg-gray-200 px-1 text-[10px] font-bold leading-none text-gray-700 dark:bg-gray-700 dark:text-gray-200"
-      >
-        PEN
-      </span>
-    );
-  if (kind === "own_goal")
-    return (
-      <span
-        title="Own goal"
-        className="inline-flex h-4 shrink-0 items-center justify-center rounded bg-red-100 px-1 text-[10px] font-bold leading-none text-red-700 dark:bg-red-900/40 dark:text-red-300"
-      >
-        OG
-      </span>
-    );
-  return (
-    <span
-      title="Goal"
-      aria-label="Goal"
-      className="shrink-0 text-sm leading-none"
-    >
-      ⚽
-    </span>
-  );
+const formatMinute = (e: MatchEvent) =>
+  e.minute == null
+    ? ""
+    : `${e.minute}${e.extraMinute ? `+${e.extraMinute}` : ""}'`;
+
+const Badge = ({
+  label,
+  title,
+  className,
+}: {
+  label: string;
+  title: string;
+  className: string;
+}) => (
+  <span
+    title={title}
+    className={cn(
+      "inline-flex h-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-bold leading-none",
+      className,
+    )}
+  >
+    {label}
+  </span>
+);
+
+const Card = ({ color, title }: { color: "yellow" | "red"; title: string }) => (
+  <span
+    title={title}
+    aria-label={title}
+    className={cn(
+      "inline-block h-3.5 w-2.5 shrink-0 rounded-[2px]",
+      color === "yellow" ? "bg-yellow-400" : "bg-red-600",
+    )}
+  />
+);
+
+function EventIcon({ kind }: { kind: MatchEvent["kind"] }) {
+  switch (kind) {
+    case "penalty":
+      return (
+        <Badge
+          label="PEN"
+          title="Penalty"
+          className="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+        />
+      );
+    case "own_goal":
+      return (
+        <Badge
+          label="OG"
+          title="Own goal"
+          className="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+        />
+      );
+    case "yellow":
+      return <Card color="yellow" title="Yellow card" />;
+    case "red":
+      return <Card color="red" title="Red card" />;
+    case "second_yellow":
+      return (
+        <span
+          title="Second yellow"
+          aria-label="Second yellow"
+          className="relative inline-flex h-3.5 w-3.5 shrink-0"
+        >
+          <span className="absolute left-0 top-0 h-3 w-2 rounded-[2px] bg-yellow-400" />
+          <span className="absolute bottom-0 right-0 h-3 w-2 rounded-[2px] bg-red-600" />
+        </span>
+      );
+    default:
+      return (
+        <span
+          title="Goal"
+          aria-label="Goal"
+          className="shrink-0 text-sm leading-none"
+        >
+          ⚽
+        </span>
+      );
+  }
 }
 
-function GoalDetail({
-  goal,
+function EventDetail({
+  event,
   align,
 }: {
-  goal: GoalEvent;
+  event: MatchEvent;
   align: "left" | "right";
 }) {
+  const goal = isGoalKind(event.kind);
   return (
     <div className={cn("min-w-0", align === "right" && "text-right")}>
       <div
@@ -542,64 +593,79 @@ function GoalDetail({
           align === "right" && "flex-row-reverse",
         )}
       >
-        <GoalIcon kind={goal.kind} />
-        <span className="truncate font-medium text-gray-900 dark:text-gray-100">
-          {goal.player}
+        <EventIcon kind={event.kind} />
+        <span
+          className={cn(
+            "truncate",
+            goal
+              ? "font-medium text-gray-900 dark:text-gray-100"
+              : "text-gray-600 dark:text-gray-300",
+          )}
+        >
+          {event.player}
         </span>
       </div>
-      {goal.assist && (
+      {goal && event.assist && (
         <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-          Assist: {goal.assist}
+          Assist: {event.assist}
         </p>
       )}
     </div>
   );
 }
 
-// Home goals on the left, away goals on the right, minute and running score in the middle.
-// goals === null means the timeline hasn't been synced yet, so nothing renders.
-export function GoalTimeline({
-  goals,
+// Home events on the left, away on the right; minute in the middle, plus the running score on goal rows.
+// events === null means the match hasn't been synced yet, so nothing renders.
+export function MatchTimeline({
+  events,
 }: {
-  goals: GoalEvent[] | null | undefined;
+  events: MatchEvent[] | null | undefined;
 }) {
-  if (!goals) return null;
-  if (!goals.length)
+  if (!events) return null;
+  if (!events.length)
     return (
       <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-        No goals
+        No goals or cards
       </p>
     );
 
   let home = 0;
   let away = 0;
-  const rows = goals.map((goal) => {
-    const side = goal.side;
-    if (side === "home") home++;
-    else if (side === "away") away++;
-    return { goal, side, score: `${home}–${away}` };
+  const rows = events.map((event) => {
+    if (isGoalKind(event.kind)) {
+      if (event.side === "home") home++;
+      else if (event.side === "away") away++;
+      return { event, score: `${home}–${away}` };
+    }
+    return { event, score: null };
   });
 
   return (
     <ol className="space-y-2">
-      {rows.map(({ goal, side, score }, i) => (
+      {rows.map(({ event, score }, i) => (
         <li
           key={i}
           className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-sm"
         >
           <div>
-            {side === "home" && <GoalDetail goal={goal} align="right" />}
+            {event.side === "home" && (
+              <EventDetail event={event} align="right" />
+            )}
           </div>
           <div className="flex w-12 flex-col items-center tabular-nums leading-tight">
             <span className="text-xs text-gray-500 dark:text-gray-400">
-              {formatMinute(goal)}
+              {formatMinute(event)}
             </span>
-            <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
-              {score}
-            </span>
+            {score && (
+              <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                {score}
+              </span>
+            )}
           </div>
           <div>
-            {side === "away" && <GoalDetail goal={goal} align="left" />}
+            {event.side === "away" && (
+              <EventDetail event={event} align="left" />
+            )}
           </div>
         </li>
       ))}
