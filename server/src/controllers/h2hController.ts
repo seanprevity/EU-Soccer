@@ -29,14 +29,8 @@ export const getH2HMatches = async (req: Request, res: Response) => {
   try {
     const team1 = req.query.team1 as string;
     const team2 = req.query.team2 as string;
-    const normalizedTeam1 = team1.split("_").join(" ");
-    const normalizedTeam2 = team2.split("_").join(" ");
     const page = Math.max(0, Number(req.query.page ?? 0));
-    const data = await get5H2HMatchesService(
-      normalizedTeam1,
-      normalizedTeam2,
-      page,
-    );
+    const data = await get5H2HMatchesService(team1, team2, page);
     res.json(data);
   } catch (err: any) {
     console.error("Failed to get H2H Matches ", err);

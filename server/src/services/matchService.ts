@@ -1,4 +1,9 @@
-import { matchStats, odds, upcomingMatches } from "../../drizzle/schema";
+import {
+  MatchPreview,
+  matchStats,
+  odds,
+  upcomingMatches,
+} from "../../drizzle/schema";
 import { db } from "../lib/db";
 import { eq, or, and, lt, gt, desc, count } from "drizzle-orm";
 import { curSeason } from "../utils/map";
@@ -37,12 +42,24 @@ export const getUpcomingMatchesService = async () => {
   return futureMatches;
 };
 
-export const getPastMatchesService = async () => {
+export const getPastMatchesService = async (): Promise<MatchPreview[]> => {
   const today = new Date();
   today.setDate(today.getDate() - 7);
   today.setHours(0, 0, 0, 0);
   return await db
-    .select()
+    .select({
+      id: matchStats.id,
+      espnId: matchStats.espnId,
+      homeTeam: matchStats.homeTeam,
+      awayTeam: matchStats.awayTeam,
+      league: matchStats.league,
+      matchDate: matchStats.matchDate,
+      ftr: matchStats.ftr,
+      fthg: matchStats.fthg,
+      ftag: matchStats.ftag,
+      hr: matchStats.hr,
+      ar: matchStats.ar,
+    })
     .from(matchStats)
     .where(gt(matchStats.matchDate, today.toISOString()));
 };
@@ -76,6 +93,80 @@ export const getUpcomingMatchByIdService = async (id: number) => {
 export const getLast5MatchesService = async (
   team: string,
   page = 0,
+): Promise<{ matches: MatchPreview[]; total: number }> => {
+  const where = or(
+    eq(matchStats.homeTeam, team),
+    eq(matchStats.awayTeam, team),
+  );
+
+  const matches = await db
+    .select({
+      id: matchStats.id,
+      espnId: matchStats.espnId,
+      homeTeam: matchStats.homeTeam,
+      awayTeam: matchStats.awayTeam,
+      league: matchStats.league,
+      matchDate: matchStats.matchDate,
+      ftr: matchStats.ftr,
+      fthg: matchStats.fthg,
+      ftag: matchStats.ftag,
+      hr: matchStats.hr,
+      ar: matchStats.ar,
+    })
+    .from(matchStats)
+    .where(where)
+    .orderBy(desc(matchStats.matchDate))
+    .limit(PAGE_SIZE)
+    .offset(page * PAGE_SIZE);
+
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(matchStats)
+    .where(where);
+
+  return { matches, total };
+};
+
+export const getRecentMatchesService = async (
+  team: string,
+  page: number,
+): Promise<{ matches: MatchPreview[]; total: number }> => {
+  const where = or(
+    eq(matchStats.homeTeam, team),
+    eq(matchStats.awayTeam, team),
+  );
+
+  const matches = await db
+    .select({
+      id: matchStats.id,
+      espnId: matchStats.espnId,
+      homeTeam: matchStats.homeTeam,
+      awayTeam: matchStats.awayTeam,
+      league: matchStats.league,
+      matchDate: matchStats.matchDate,
+      ftr: matchStats.ftr,
+      fthg: matchStats.fthg,
+      ftag: matchStats.ftag,
+      hr: matchStats.hr,
+      ar: matchStats.ar,
+    })
+    .from(matchStats)
+    .where(where)
+    .orderBy(desc(matchStats.matchDate))
+    .limit(PAGE_SIZE)
+    .offset(page * PAGE_SIZE);
+
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(matchStats)
+    .where(where);
+
+  return { matches, total };
+};
+
+export const getLast5MatchStatsService = async (
+  team: string,
+  page = 0,
 ): Promise<{ matches: MatchRow[]; total: number }> => {
   const where = or(
     eq(matchStats.homeTeam, team),
@@ -96,23 +187,6 @@ export const getLast5MatchesService = async (
     .where(where);
 
   return { matches, total };
-};
-
-export const getRecentMatchesService = async (
-  team: string,
-  endDate: string,
-) => {
-  return await db
-    .select()
-    .from(matchStats)
-    .where(
-      and(
-        or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)),
-        lt(matchStats.matchDate, endDate),
-      ),
-    )
-    .orderBy(desc(matchStats.matchDate));
-  //.limit(20);
 };
 
 // Simulate a match using Monte Carlo

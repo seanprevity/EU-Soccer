@@ -44,12 +44,27 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
       </div>
     );
 
+  const homeStanding = standings?.find(
+    (t) => t.name === match.homeTeam && t.type === "TOTAL",
+  );
+  const awayStanding = standings?.find(
+    (t) => t.name === match.awayTeam && t.type === "TOTAL",
+  );
+
+  const matchweek =
+    homeStanding && awayStanding
+      ? Math.max(homeStanding.played, awayStanding.played) + 1
+      : null;
+
   return (
     <div className="w-full font-sans">
       <Teams
         homeTeam={match.homeTeam}
         awayTeam={match.awayTeam}
         matchDate={match.matchDate}
+        homeForm={homeStanding?.form ?? null}
+        awayForm={awayStanding?.form ?? null}
+        matchweek={matchweek}
       />
       <div className="px-4 sm:px-6 md:px-16 lg:px-24">
         <Odds match={match} matchId={id} />
@@ -57,20 +72,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
       <TeamStats homeTeam={match.homeTeam} awayTeam={match.awayTeam} />
 
-      <RecentForm
-        homeTeam={match.homeTeam}
-        awayTeam={match.awayTeam}
-        homeForm={
-          standings?.find(
-            (team) => team.name === match.homeTeam && team.type === "TOTAL",
-          )?.form ?? null
-        }
-        awayForm={
-          standings?.find(
-            (team) => team.name === match.awayTeam && team.type === "TOTAL",
-          )?.form ?? null
-        }
-      />
+      <RecentForm homeTeam={match.homeTeam} awayTeam={match.awayTeam} />
 
       <div className="pt-0 pb-0 px-2 sm:px-4 md:px-8 lg:px-16">
         <HomeAwayRecord

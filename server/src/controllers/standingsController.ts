@@ -1,16 +1,16 @@
 import { Request, Response } from "express";
 import {
   getStandingsService,
-  getGoalScorersService,
   getTeamStandingsService,
   getRecentTeamStandingsService,
   getRecentTableStandingsService,
+  getTeamsExpectedStandingsService,
 } from "../services/standingsService";
 
 // gets standings for a specific league + season
 export const getStandings = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const league = req.query.league as string;
@@ -26,29 +26,10 @@ export const getStandings = async (
   }
 };
 
-// gets top goal scorers for a specific league + season
-export const getGoalScorers = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const league = req.query.league as string;
-    const normalizedLeague = league.split("_").join(" ");
-    const season = req.query.season as string;
-    const scorers = await getGoalScorersService(normalizedLeague, season);
-    res.json(scorers);
-  } catch (error: any) {
-    console.error("Error fetching goal scorers ", error);
-    res.status(500).json({
-      message: `Error fetching goal scorers: ${error.message}`,
-    });
-  }
-};
-
 // grabs team standings for two teams in the current season
 export const getTeamStandings = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const team1 = req.query.team1 as string;
@@ -57,7 +38,7 @@ export const getTeamStandings = async (
     const normalizedTeam2 = team2.split("_").join(" ");
     const data = await getTeamStandingsService(
       normalizedTeam1,
-      normalizedTeam2
+      normalizedTeam2,
     );
     if (!data.length) {
       res.status(404).json({ error: "Team Standings not found" });
@@ -74,7 +55,7 @@ export const getTeamStandings = async (
 
 export const getRecentTeamStandings = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const team = req.query.team as string;
@@ -91,7 +72,7 @@ export const getRecentTeamStandings = async (
 
 export const getRecentTableStandings = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const team = req.query.team as string;
@@ -103,5 +84,29 @@ export const getRecentTableStandings = async (
     res.status(500).json({
       message: `Error fetching recent standings: ${err.message}`,
     });
+  }
+};
+
+export const getTeamsExpectedStandings = async (
+  req: Request,
+  res: Response,
+) => {
+  const teams = String(req.query.teams ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (!teams.length) {
+    res.status(400).json({ message: "Teams required" });
+    return;
+  }
+  if (teams.length > 30) {
+    res.status(400).json({ message: "Too many teams (max 30)" });
+    return;
+  }
+  try {
+    res.json(await getTeamsExpectedStandingsService(teams));
+  } catch (error) {
+    console.error("getTeamsExpectedStandings: ", error);
+    res.status(500).json({ message: "Failed to load expected standings." });
   }
 };

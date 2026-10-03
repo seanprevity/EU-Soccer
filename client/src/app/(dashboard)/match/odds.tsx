@@ -1,8 +1,85 @@
 "use client";
 
+import Image from "next/image";
 import { useGetOddsQuery, useGetSimulationQuery } from "@/state/api";
 import { upcomingMatches } from "@/types/drizzleTypes";
-import HomeAwayRecord from "./homeAwayRecord";
+import { cn, getLogoFile } from "@/lib/utils";
+
+type Outcome = "home" | "draw" | "away";
+type OddsKey = "oddsHome" | "oddsDraw" | "oddsAway";
+
+const OUTCOME_STYLE: Record<
+  Outcome,
+  { bar: string; text: string; badge: string; best: string; label: string }
+> = {
+  home: {
+    bar: "bg-sky-600",
+    text: "text-sky-600 dark:text-sky-400",
+    badge: "bg-sky-600 text-white",
+    best: "bg-sky-100 text-sky-800 ring-1 ring-sky-300 dark:bg-sky-900/50 dark:text-sky-200 dark:ring-sky-700",
+    label: "Home favourite",
+  },
+  draw: {
+    bar: "bg-gray-400 dark:bg-gray-500",
+    text: "text-gray-500 dark:text-gray-400",
+    badge: "bg-gray-500 text-white",
+    best: "bg-gray-200 text-gray-900 ring-1 ring-gray-300 dark:bg-gray-600 dark:text-white dark:ring-gray-500",
+    label: "Draw favoured",
+  },
+  away: {
+    bar: "bg-orange-500",
+    text: "text-orange-600 dark:text-orange-400",
+    badge: "bg-orange-500 text-white",
+    best: "bg-orange-100 text-orange-800 ring-1 ring-orange-300 dark:bg-orange-900/50 dark:text-orange-200 dark:ring-orange-700",
+    label: "Away favourite",
+  },
+};
+
+// Whole-number percentages that always total exactly 100 (largest-remainder method)
+const toPercents = (shares: number[]) => {
+  const total = shares.reduce((a, b) => a + b, 0);
+  if (!total) return shares.map(() => 0);
+  const raw = shares.map((s) => (s / total) * 100);
+  const result = raw.map(Math.floor);
+  let left = 100 - result.reduce((a, b) => a + b, 0);
+  raw
+    .map((r, i) => ({ i, rem: r - Math.floor(r) }))
+    .sort((a, b) => b.rem - a.rem)
+    .forEach(({ i }) => {
+      if (left-- > 0) result[i]++;
+    });
+  return result;
+};
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-1 border-b-2 border-[#38003c] pb-2 text-center text-xl font-bold text-gray-800 dark:border-gray-400 dark:text-gray-200">
+      {children}
+    </h2>
+  );
+}
+
+function TeamLabel({ team, align }: { team: string; align: "left" | "right" }) {
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 flex-1 items-center gap-2",
+        align === "right" && "flex-row-reverse text-right",
+      )}
+    >
+      <Image
+        src={`/${getLogoFile(team)}`}
+        alt=""
+        width={24}
+        height={24}
+        className="h-6 w-6 shrink-0 object-contain"
+      />
+      <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
+        {team}
+      </span>
+    </div>
+  );
+}
 
 const Odds = ({
   match,
@@ -12,260 +89,218 @@ const Odds = ({
   matchId: string;
 }) => {
   const { data: odds } = useGetOddsQuery({ id: matchId });
-  const { data: simulation, isLoading: isSimulationLoading } =
-    useGetSimulationQuery({
-      homeTeam: match.homeTeam,
-      awayTeam: match.awayTeam,
-    });
-  console.log(simulation);
-  if (!odds || odds.length === 0 || !simulation) return null;
-  const numericOdds = odds.map((o) => ({
-    ...o,
+  const { data: simulation } = useGetSimulationQuery({
+    homeTeam: match.homeTeam,
+    awayTeam: match.awayTeam,
+  });
+
+  const rows = (odds ?? []).map((o) => ({
+    bookmaker: o.bookmaker,
     oddsHome: Number(o.oddsHome),
     oddsDraw: Number(o.oddsDraw),
     oddsAway: Number(o.oddsAway),
   }));
+  const hasOdds = rows.length > 0;
+  if (!simulation && !hasOdds) return null;
 
-  const avgOdds = { home: 0, draw: 0, away: 0 };
-  numericOdds.forEach((o) => {
-    avgOdds.home += o.oddsHome;
-    avgOdds.draw += o.oddsDraw;
-    avgOdds.away += o.oddsAway;
-  });
-  avgOdds.home /= odds.length;
-  avgOdds.draw /= odds.length;
-  avgOdds.away /= odds.length;
-
-  const bestSim = Math.max(
-    simulation.home_win_prob,
-    simulation.draw_prob,
-    simulation.away_win_prob
-  );
-  const favoriteOutcome =
-    bestSim === simulation.home_win_prob
+  // Simulation
+  const [homePct, drawPct, awayPct] = simulation
+    ? toPercents([
+        simulation.home_win_prob,
+        simulation.draw_prob,
+        simulation.away_win_prob,
+      ])
+    : [0, 0, 0];
+  const favourite: Outcome =
+    homePct >= drawPct && homePct >= awayPct
       ? "home"
-      : bestSim === simulation.away_win_prob
-      ? "away"
-      : "draw";
+      : awayPct >= drawPct
+        ? "away"
+        : "draw";
+  const favouriteName =
+    favourite === "home"
+      ? match.homeTeam
+      : favourite === "away"
+        ? match.awayTeam
+        : "Draw";
 
-  const calcImplied = (decimal: number) => Math.round(decimal * 100);
+  // Bookmaker consensus: average odds -> implied probability, with the margin removed
+  const avg = (key: OddsKey) =>
+    rows.reduce((sum, r) => sum + r[key], 0) / rows.length;
+  const marketPct = hasOdds
+    ? toPercents([
+        1 / avg("oddsHome"),
+        1 / avg("oddsDraw"),
+        1 / avg("oddsAway"),
+      ])
+    : null;
 
-  const findBestOdds = (outcome: "oddsHome" | "oddsDraw" | "oddsAway") => {
-    const oddsWithValues = numericOdds.map((o) => ({
-      bookmaker: o.bookmaker,
-      value: o[outcome],
-    }));
-    const max = Math.max(...oddsWithValues.map((o) => Number(o.value!)));
-    return oddsWithValues
-      .filter((o) => o.value === max)
-      .map((o) => o.bookmaker);
+  const bestFor = (key: OddsKey) => {
+    const max = Math.max(...rows.map((r) => r[key]));
+    return new Set(rows.filter((r) => r[key] === max).map((r) => r.bookmaker));
+  };
+  const best: Record<OddsKey, Set<string>> = {
+    oddsHome: bestFor("oddsHome"),
+    oddsDraw: bestFor("oddsDraw"),
+    oddsAway: bestFor("oddsAway"),
   };
 
-  const bestHome = findBestOdds("oddsHome");
-  const bestDraw = findBestOdds("oddsDraw");
-  const bestAway = findBestOdds("oddsAway");
-
-  let homeSim = calcImplied(simulation.home_win_prob);
-  let awaySim = calcImplied(simulation.away_win_prob);
-  let drawSim = calcImplied(simulation.draw_prob);
-  const mostLikelyScore = simulation.most_likely_score;
-  const mostLikelyScorePct = Math.round(
-    simulation.most_likely_score_prob * 100
-  );
-
-  const total = homeSim + awaySim + drawSim;
-  if (total > 100) {
-    if (homeSim > awaySim && homeSim > drawSim) {
-      homeSim -= 1;
-    } else if (awaySim > homeSim && awaySim > drawSim) {
-      awaySim -= 1;
-    } else {
-      drawSim -= 1;
-    }
-  }
-  if (total < 100 && total > 0) {
-    if (homeSim < awaySim && homeSim < drawSim) {
-      homeSim += 1;
-    } else if (awaySim < homeSim && awaySim < drawSim) {
-      awaySim += 1;
-    } else {
-      drawSim += 1;
-    }
-  }
+  const segments: { outcome: Outcome; pct: number; name: string }[] = [
+    { outcome: "home", pct: homePct, name: match.homeTeam },
+    { outcome: "draw", pct: drawPct, name: "Draw" },
+    { outcome: "away", pct: awayPct, name: match.awayTeam },
+  ];
 
   return (
-    <section className="my-4 sm:my-8 p-4 sm:p-6 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-sm">
-      <h2 className="text-center text-lg sm:text-xl dark:text-gray-200 font-bold relative mb-2 after:content-[''] after:block after:w-12 after:h-1 after:bg-black dark:after:bg-gray-500 after:mx-auto after:mt-2">
-        Prediction
-      </h2>
-      <p className="text-center text-xs italic text-gray-600 dark:text-gray-400 mb-2">
-        (Percentages based on Monte-Carlo simulations)
-      </p>
+    <section className="my-4 space-y-6 rounded-lg bg-white p-4 shadow-md sm:my-8 md:p-6 dark:bg-gray-800">
+      {simulation && (
+        <div className="space-y-4">
+          <div>
+            <SectionTitle>Prediction</SectionTitle>
+            <p className="text-center text-xs italic text-gray-500 dark:text-gray-400">
+              Based on Monte Carlo simulations
+            </p>
+          </div>
 
-      {/* Prediction */}
-      <div className="w-full max-w-3xl mx-auto mb-6 sm:mb-8 p-4 sm:p-6 bg-white dark:bg-gray-700 rounded-lg shadow-sm">
-        <div className="text-center mb-4">
-          <div className="inline-flex flex-col items-center relative text-lg sm:text-xl dark:text-gray-200 font-bold">
-            <span className="text-center px-2">
-              {favoriteOutcome === "home"
-                ? match.homeTeam
-                : favoriteOutcome === "away"
-                ? match.awayTeam
-                : "Draw"}
-            </span>
-            <span
-              className={`mt-2 text-xs px-2 py-1 rounded font-semibold ${
-                favoriteOutcome === "home"
-                  ? "bg-blue-600 text-white"
-                  : favoriteOutcome === "away"
-                  ? "bg-red-600 text-white"
-                  : "bg-gray-600 dark:bg-gray-500 text-white"
-              }`}
-            >
-              {favoriteOutcome === "home"
-                ? "Home Favorite"
-                : favoriteOutcome === "away"
-                ? "Away Favorite"
-                : "Draw Favorite"}
-            </span>
-          </div>
-        </div>
-
-        {/* Probability Bar */}
-        <div className="flex h-8 sm:h-10 rounded-lg overflow-hidden mb-2">
-          <div
-            className="flex items-center bg-gradient-to-r from-blue-500 to-blue-600 duration-300 justify-center text-white text-xs sm:text-sm font-semibold min-w-[3rem] transition-all"
-            style={{
-              width: `${homeSim}%`,
-            }}
-          >
-            {homeSim}%
-          </div>
-          <div
-            className="flex items-center bg-gradient-to-r from-gray-400 to-gray-500 duration-500 justify-center text-white text-xs sm:text-sm font-semibold min-w-[3rem] transition-all"
-            style={{
-              width: `${drawSim}%`,
-            }}
-          >
-            {drawSim}%
-          </div>
-          <div
-            className="flex items-center bg-gradient-to-r from-red-500 to-red-600 duration-500 justify-center text-white text-xs sm:text-sm font-semibold min-w-[3rem] transition-all"
-            style={{
-              width: `${awaySim}%`,
-            }}
-          >
-            {awaySim}%
-          </div>
-        </div>
-
-        {/* Labels */}
-        <div className="flex justify-between text-xs sm:text-sm font-semibold gap-2">
-          <div className="text-left text-blue-600 dark:text-blue-400 flex-1 min-w-0 break-words">
-            {match.homeTeam}
-          </div>
-          <div className="text-center text-gray-500 dark:text-gray-200 flex-shrink-0">
-            Draw
-          </div>
-          <div className="text-right text-red-600 dark:text-red-400 flex-1 min-w-0 break-words">
-            {match.awayTeam}
-          </div>
-        </div>
-
-        <p className="text-center text-xs sm:text-sm text-gray-600 dark:text-gray-300 mt-1">
-          Most common scoreline:{" "}
-          <span className="font-semibold text-gray-800 dark:text-gray-100">
-            {mostLikelyScore}
-          </span>{" "}
-          <span className="text-gray-500 dark:text-gray-400">
-            ({mostLikelyScorePct}%)
-          </span>
-        </p>
-      </div>
-
-      {/* Bookmaker Odds */}
-      <div className="w-full max-w-3xl mx-auto">
-        <h3 className="text-center text-base sm:text-lg dark:text-gray-200 font-semibold mb-2">
-          Bookmaker Odds
-        </h3>
-        <p className="text-center text-xs sm:text-sm italic text-gray-600 dark:text-gray-400 mb-2 px-2">
-          Highlighted cells show the best odds for each outcome
-        </p>
-
-        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <div className="rounded-b-lg overflow-hidden min-w-[500px] sm:min-w-0">
-            {/* Header */}
-            <div className="flex bg-gray-200 dark:bg-gray-700 rounded-t-lg font-semibold text-gray-700 dark:text-gray-200 px-3 sm:px-4 py-2">
-              <div className="w-[120px] sm:w-auto sm:flex-1 flex-shrink-0">
-                Bookmaker
-              </div>
-              <div className="grid grid-cols-3 flex-1 text-center gap-1 sm:gap-2">
-                <span className="text-blue-600 dark:text-blue-400 text-xs sm:text-sm truncate">
-                  {match.homeTeam}
-                </span>
-                <span className="text-xs sm:text-sm">Draw</span>
-                <span className="text-red-600 dark:text-red-400 text-xs sm:text-sm truncate">
-                  {match.awayTeam}
-                </span>
-              </div>
+          <div className="mx-auto max-w-3xl space-y-4 rounded-md bg-[#f8f8f8] p-4 sm:p-6 dark:bg-gray-700">
+            {/* Favourite */}
+            <div className="flex flex-col items-center gap-2 text-center">
+              <span className="text-lg font-bold text-gray-900 sm:text-xl dark:text-white">
+                {favouriteName}
+              </span>
+              <span
+                className={cn(
+                  "rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                  OUTCOME_STYLE[favourite].badge,
+                )}
+              >
+                {OUTCOME_STYLE[favourite].label}
+              </span>
             </div>
 
-            {/* Rows */}
-            {odds.map((o) => (
-              <div
-                key={o.bookmaker}
-                className="flex px-3 sm:px-4 py-2 items-center border-b last:border-b-0 even:bg-gray-50 dark:even:bg-gray-500 dark:odd:bg-gray-600 dark:odd:text-gray-300 dark:border-0"
-              >
-                <div className="w-[120px] sm:w-auto sm:flex-1 flex-shrink-0 font-medium text-sm sm:text-base truncate pr-2">
-                  {o.bookmaker}
-                </div>
-                <div className="grid grid-cols-3 flex-1 text-center gap-1 sm:gap-2">
+            {/* Probability bar */}
+            <div className="flex h-9 gap-0.5 overflow-hidden rounded-full sm:h-10">
+              {segments.map(({ outcome, pct, name }) =>
+                pct > 0 ? (
                   <div
-                    className={`px-1 sm:px-2 py-1 dark:text-black rounded text-xs sm:text-sm font-semibold ${
-                      bestHome.includes(o.bookmaker)
-                        ? "bg-blue-200 text-blue-800 shadow-sm"
-                        : "bg-gray-200"
-                    }`}
-                    title={
-                      bestHome.includes(o.bookmaker)
-                        ? "Best odds for home win"
-                        : ""
-                    }
+                    key={outcome}
+                    title={`${name}: ${pct}%`}
+                    className={cn(
+                      "flex min-w-0 items-center justify-center text-xs font-semibold tabular-nums text-white transition-all duration-500 sm:text-sm",
+                      OUTCOME_STYLE[outcome].bar,
+                    )}
+                    style={{ flexGrow: pct, flexBasis: 0 }}
                   >
-                    {o.oddsHome}
+                    {pct >= 8 && `${pct}%`}
                   </div>
-                  <div
-                    className={`px-1 sm:px-2 py-1 dark:text-black rounded text-xs sm:text-sm font-semibold ${
-                      bestDraw.includes(o.bookmaker)
-                        ? "bg-gray-300 dark:bg-gray-400 shadow-sm"
-                        : "bg-gray-200"
-                    }`}
-                    title={
-                      bestDraw.includes(o.bookmaker) ? "Best odds for draw" : ""
-                    }
-                  >
-                    {o.oddsDraw}
-                  </div>
-                  <div
-                    className={`px-1 sm:px-2 py-1 dark:text-black rounded text-xs sm:text-sm font-semibold ${
-                      bestAway.includes(o.bookmaker)
-                        ? "bg-red-200 text-red-800 shadow-sm"
-                        : "bg-gray-200"
-                    }`}
-                    title={
-                      bestAway.includes(o.bookmaker)
-                        ? "Best odds for away win"
-                        : ""
-                    }
-                  >
-                    {o.oddsAway}
-                  </div>
-                </div>
-              </div>
-            ))}
+                ) : null,
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <TeamLabel team={match.homeTeam} align="left" />
+              <span className="shrink-0 text-sm font-semibold text-gray-500 dark:text-gray-400">
+                Draw
+              </span>
+              <TeamLabel team={match.awayTeam} align="right" />
+            </div>
+
+            <div className="flex flex-col items-center gap-1 border-t border-gray-200 pt-3 text-xs text-gray-600 sm:text-sm dark:border-gray-600 dark:text-gray-300">
+              <p>
+                Most likely scoreline{" "}
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {simulation.most_likely_score}
+                </span>{" "}
+                <span className="tabular-nums text-gray-500 dark:text-gray-400">
+                  ({Math.round(simulation.most_likely_score_prob * 100)}%)
+                </span>
+              </p>
+              {marketPct && (
+                <p className="tabular-nums">
+                  Bookmakers:{" "}
+                  <span className={OUTCOME_STYLE.home.text}>
+                    {marketPct[0]}%
+                  </span>
+                  {" · "}
+                  <span className={OUTCOME_STYLE.draw.text}>
+                    {marketPct[1]}%
+                  </span>
+                  {" · "}
+                  <span className={OUTCOME_STYLE.away.text}>
+                    {marketPct[2]}%
+                  </span>
+                </p>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {hasOdds && (
+        <div className="mx-auto max-w-3xl space-y-2">
+          <SectionTitle>Bookmaker Odds</SectionTitle>
+          <p className="text-center text-xs italic text-gray-500 dark:text-gray-400">
+            Highlighted cells are the best odds for each outcome
+          </p>
+
+          <div className="overflow-x-auto rounded-lg shadow-sm">
+            <table className="w-full min-w-[420px] border-collapse text-sm">
+              <thead className="bg-[#38003c] text-white dark:bg-gray-900">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold">
+                    Bookmaker
+                  </th>
+                  <th className="w-1/5 px-2 py-2 text-center font-semibold">
+                    <span className="block truncate">{match.homeTeam}</span>
+                  </th>
+                  <th className="w-1/5 px-2 py-2 text-center font-semibold">
+                    Draw
+                  </th>
+                  <th className="w-1/5 px-2 py-2 text-center font-semibold">
+                    <span className="block truncate">{match.awayTeam}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800">
+                {rows.map((r) => (
+                  <tr
+                    key={r.bookmaker}
+                    className="border-b border-gray-200 transition-colors last:border-b-0 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700"
+                  >
+                    <td className="truncate px-3 py-2 font-medium text-gray-800 dark:text-gray-200">
+                      {r.bookmaker}
+                    </td>
+                    {(
+                      [
+                        ["oddsHome", "home"],
+                        ["oddsDraw", "draw"],
+                        ["oddsAway", "away"],
+                      ] as [OddsKey, Outcome][]
+                    ).map(([key, outcome]) => {
+                      const isBest = best[key].has(r.bookmaker);
+                      return (
+                        <td key={key} className="px-2 py-1.5 text-center">
+                          <span
+                            title={isBest ? "Best available odds" : undefined}
+                            className={cn(
+                              "inline-block min-w-[3.25rem] rounded px-2 py-1 font-semibold tabular-nums",
+                              isBest
+                                ? OUTCOME_STYLE[outcome].best
+                                : "text-gray-700 dark:text-gray-300",
+                            )}
+                          >
+                            {r[key].toFixed(2)}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

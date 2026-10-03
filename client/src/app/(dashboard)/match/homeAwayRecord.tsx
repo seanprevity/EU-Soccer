@@ -231,7 +231,7 @@ const HomeAwayRecord = ({
 
   return (
     <section className="space-y-4 rounded-lg bg-gray-100 p-4 dark:bg-gray-900">
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+      <h2 className="text-center text-2xl font-bold text-gray-900 dark:text-white">
         Home and away form
       </h2>
 

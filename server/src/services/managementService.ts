@@ -4,16 +4,32 @@ import {
   upcomingMatches,
   teams,
   head2Head,
-  goalScorers,
   players,
   odds,
   squad,
   MatchEvent,
+  MatchLineups,
+  TeamLineup,
+  LineupPlayer,
+  topPlayers,
+  TopPlayerCategory,
+  TOP_PLAYER_CATEGORIES,
 } from "../../drizzle/schema";
-import { and, eq, lt, or, desc, gt, sql, isNull, gte } from "drizzle-orm";
+import {
+  and,
+  eq,
+  lt,
+  or,
+  desc,
+  gt,
+  sql,
+  isNull,
+  gte,
+  inArray,
+  ne,
+  notInArray,
+} from "drizzle-orm";
 import { db } from "../lib/db";
-import fs from "fs";
-import path from "path";
 import csv from "csv-parser";
 import { Readable } from "stream";
 import axios from "axios";
@@ -25,20 +41,22 @@ import {
   map_team_name,
   ODDS_MAP,
   curSeason,
-  skip_coaches,
   ESPN_MAP,
 } from "../utils/map";
 import { StandingsStats, bookmakers } from "../config/arrays";
+import { updatePlayerImagesService } from "./imageService";
 
 dotenv.config();
 
 const football_api_key = process.env.FOOTBALL_DATA_API_KEY;
-const api_football_key = process.env.API_FOOTBALL_DATA_KEY;
 const odds_api_key = process.env.ODDS_API_KEY;
 const football_url = "https://api.football-data.org/v4";
 const headers = { "X-Auth-Token": football_api_key };
-const squads_url = "https://v3.football.api-sports.io";
-const squad_headers = { "x-rapidapi-key": api_football_key };
+const espn = axios.create({
+  baseURL: "https://site.web.api.espn.com/apis/site/v2/sports/soccer",
+  validateStatus: (s) => s < 500,
+});
+const TOP_N = 10;
 
 // NOTE: RUN UPDATEMATCHSERVICE FIRST THEN UPDATESTANDINGSSERVICE
 
@@ -565,149 +583,74 @@ export const updateStandingsService = async (
   return { success: true };
 };
 
-// will find current top goalscorers
-export const updateTopGoalScorer = async (
-  league: string,
-  competition: string,
-  season: string,
-) => {
-  try {
-    const url = `${football_url}/competitions/${competition}/scorers?season=${season}`;
-    const res = await axios.get(url, { headers });
-    const data = res.data;
-    // clear goalScorers table for current season+league to replace with updated data
-    await db
-      .delete(goalScorers)
-      .where(
-        and(eq(goalScorers.season, season), eq(goalScorers.league, league)),
-      );
+// Current-season leaderboards for one league, built from the squad table.
+// called after leagueSquadService finishes
+export const updateTopPlayersService = async (league: string) => {
+  const rows = await db
+    .select({
+      player: squad.player,
+      team: squad.team,
+      appearances: squad.appearances,
+      goals: squad.goals,
+      assists: squad.assists,
+      saves: squad.saves,
+      yellowCards: squad.yellowCards,
+      redCards: squad.redCards,
+    })
+    .from(squad)
+    .where(and(eq(squad.league, league), eq(squad.statsSeason, curSeason)));
 
-    for (const scorer of data["scorers"]) {
-      const name = scorer["player"]["name"];
-      // insert scorer into player database
-      await updatePlayerInfo(name);
-      const team = map_team(scorer["team"]["shortName"]);
-      //console.log(scorer);
-      await db
-        .insert(goalScorers)
-        .values({
-          player: name,
-          team: team,
-          goals: scorer["goals"],
-          league: league,
-          season: season,
-        })
-        .onConflictDoUpdate({
-          target: [goalScorers.player, goalScorers.season],
-          set: {
-            team: team,
-            goals: scorer["goals"],
-            league: league,
-            season: season,
-          },
-        });
-    }
-    return { success: true };
-  } catch (err: any) {
-    console.log(`Error updating top goal scorer in ${league}. `, err.message);
-    console.log("cause:", err.cause);
-    throw err;
+  // No current-season squad data means the sync hasn't run or failed: keep what's stored
+  if (!rows.length) {
+    console.warn(
+      `Top players: no ${curSeason} squad stats for ${league}, left unchanged`,
+    );
+    return { league, season: curSeason, rows: 0 };
   }
-};
 
-// this will get images for the players
-export const updatePlayerInfo = async (name: string) => {
-  try {
-    // check if player already has image
-    const existingPlayer = await db.query.players.findFirst({
-      where: eq(players.name, name),
-    });
-    if (existingPlayer) {
-      console.log(`Skipping ${name}`);
-      return;
-    }
-    const url = `https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=${encodeURIComponent(
-      name,
-    )}`;
-    const res = await axios.get(url);
-    const player = res.data.player?.[0];
-    const imageUrl = player?.strCutout ?? null;
+  const entries: (typeof topPlayers.$inferInsert)[] = [];
 
-    if (!player) {
-      console.log(`${name} not found on TheSportsDB — inserting without image`);
+  for (const [category, column] of Object.entries(TOP_PLAYER_CATEGORIES) as [
+    TopPlayerCategory,
+    (typeof TOP_PLAYER_CATEGORIES)[TopPlayerCategory],
+  ][]) {
+    // A player listed at two clubs in the same league keeps his higher figure
+    const best = new Map<string, (typeof rows)[number]>();
+    for (const r of rows) {
+      if (!r.player || !r.team || !r[column]) continue; // skips null and 0
+      const prev = best.get(r.player);
+      if (!prev || r[column]! > prev[column]!) best.set(r.player, r);
     }
-    await db
-      .insert(players)
-      .values({ name, imageUrl })
-      .onConflictDoUpdate({
-        target: [players.name],
-        set: {
-          imageUrl: sql`coalesce(excluded.image_url, ${players.imageUrl})`,
-        },
+
+    const ranked = [...best.values()].sort((a, b) => b[column]! - a[column]!);
+    // Top 10, plus anyone tied with 10th place
+    const cutoff = ranked[TOP_N - 1]?.[column];
+    const top =
+      cutoff == null ? ranked : ranked.filter((r) => r[column]! >= cutoff);
+
+    for (const r of top)
+      entries.push({
+        player: r.player!,
+        team: r.team!,
+        league,
+        season: curSeason,
+        category,
+        value: r[column]!,
+        appearances: r.appearances,
       });
-    return { success: true };
-  } catch (err: any) {
-    console.log(`Error fetching player info for ${name}, `, err);
-    throw err;
   }
-};
 
-// used to import data from a csv from wikitables
-export const importHistoricalGoalScorers = async (
-  fileName: string, // PL_2005.csv, move utils/stats folder into services folder before using
-  // season: string,
-  league: string,
-) => {
-  try {
-    const filePath = path.join(__dirname, "stats", fileName);
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`CSV file not found: ${filePath}`);
-    }
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(topPlayers)
+      .where(
+        and(eq(topPlayers.league, league), eq(topPlayers.season, curSeason)),
+      );
+    if (entries.length) await tx.insert(topPlayers).values(entries);
+  });
 
-    const results: any[] = [];
-    await new Promise<void>((resolve, reject) => {
-      fs.createReadStream(filePath)
-        .pipe(csv())
-        .on("data", (row) => {
-          const player = row["Player(s)"]?.trim();
-          const club = row["Club(s)"]?.trim();
-          const goals = Number(row["Goals"]);
-          const season = Number(row["Season"]);
-          if (player && club && !isNaN(goals) && !isNaN(season)) {
-            results.push({ player, club, goals, season });
-          }
-        })
-        .on("end", resolve)
-        .on("error", reject);
-    });
-
-    for (const { player, club, goals, season } of results) {
-      await updatePlayerInfo(player);
-      await db
-        .insert(goalScorers)
-        .values({
-          player,
-          team: club,
-          goals,
-          season,
-          league,
-        })
-        .onConflictDoUpdate({
-          target: [goalScorers.player, goalScorers.season],
-          set: {
-            team: club,
-            goals: goals,
-            league: league,
-            season: season,
-          },
-        });
-    }
-    console.log(`Imported goal scorers for ${league}`);
-    return { success: true };
-  } catch (err: any) {
-    console.error("Error importing goal scorers:", err);
-    throw err;
-  }
+  console.log(`Top players: ${entries.length} rows for ${league} ${curSeason}`);
+  return { league, season: curSeason, rows: entries.length };
 };
 
 // Service to fetch and store odds
@@ -795,148 +738,212 @@ export const updateOddsService = async (sport: string) => {
   }
 };
 
-// adds images to the players table from the goalscorers table for a specific season
-export const updateGSImageUrlService = async (season: string) => {
-  try {
-    const playerList = await db.select().from(players);
+const excluded = (column: string) => sql.raw(`excluded.${column}`);
 
-    await Promise.all(
-      playerList.map((p) =>
-        db
-          .update(goalScorers)
-          .set({ imageUrl: p.imageUrl })
-          .where(
-            and(eq(goalScorers.player, p.name), eq(goalScorers.season, season)),
-          ),
-      ),
-    );
-  } catch (err) {
-    console.error(`DB error on updating image URLs:`, err);
-  }
+// statistics.splits.categories[].stats[] -> { name: value }; null when no stats block at all
+const rosterStats = (athlete: any) => {
+  const values = new Map<string, number>();
+  for (const category of athlete.statistics?.splits?.categories ?? [])
+    for (const s of category.stats ?? [])
+      if (Number.isFinite(s.value)) values.set(s.name, s.value);
+  const stat = (name: string) =>
+    values.size ? (values.get(name) ?? null) : null;
+  return {
+    appearances: stat("appearances"),
+    subIns: stat("subIns"),
+    goals: stat("totalGoals"),
+    assists: stat("goalAssists"),
+    ownGoals: stat("ownGoals"),
+    shots: stat("totalShots"),
+    shotsOnTarget: stat("shotsOnTarget"),
+    yellowCards: stat("yellowCards"),
+    redCards: stat("redCards"),
+    foulsCommitted: stat("foulsCommitted"),
+    foulsSuffered: stat("foulsSuffered"),
+    offsides: stat("offsides"),
+    saves: stat("saves"),
+    goalsConceded: stat("goalsConceded"),
+  };
 };
 
-// updates the squad of a team using team api on api-football, uses team id from map in /utils
-export const updateSquadService = async (team: string, id: number) => {
-  try {
-    const url = `${squads_url}/players/squads?team=${id}`;
-    const res = await axios.get(url, { headers: squad_headers });
-    const data = res.data;
-    // add coach
-    await updateCoachService(team, id);
-    // add players in squad
-    // console.log(data);
-    const squadData = data?.response?.[0]?.players ?? [];
-    for (const player of squadData) {
-      await db
-        .insert(players)
-        .values({
-          name: player["name"],
-        })
-        .onConflictDoNothing();
-      await db
-        .insert(squad)
-        .values({
-          player: player["name"],
-          position: player["position"],
-          number: player["number"],
-          team: team,
-        })
-        .onConflictDoUpdate({
-          target: [squad.player, squad.team],
-          set: {
-            number: player["number"],
-            team: team,
-          },
-        });
+// updates squads for a team
+export const updateSquadService = async (
+  team: string, // DB team name
+  league: string, // DB league name, e.g. "Premier League"
+  espnLeague: string,
+  espnTeamId: string,
+) => {
+  const res = await espn.get(`/${espnLeague}/teams/${espnTeamId}/roster`);
+  if (res.status !== 200)
+    throw new Error(`ESPN roster ${espnLeague}/${espnTeamId} → ${res.status}`);
+
+  const athletes: any[] = (res.data?.athletes ?? [])
+    .flatMap((a: any) => a.items ?? [a])
+    .filter((a: any) => a.displayName);
+  if (!athletes.length) {
+    console.warn(`ESPN: empty roster for ${team}, squad left unchanged`);
+    return { team, players: 0 };
+  }
+
+  const now = new Date().toISOString();
+  const statsSeason = String(res.data?.season?.year ?? curSeason);
+
+  // One row per name: a duplicate inside one upsert statement is a Postgres error
+  const byName = new Map<string, any>();
+  for (const a of athletes) byName.set(a.displayName, a);
+
+  const rows = [...byName.values()].map((a) => ({
+    player: a.displayName as string,
+    team,
+    league,
+    espnId: String(a.id),
+    position: a.position?.name ?? null,
+    number: toInt(a.jersey),
+    nationality: a.citizenship ?? null,
+    nationalityCode: a.citizenshipCountry?.abbreviation ?? null,
+    flagUrl: a.flag?.href ?? null,
+    dateOfBirth: a.dateOfBirth ? String(a.dateOfBirth).slice(0, 10) : null,
+    heightIn: toInt(a.height),
+    weightLbs: toInt(a.weight),
+    statsSeason,
+    ...rosterStats(a),
+    updatedAt: now,
+  }));
+  const names = rows.map((r) => r.player);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(players)
+      .values(
+        rows.map((r) => ({
+          name: r.player,
+          imageUrl: byName.get(r.player)?.headshot?.href ?? null,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: players.name,
+        set: {
+          imageUrl: sql`coalesce(${players.imageUrl}, excluded.image_url)`,
+        },
+      });
+
+    await tx
+      .delete(squad)
+      .where(
+        and(
+          eq(squad.team, team),
+          or(isNull(squad.position), ne(squad.position, "Coach")),
+          notInArray(squad.player, names),
+        ),
+      );
+
+    await tx
+      .insert(squad)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: [squad.player, squad.team],
+        set: {
+          league: excluded("league"),
+          espnId: excluded("espn_id"),
+          position: excluded("position"),
+          number: excluded("number"),
+          nationality: excluded("nationality"),
+          nationalityCode: excluded("nationality_code"),
+          flagUrl: excluded("flag_url"),
+          dateOfBirth: excluded("date_of_birth"),
+          heightIn: excluded("height_in"),
+          weightLbs: excluded("weight_lbs"),
+          statsSeason: excluded("stats_season"),
+          appearances: excluded("appearances"),
+          subIns: excluded("sub_ins"),
+          goals: excluded("goals"),
+          assists: excluded("assists"),
+          ownGoals: excluded("own_goals"),
+          shots: excluded("shots"),
+          shotsOnTarget: excluded("shots_on_target"),
+          yellowCards: excluded("yellow_cards"),
+          redCards: excluded("red_cards"),
+          foulsCommitted: excluded("fouls_committed"),
+          foulsSuffered: excluded("fouls_suffered"),
+          offsides: excluded("offsides"),
+          saves: excluded("saves"),
+          goalsConceded: excluded("goals_conceded"),
+          updatedAt: excluded("updated_at"),
+        },
+      });
+  });
+
+  console.log(`Squad updated for ${team} (${rows.length} players)`);
+  return { team, players: rows.length };
+};
+
+// Every team in a league: one teams request, then one roster request per team
+export const updateLeagueSquadsService = async (
+  league: string,
+  espnLeague: string,
+) => {
+  const res = await espn.get(`/${espnLeague}/teams`);
+  if (res.status !== 200)
+    throw new Error(`ESPN teams ${espnLeague} → ${res.status}`);
+  const espnTeams: any[] =
+    res.data?.sports?.[0]?.leagues?.[0]?.teams?.map((t: any) => t.team) ?? [];
+
+  const known = new Set(
+    (await db.select({ name: teams.teamName }).from(teams)).map((t) => t.name),
+  );
+
+  const results = [];
+  for (const t of espnTeams) {
+    const team = espnTeam(t.displayName);
+    if (!known.has(team)) {
+      console.warn(
+        `No DB team for "${t.displayName}" (mapped to "${team}"), skipped`,
+      );
+      continue;
     }
-  } catch (err: any) {
-    console.log(`Error updating squad: `, err.message);
-    throw err;
-  }
-};
-
-export const updateCoachService = async (team: string, id: number) => {
-  try {
-    const url = `${squads_url}/coachs?team=${id}`;
-    const res = await axios.get(url, { headers: squad_headers });
-    const data = res.data;
-    //console.log(data);
-    for (const coach of data["response"]) {
-      let flag = false;
-      for (const team of coach["career"]) {
-        // console.log(team);
-        if (team["end"] === null) {
-          if (
-            team["team"]["id"] === id &&
-            !skip_coaches.includes(coach["name"])
-          ) {
-            if (coach["name"] === "Andoni Iraola" && team !== "Bournemouth")
-              continue;
-            if (coach["name"] === "Nuno Espírito Santo" && team !== "West Ham")
-              continue;
-            flag = true;
-            break;
-          }
-        }
-      }
-      if (flag === true) {
-        console.log(coach["name"]);
-
-        // add coach to players db for foreign key
-        await db
-          .insert(players)
-          .values({
-            name: coach["name"],
-          })
-          .onConflictDoNothing();
-
-        // remove previous coach(s) to insert current coach - delete the ones with current season as this one
-        await db
-          .delete(squad)
-          .where(and(eq(squad.team, team), eq(squad.position, "Coach")));
-
-        // insert coach into db - conflict will handle if the coach was previously on another team
-        await db
-          .insert(squad)
-          .values({
-            player: coach["name"],
-            position: "Coach",
-            number: 0,
-            team: team,
-          })
-          .onConflictDoUpdate({
-            target: [squad.player, squad.team],
-            set: {
-              team: team,
-            },
-          });
-        break;
-      }
+    await sleep(ESPN_DELAY_MS);
+    try {
+      results.push(
+        await updateSquadService(team, league, espnLeague, String(t.id)),
+      );
+    } catch (err: any) {
+      console.warn(`Squad update failed for ${team}: ${err.message}`);
     }
-    console.log(`Updated coach for ${team}.`);
-  } catch (err: any) {
-    console.log(`Error fetching coach: ${err.message}`);
-    throw err;
   }
-};
+  await updateTopPlayersService(league);
 
-const espn = axios.create({
-  baseURL: "https://site.web.api.espn.com/apis/site/v2/sports/soccer",
-  validateStatus: (s) => s < 500, // handle 4xx ourselves instead of throwing
-});
+  // Images for new players
+  let images = null;
+  try {
+    images = await updatePlayerImagesService(league);
+  } catch (err: any) {
+    console.warn(`Player images failed for ${league}: ${err.message}`);
+  }
+  return { teams: results, images };
+};
 
 const ESPN_DELAY_MS = 1000;
 
+type Side = "home" | "away";
+
 type EspnMatch = {
   id: string;
-  home: string; // mapped to DB names
+  home: string; // mapped to your DB names
   away: string;
-  rawHome: string; // ESPN name
+  rawHome: string; // ESPN's own names, for logging unmatched teams
   rawAway: string;
+  sideById: Map<string, Side>; // ESPN team id -> side
   completed: boolean;
   homePoss: number | null;
   awayPoss: number | null;
   events: MatchEvent[];
+};
+
+type TeamStats = {
+  shots: number | null;
+  shotsOnTarget: number | null;
+  blockedShots: number | null;
+  saves: number | null;
 };
 
 const isGoal = (kind: MatchEvent["kind"]) =>
@@ -957,9 +964,9 @@ const parseMinute = (display: string | undefined) => {
   };
 };
 
-// competitors[].statistics[] -> { name: "possessionPct", displayValue: "46.2" }
-const statValue = (competitor: any, name: string): number | null => {
-  const stat = competitor?.statistics?.find((s: any) => s.name === name);
+// statistics[] -> { name, displayValue }, used on scoreboard competitors and boxscore teams
+const statValue = (holder: any, name: string): number | null => {
+  const stat = holder?.statistics?.find((s: any) => s.name === name);
   const value = stat ? parseFloat(stat.displayValue) : NaN;
   return Number.isFinite(value) ? value : null;
 };
@@ -967,15 +974,18 @@ const statValue = (competitor: any, name: string): number | null => {
 const flip = (side: MatchEvent["side"]): MatchEvent["side"] =>
   side === "home" ? "away" : side === "away" ? "home" : null;
 
-// Only place that knows ESPN's event shape: events[] -> competitions[0] -> competitors[] + details[]
+const byMinute = (a: MatchEvent, b: MatchEvent) =>
+  (a.minute ?? 0) - (b.minute ?? 0) ||
+  (a.extraMinute ?? 0) - (b.extraMinute ?? 0);
+
+// Scoreboard: events[] -> competitions[0] -> competitors[] + details[]
 const parseEspnEvent = (ev: any): EspnMatch | null => {
   const comp = ev.competitions?.[0];
   const home = comp?.competitors?.find((c: any) => c.homeAway === "home");
   const away = comp?.competitors?.find((c: any) => c.homeAway === "away");
   if (!home || !away) return null;
 
-  // ESPN team id -> side, used to place each goal
-  const sideById = new Map<string, "home" | "away">([
+  const sideById = new Map<string, Side>([
     [String(home.team?.id), "home"],
     [String(away.team?.id), "away"],
   ]);
@@ -984,7 +994,7 @@ const parseEspnEvent = (ev: any): EspnMatch | null => {
     .filter((d: any) => {
       if (d.shootout) return false;
       if (d.scoringPlay) return true;
-      // cards to coaches/staff show no player no skip
+      // Cards shown to coaches/staff have no athletesInvolved, so there's no player to show
       if (d.yellowCard || d.redCard)
         return Boolean(d.athletesInvolved?.[0]?.displayName);
       return false;
@@ -1010,7 +1020,8 @@ const parseEspnEvent = (ev: any): EspnMatch | null => {
         };
       }
 
-      // store on side where the goal counted
+      // Goal: side is stored as the team the goal counts for. For an own goal that's the
+      // opposite of the scorer's team, when ESPN tells us the scorer's team.
       const scorerSide = sideById.get(String(player?.team?.id)) ?? null;
       return {
         ...minutes,
@@ -1024,11 +1035,7 @@ const parseEspnEvent = (ev: any): EspnMatch | null => {
         kind: d.ownGoal ? "own_goal" : d.penaltyKick ? "penalty" : "goal",
       };
     })
-    .sort(
-      (a: MatchEvent, b: MatchEvent) =>
-        (a.minute ?? 0) - (b.minute ?? 0) ||
-        (a.extraMinute ?? 0) - (b.extraMinute ?? 0),
-    );
+    .sort(byMinute);
 
   const rawHome = home.team?.displayName ?? home.team?.name ?? "";
   const rawAway = away.team?.displayName ?? away.team?.name ?? "";
@@ -1039,6 +1046,7 @@ const parseEspnEvent = (ev: any): EspnMatch | null => {
     away: espnTeam(rawAway),
     rawHome,
     rawAway,
+    sideById,
     completed: ev.status?.type?.completed === true,
     homePoss: statValue(home, "possessionPct"),
     awayPoss: statValue(away, "possessionPct"),
@@ -1055,18 +1063,149 @@ const fetchEspnDay = async (
     params: { dates: date },
   });
   if (res.status !== 200) {
-    console.warn(`ESPN ${espnLeague} ${date} → ${res.status}`, res.data);
+    console.warn(
+      `ESPN scoreboard ${espnLeague} ${date} → ${res.status}`,
+      res.data,
+    );
     return null;
   }
   const events: any[] = res.data?.events ?? [];
   return events.map(parseEspnEvent).filter((m): m is EspnMatch => m !== null);
 };
 
-// Run after the CSV import. One ESPN request per distinct match date.
+// Summary: boxscore.teams[] (stats), rosters[] (lineups), keyEvents[] (subs)
+const fetchEspnSummary = async (
+  espnLeague: string,
+  eventId: string,
+): Promise<any | null> => {
+  const res = await espn.get(`/${espnLeague}/summary`, {
+    params: { event: eventId },
+  });
+  if (res.status !== 200) {
+    console.warn(
+      `ESPN summary ${espnLeague} ${eventId} → ${res.status}`,
+      res.data,
+    );
+    return null;
+  }
+  return res.data;
+};
+
+const parseTeamStats = (
+  summary: any,
+  match: EspnMatch,
+): Record<Side, TeamStats | null> => {
+  const out: Record<Side, TeamStats | null> = { home: null, away: null };
+  for (const t of summary?.boxscore?.teams ?? []) {
+    const side = match.sideById.get(String(t.team?.id));
+    if (!side) continue;
+    out[side] = {
+      shots: statValue(t, "totalShots"),
+      shotsOnTarget: statValue(t, "shotsOnTarget"),
+      blockedShots: statValue(t, "blockedShots"),
+      saves: statValue(t, "saves"),
+    };
+  }
+  return out;
+};
+
+const parseSubs = (summary: any, match: EspnMatch): MatchEvent[] =>
+  (summary?.keyEvents ?? [])
+    .filter((e: any) => e.type?.type === "substitution")
+    .map(
+      (e: any): MatchEvent => ({
+        ...parseMinute(e.clock?.displayValue),
+        side: match.sideById.get(String(e.team?.id)) ?? null,
+        // "Trey Nyoni replaces Florian Wirtz": participants[0] comes on, participants[1] goes off
+        player: e.participants?.[0]?.athlete?.displayName ?? null,
+        playerOut: e.participants?.[1]?.athlete?.displayName ?? null,
+        assist: null,
+        kind: "sub",
+      }),
+    );
+
+const parseLineups = (summary: any): MatchLineups | null => {
+  const team = (homeAway: Side): TeamLineup | null => {
+    const r = (summary?.rosters ?? []).find(
+      (x: any) => x.homeAway === homeAway,
+    );
+    if (!r?.roster?.length) return null;
+    return {
+      formation: r.formation ?? null,
+      players: r.roster.map(
+        (p: any): LineupPlayer => ({
+          espnId: String(p.athlete?.id ?? ""),
+          name: p.athlete?.displayName ?? "",
+          shortName: p.athlete?.shortName ?? null,
+          jersey: p.jersey ?? null,
+          position: p.position?.abbreviation ?? null,
+          positionName: p.position?.displayName ?? null,
+          formationPlace: p.formationPlace ? Number(p.formationPlace) : null,
+          starter: Boolean(p.starter),
+          subbedIn: Boolean(p.subbedIn),
+          subbedOut: Boolean(p.subbedOut),
+          headshot: p.athlete?.headshot?.href ?? null,
+        }),
+      ),
+    };
+  };
+  const home = team("home");
+  const away = team("away");
+  return home && away ? { home, away } : null;
+};
+
+// Players ESPN has no headshot for: fall back to the image already stored in the players table
+const fillMissingHeadshots = async (lineups: MatchLineups) => {
+  const all = [...lineups.home.players, ...lineups.away.players];
+  const missing = all.filter((p) => !p.headshot && p.name).map((p) => p.name);
+  if (!missing.length) return;
+  const rows = await db
+    .select({ name: players.name, imageUrl: players.imageUrl })
+    .from(players)
+    .where(inArray(players.name, missing));
+  const byName = new Map(rows.map((r) => [r.name, r.imageUrl]));
+  for (const p of all) if (!p.headshot) p.headshot = byName.get(p.name) ?? null;
+};
+
+// Fallback: gets assist from the text if it is there: "Assisted by Bukayo Saka with a cross." -> "Bukayo Saka"
+const assistFromText = (text: string | undefined) =>
+  /Assisted by (.+?)(?=\s+(?:with|following|after)\b|\.(?:\s|$)|$)/.exec(
+    text ?? "",
+  )?.[1] ?? null;
+
+// get assists from summary key events if available
+const addAssists = (events: MatchEvent[], summary: any): MatchEvent[] => {
+  const goalEvents: any[] = (summary?.keyEvents ?? []).filter(
+    (k: any) => k.scoringPlay,
+  );
+  const used = new Set<any>();
+
+  return events.map((e) => {
+    if (!isGoal(e.kind) || e.kind === "own_goal" || e.assist) return e;
+    const clock = parseMinute;
+    const match = goalEvents.find((k) => {
+      if (used.has(k)) return false;
+      const m = clock(k.clock?.displayValue);
+      return (
+        m.minute === e.minute &&
+        m.extraMinute === e.extraMinute &&
+        k.participants?.[0]?.athlete?.displayName === e.player
+      );
+    });
+    if (!match) return e;
+    used.add(match);
+    const assist =
+      match.participants?.[1]?.athlete?.displayName ??
+      assistFromText(match.text);
+    return assist ? { ...e, assist } : e;
+  });
+};
+
 export const syncEspnMatchDataService = async (
   league: string,
   espnLeague: string,
   since: Date,
+  to = new Date(),
 ) => {
   const pending = await db
     .select()
@@ -1074,9 +1213,9 @@ export const syncEspnMatchDataService = async (
     .where(
       and(
         eq(matchStats.league, league),
-        isNull(matchStats.events),
+        or(isNull(matchStats.events), isNull(matchStats.lineups)),
         gte(matchStats.matchDate, since.toISOString()),
-        lt(matchStats.matchDate, new Date().toISOString()),
+        lt(matchStats.matchDate, to.toISOString()),
       ),
     );
   if (!pending.length) return { updated: 0, remaining: 0 };
@@ -1085,7 +1224,7 @@ export const syncEspnMatchDataService = async (
   const byDate = new Map<string, typeof pending>();
   for (const row of pending) {
     if (!row.matchDate) continue;
-    const date = row.matchDate.slice(0, 10).replace(/-/g, ""); // "20260920"
+    const date = row.matchDate.slice(0, 10).replace(/-/g, ""); // "2026-09-20T..." -> "20260920"
     byDate.set(date, [...(byDate.get(date) ?? []), row]);
   }
 
@@ -1132,15 +1271,43 @@ export const syncEspnMatchDataService = async (
         continue;
       }
 
-      await db
-        .update(matchStats)
-        .set({
-          espnId: hit.id,
-          events: hit.events,
-          hposs: hit.homePoss,
-          aposs: hit.awayPoss,
-        })
-        .where(eq(matchStats.id, row.id));
+      const summary = await fetchEspnSummary(espnLeague, hit.id);
+      await sleep(ESPN_DELAY_MS);
+
+      // Scoreboard data is saved either way. Without a summary, lineups stay null and the
+      // row is picked up again next run.
+      const update: Partial<typeof matchStats.$inferInsert> = {
+        espnId: hit.id,
+        events: hit.events,
+        hposs: hit.homePoss,
+        aposs: hit.awayPoss,
+      };
+
+      if (summary) {
+        const stats = parseTeamStats(summary, hit);
+        const subs = parseSubs(summary, hit);
+        const lineups = parseLineups(summary);
+        if (lineups) await fillMissingHeadshots(lineups);
+
+        Object.assign(update, {
+          events: [...addAssists(hit.events, summary), ...subs].sort(byMinute),
+          lineups,
+          hs: stats.home?.shots ?? row.hs,
+          as: stats.away?.shots ?? row.as,
+          hst: stats.home?.shotsOnTarget ?? row.hst,
+          ast: stats.away?.shotsOnTarget ?? row.ast,
+          hbs: stats.home?.blockedShots ?? null,
+          abs: stats.away?.blockedShots ?? null,
+          hsv: stats.home?.saves ?? null,
+          asv: stats.away?.saves ?? null,
+        });
+        if (!lineups)
+          console.warn(
+            `ESPN: no lineups for ${row.homeTeam} vs ${row.awayTeam}`,
+          );
+      }
+
+      await db.update(matchStats).set(update).where(eq(matchStats.id, row.id));
       updated++;
     }
   }
@@ -1149,7 +1316,7 @@ export const syncEspnMatchDataService = async (
   return { updated, remaining: pending.length - updated };
 };
 
-// Whole curSeason for one league
+// Whole season for one league.
 export const backfillEspnMatchDataService = (
   league: string,
   espnLeague: string,
@@ -1157,5 +1324,6 @@ export const backfillEspnMatchDataService = (
   syncEspnMatchDataService(
     league,
     espnLeague,
-    new Date(Date.UTC(Number(curSeason), 7, 1)),
+    new Date(Date.UTC(Number(curSeason) - 2, 7, 1)),
+    new Date(Date.UTC(Number(curSeason) - 1, 7, 1)),
   );

@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../lib/db";
 import { curSeason } from "../utils/map";
 import {
-  getLast5MatchesService,
+  getLast5MatchStatsService,
   getTeamMatchStatsService,
 } from "./matchService";
 import { matchStats } from "../../drizzle/schema";
@@ -162,8 +162,8 @@ export const getLast5TeamStatsService = async (
   team1: string,
   team2: string
 ) => {
-  const last5Team1 = await getLast5MatchesService(team1);
-  const last5Team2 = await getLast5MatchesService(team2);
+  const last5Team1 = await getLast5MatchStatsService(team1);
+  const last5Team2 = await getLast5MatchStatsService(team2);
 
   return [
     calculateLast5Stats(team1, last5Team1.matches),

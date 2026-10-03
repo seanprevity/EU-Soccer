@@ -1,14 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { cn, getLogoFile, statsKeys } from "@/lib/utils";
-import { head2Head, matchStats } from "@/types/drizzleTypes";
+import { cn, getLogoFile } from "@/lib/utils";
+import { head2Head, matchPreview } from "@/types/drizzleTypes";
 import { useGet5H2HMatchesQuery } from "@/state/api";
-import { RedCardBadge, StatBar } from "@/lib/uiUtils";
+import { RedCardBadge } from "@/lib/uiUtils";
+import Link from "next/link";
+import { useAppSelector } from "@/state/redux";
+import { useDispatch } from "react-redux";
+import { setH2HPage } from "@/state";
+import Pager from "@/components/Pager";
 
 type Segment = "home" | "draw" | "away";
 const PAGE_SIZE = 5;
@@ -43,12 +45,6 @@ function toPercentages(values: number[], total: number): number[] {
   return floored;
 }
 
-// returns a stat from a match
-const getStatValue = (m: matchStats, side: "h" | "a", key: string): number => {
-  const v = m[`${side}${key.slice(1)}` as keyof matchStats];
-  return typeof v === "number" ? v : 0;
-};
-
 function useH2HMatches(h2h: head2Head | null, page: number) {
   const { data, isLoading, isFetching } = useGet5H2HMatchesQuery(
     {
@@ -63,7 +59,6 @@ function useH2HMatches(h2h: head2Head | null, page: number) {
     matches: data?.matches ?? [],
     isLoading: isLoading || isFetching,
     total,
-    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
   };
 }
 
@@ -102,26 +97,25 @@ function TeamLine({
   );
 }
 
-function MatchCard({
-  m,
-  open,
-  onToggle,
-}: {
-  m: matchStats;
-  open: boolean;
-  onToggle: () => void;
-}) {
+// Invisible card so final page keeps size
+function PlaceholderCard() {
+  return (
+    <li aria-hidden className={cn(panel, "invisible")}>
+      <div className="h-12 p-3 box-content" />
+    </li>
+  );
+}
+
+function MatchCard({ m }: { m: matchPreview }) {
   const homeWon = m.fthg! > m.ftag!;
   const awayWon = m.ftag! > m.fthg!;
 
   return (
     <li className={cn(panel, "overflow-hidden")}>
-      <button
-        onClick={onToggle}
-        aria-expanded={open}
+      <Link
+        href={`/postmatch/${m.id}`}
         className={cn(
           "flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-900",
-          open && "bg-gray-50 dark:bg-gray-900",
         )}
       >
         <span className="w-16 shrink-0 text-xs tabular-nums text-gray-500 dark:text-gray-400">
@@ -139,7 +133,7 @@ function MatchCard({
           <TeamLine team={m.awayTeam} red={m.ar} won={awayWon} />
         </div>
 
-        <div className="flex flex-col items-end gap-1.5 text-lg font-bold tabular-nums leading-5">
+        <div className="flex flex-col items-end gap-2 pr-1 text-lg font-bold tabular-nums leading-5">
           <span
             className={
               homeWon ? "text-gray-900 dark:text-white" : "text-gray-400"
@@ -155,72 +149,7 @@ function MatchCard({
             {m.ftag}
           </span>
         </div>
-
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 shrink-0 text-gray-400 transition-transform",
-            open && "rotate-180",
-          )}
-        />
-      </button>
-
-      <AnimatePresence mode="wait">
-        {open && (
-          <motion.div
-            key={`match-${m.id}`}
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0, transition: { duration: 0.3 } }}
-            transition={{ duration: 0.35, ease: [0.45, 0, 0.55, 1] }}
-            className="overflow-hidden"
-          >
-            <div className="border-t border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
-              <div className="mb-3 flex items-center justify-between text-sm text-gray-900 dark:text-gray-100">
-                <Link
-                  href={`/team/${m.homeTeam.split(" ").join("_")}`}
-                  className="flex items-center gap-2 transition-opacity hover:opacity-60"
-                >
-                  <Image
-                    src={`/${getLogoFile(m.homeTeam)}`}
-                    alt={`${m.homeTeam} logo`}
-                    width={32}
-                    height={32}
-                    className="object-contain"
-                  />
-                  {m.homeTeam}
-                </Link>
-                <Link
-                  href={`/team/${m.awayTeam.split(" ").join("_")}`}
-                  className="flex items-center gap-2 transition-opacity hover:opacity-60"
-                >
-                  {m.awayTeam}
-                  <Image
-                    src={`/${getLogoFile(m.awayTeam)}`}
-                    alt={`${m.awayTeam} logo`}
-                    width={32}
-                    height={32}
-                    className="object-contain"
-                  />
-                </Link>
-              </div>
-              {statsKeys.map(({ key, label }) => {
-                const homeValue = getStatValue(m, "h", key);
-                const awayValue = getStatValue(m, "a", key);
-                if (key === "hxg" && homeValue === 0 && awayValue === 0)
-                  return null;
-                return (
-                  <StatBar
-                    key={key}
-                    label={label}
-                    homeValue={homeValue}
-                    awayValue={awayValue}
-                  />
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </Link>
     </li>
   );
 }
@@ -233,14 +162,12 @@ const Head2Head = ({
   homeTeam: string;
 }) => {
   const [hovered, setHovered] = useState<Segment | null>(null);
-  const [page, setPage] = useState(0);
-  const [expandedMatchId, setExpandedMatchId] = useState<number[]>([]);
-  const {
-    matches,
-    isLoading,
-    total: pagedTotal,
-    totalPages,
-  } = useH2HMatches(h2h, page);
+  const dispatch = useDispatch();
+  const page = useAppSelector((state) => state.global.h2hPage);
+  const { matches, isLoading, total: pagedTotal } = useH2HMatches(h2h, page);
+  const setPage = (page: number) => {
+    dispatch(setH2HPage(page));
+  };
 
   if (h2h === null) return null;
 
@@ -275,23 +202,13 @@ const Head2Head = ({
 
   const dim = (key: Segment) =>
     hovered !== null && hovered !== key && "opacity-30";
-
-  const toggle = (id: number) =>
-    setExpandedMatchId((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-
-  const goTo = (next: number) => {
-    setPage(next);
-    setExpandedMatchId([]);
-  };
-
-  const first = page * PAGE_SIZE + 1;
-  const last = Math.min((page + 1) * PAGE_SIZE, pagedTotal);
+  // Only pad when paging exists: a series with 3 meetings in total should just show 3
+  const fillers =
+    total > PAGE_SIZE ? Math.max(0, PAGE_SIZE - matches.length) : 0;
 
   return (
     <section className="space-y-4 rounded-lg bg-gray-100 p-4 dark:bg-gray-900">
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+      <h2 className="text-center text-2xl font-bold text-gray-900 dark:text-white">
         Head to head
       </h2>
 
@@ -362,29 +279,13 @@ const Head2Head = ({
               <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Recent meetings
               </h3>
-              {pagedTotal > 0 && (
-                <div className="flex items-center gap-2 text-xs tabular-nums text-gray-500 dark:text-gray-400">
-                  <span>
-                    {first}–{last} of {pagedTotal}
-                  </span>
-                  <button
-                    onClick={() => goTo(page - 1)}
-                    disabled={page == 0 || isLoading}
-                    aria-label="Previous page"
-                    className="rounded p-1 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-gray-800"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => goTo(page + 1)}
-                    disabled={page >= totalPages - 1 || isLoading}
-                    aria-label="Next page"
-                    className="rounded p-1 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-gray-800"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
+              <Pager
+                page={page}
+                pageSize={PAGE_SIZE}
+                total={total}
+                disabled={isLoading}
+                onChange={setPage}
+              />
             </div>
 
             <ul
@@ -394,12 +295,10 @@ const Head2Head = ({
               )}
             >
               {matches.map((m) => (
-                <MatchCard
-                  key={m.id}
-                  m={m}
-                  open={expandedMatchId.includes(m.id)}
-                  onToggle={() => toggle(m.id)}
-                />
+                <MatchCard key={m.id} m={m} />
+              ))}
+              {Array.from({ length: fillers }, (_, i) => (
+                <PlaceholderCard key={`filler-${i}`} />
               ))}
             </ul>
           </div>

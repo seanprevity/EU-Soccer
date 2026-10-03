@@ -1,33 +1,19 @@
 "use client";
 
-import {
-  MatchTimeline,
-  RedCardBadge,
-  renderForm,
-  StatBar,
-} from "@/lib/uiUtils";
-import {
-  getLogoFile,
-  getResultColors,
-  getMatchResult,
-  statsKeys,
-} from "@/lib/utils";
+import { RedCardBadge } from "@/lib/uiUtils";
+import { getLogoFile, getResultColors, getMatchResult } from "@/lib/utils";
 import { useGetLast5MatchesQuery } from "@/state/api";
-import { matchStats } from "@/types/drizzleTypes";
-import { AnimatePresence, motion } from "framer-motion";
+import { matchPreview } from "@/types/drizzleTypes";
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
 import Pager from "@/components/Pager";
+import { useDispatch } from "react-redux";
+import { useAppSelector } from "@/state/redux";
+import { setAwayRFPage, setHomeRFPage } from "@/state";
 
 const PAGE_SIZE = 5;
 
 const teamHref = (team: string) => `/team/${team.split(" ").join("_")}`;
-
-const readStat = (m: matchStats, side: "h" | "a", key: string): number => {
-  const v = m[`${side}${key.slice(1)}` as keyof matchStats];
-  return typeof v === "number" ? v : 0;
-};
 
 function useRecentMatches(team: string, page: number) {
   const { data, isLoading, isFetching } = useGetLast5MatchesQuery({
@@ -39,7 +25,6 @@ function useRecentMatches(team: string, page: number) {
     matches: data?.matches ?? [],
     isLoading: isLoading || isFetching,
     total,
-    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
   };
 }
 
@@ -89,59 +74,16 @@ function Score({ value, won }: { value: number | null; won: boolean }) {
   );
 }
 
-function StatsTeam({ team, side }: { team: string; side: "left" | "right" }) {
-  const logo = (
-    <Image
-      src={`/${getLogoFile(team)}`}
-      alt={`${team} logo`}
-      width={36}
-      height={36}
-      className="object-contain"
-    />
-  );
-  return (
-    <div
-      className={`flex items-center gap-1.5 sm:gap-2 ${side === "left" ? "text-left" : "text-right"}`}
-    >
-      {side === "left" && logo}
-      <span className="text-sm sm:text-base">
-        <Link
-          href={teamHref(team)}
-          className="no-underline gap-2 hover:opacity-60 transition-opacity"
-        >
-          {team}
-        </Link>
-      </span>
-      {side === "right" && logo}
-    </div>
-  );
-}
-
-function MatchCard({
-  m,
-  team,
-  open,
-  onToggle,
-}: {
-  m: matchStats;
-  team: string;
-  open: boolean;
-  onToggle: () => void;
-}) {
+function MatchRow({ m, team }: { m: matchPreview; team: string }) {
   const colors = getResultColors(getMatchResult(m, team));
   const homeWon = m.fthg! > m.ftag!;
   const awayWon = m.ftag! > m.fthg!;
 
   return (
     <li className="bg-white dark:bg-gray-800 rounded-md shadow-sm overflow-hidden">
-      <button
-        onClick={onToggle}
-        aria-expanded={open}
-        className={`relative w-full flex items-center ${colors.gradient} p-2 sm:p-3 hover:bg-gray-100 dark:hover:bg-gray-700 hover:rounded-md cursor-pointer transition text-left gap-3 ${
-          open
-            ? "hover:rounded-b-none bg-gray-300 dark:bg-gray-600 rounded-t-md"
-            : ""
-        }`}
+      <Link
+        href={`/postmatch/${m.id}`}
+        className={`relative w-full flex items-center ${colors.gradient} p-2 sm:p-3 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer transition text-left gap-3`}
       >
         <div
           className={`absolute left-0 top-1/2 -translate-y-1/2 w-3 h-[55%] ${colors.rectangle} rounded-r-md -translate-x-1/2 z-10`}
@@ -168,79 +110,24 @@ function MatchCard({
             <Score value={m.ftag} won={awayWon} />
           </div>
         </div>
-      </button>
-
-      <AnimatePresence mode="wait">
-        {open && (
-          <motion.div
-            key={`match-${m.id}`}
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0, transition: { duration: 0.3 } }}
-            transition={{ duration: 0.35, ease: [0.45, 0, 0.55, 1] }}
-            className="overflow-hidden"
-          >
-            <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-600 border-t dark:border-gray-800 rounded-b-md">
-              <h4 className="text-center text-xs sm:text-sm font-bold text-gray-600 dark:text-gray-200 mb-2 sm:mb-3">
-                Match Stats Comparison
-              </h4>
-              <div className="flex items-center justify-between mb-2 sm:mb-3 dark:text-gray-200">
-                <StatsTeam team={m.homeTeam} side="left" />
-                <StatsTeam team={m.awayTeam} side="right" />
-              </div>
-
-              {m.events && (
-                <div className="mb-3 border-b border-gray-200 pb-3 dark:border-gray-600">
-                  <MatchTimeline events={m.events} />
-                </div>
-              )}
-
-              {statsKeys.map(({ key, label }) => {
-                const homeValue = readStat(m, "h", key);
-                const awayValue = readStat(m, "a", key);
-                if (
-                  (key === "hxg" || key === "hposs") &&
-                  homeValue === 0 &&
-                  awayValue === 0
-                )
-                  return null;
-                return (
-                  <StatBar
-                    key={key}
-                    label={label}
-                    homeValue={homeValue}
-                    awayValue={awayValue}
-                  />
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </Link>
     </li>
   );
 }
 
-function TeamColumn({ team, form }: { team: string; form: string | null }) {
-  const [page, setPage] = useState(0);
-  const [expanded, setExpanded] = useState<number[]>([]);
-  const { matches, isLoading, total, totalPages } = useRecentMatches(
-    team,
-    page,
+function TeamColumn({ team, isHome }: { team: string; isHome: boolean }) {
+  const dispatch = useDispatch();
+  const page = useAppSelector((state) =>
+    isHome ? state.global.homeRFPage : state.global.awayRFPage,
   );
-
-  const toggle = (id: number) =>
-    setExpanded((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-
-  const goTo = (next: number) => {
-    setPage(next);
-    setExpanded([]);
+  const setPage = (page: number) => {
+    if (isHome) dispatch(setHomeRFPage(page));
+    else dispatch(setAwayRFPage(page));
   };
+  const { matches, isLoading, total } = useRecentMatches(team, page);
 
   return (
-    <div className="w-full md:w-1/2 px-2 self-stretch">
+    <div className="w-full md:flex-1 md:max-w-xl px-2 self-stretch">
       <div className="flex flex-col items-center mb-4">
         <Image
           src={`/${getLogoFile(team)}`}
@@ -257,9 +144,6 @@ function TeamColumn({ team, form }: { team: string; form: string | null }) {
             {team}
           </Link>
         </h3>
-        <span className="px-1 py-2 justify-center gap-[2px] flex">
-          {renderForm(form)}
-        </span>
       </div>
 
       {isLoading && !matches.length ? (
@@ -271,28 +155,21 @@ function TeamColumn({ team, form }: { team: string; form: string | null }) {
           No recent matches.
         </div>
       ) : (
-        <div className="max-w-xl mx-auto mb-6">
+        <div className="mb-6">
           <div className="flex justify-end mb-2">
             <Pager
               page={page}
               pageSize={PAGE_SIZE}
               total={total}
-              totalPages={totalPages}
               disabled={isLoading}
-              onChange={goTo}
+              onChange={setPage}
             />
           </div>
           <ul
             className={`space-y-3 sm:space-y-4 transition-opacity ${isLoading ? "opacity-50" : ""}`}
           >
             {matches.map((m) => (
-              <MatchCard
-                key={m.id}
-                m={m}
-                team={team}
-                open={expanded.includes(m.id)}
-                onToggle={() => toggle(m.id)}
-              />
+              <MatchRow key={m.id} m={m} team={team} />
             ))}
           </ul>
         </div>
@@ -304,21 +181,17 @@ function TeamColumn({ team, form }: { team: string; form: string | null }) {
 const RecentForm = ({
   homeTeam,
   awayTeam,
-  homeForm,
-  awayForm,
 }: {
   homeTeam: string;
   awayTeam: string;
-  homeForm: string | null;
-  awayForm: string | null;
 }) => (
   <div className="w-full pt-2">
     <h2 className="text-center text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 md:mb-0 mt-6">
-      Recent Form
+      Match History
     </h2>
-    <div className="flex flex-col gap-1 md:flex-row w-full items-start justify-center">
-      <TeamColumn team={homeTeam} form={homeForm} />
-      <TeamColumn team={awayTeam} form={awayForm} />
+    <div className="flex flex-col md:flex-row w-full items-start justify-center gap-6 md:gap-8">
+      <TeamColumn team={homeTeam} isHome={true} />
+      <TeamColumn team={awayTeam} isHome={false} />
     </div>
   </div>
 );

@@ -1,10 +1,10 @@
 import express from "express";
 import {
-  getGoalScorers,
   getStandings,
   getTeamStandings,
   getRecentTeamStandings,
   getRecentTableStandings,
+  getTeamsExpectedStandings,
 } from "../controllers/standingsController";
 
 const router = express.Router();
@@ -13,7 +13,7 @@ const router = express.Router();
 router.get("/", getStandings);
 router.get("/recent", getRecentTeamStandings);
 router.get("/table", getRecentTableStandings);
-router.get("/goal-scorers", getGoalScorers);
-router.get('/teams', getTeamStandings);
+router.get("/teams", getTeamStandings);
+router.get("/expected", getTeamsExpectedStandings);
 
 export default router;

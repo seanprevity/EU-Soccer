@@ -12,6 +12,8 @@ import {
   primaryKey,
   doublePrecision,
   jsonb,
+  index,
+  date,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -20,9 +22,62 @@ export type MatchEvent = {
   extraMinute: number | null;
   side: "home" | "away" | null;
   player: string | null;
+  playerOut?: string | null;
   assist: string | null;
-  kind: "goal" | "penalty" | "own_goal" | "yellow" | "red" | "second_yellow";
+  kind:
+    | "goal"
+    | "penalty"
+    | "own_goal"
+    | "yellow"
+    | "red"
+    | "second_yellow"
+    | "sub";
 };
+
+export type LineupPlayer = {
+  espnId: string;
+  name: string;
+  shortName: string | null;
+  jersey: string | null;
+  position: string | null;
+  positionName: string | null;
+  formationPlace: number | null;
+  starter: boolean;
+  subbedIn: boolean;
+  subbedOut: boolean;
+  headshot: string | null;
+};
+
+export type MatchPreview = {
+  id: number;
+  espnId: string | null;
+  homeTeam: string;
+  awayTeam: string;
+  league: string;
+  matchDate: string | null;
+  ftr: string | null;
+  fthg: number | null;
+  ftag: number | null;
+  hr: number | null;
+  ar: number | null;
+};
+
+export type TeamLineup = { formation: string | null; players: LineupPlayer[] };
+export type MatchLineups = { home: TeamLineup; away: TeamLineup };
+
+// Leaderboard name -> squad column it's ranked by
+export const TOP_PLAYER_CATEGORIES = {
+  goals: "goals",
+  assists: "assists",
+  saves: "saves",
+  yellow_cards: "yellowCards",
+  red_cards: "redCards",
+} as const;
+
+export type TopPlayerCategory = keyof typeof TOP_PLAYER_CATEGORIES;
+
+export const isTopPlayerCategory = (c: string): c is TopPlayerCategory =>
+  Object.hasOwn(TOP_PLAYER_CATEGORIES, c);
 
 export const odds = pgTable(
   "odds",
@@ -108,6 +163,10 @@ export const players = pgTable(
   {
     name: text().primaryKey().notNull(),
     imageUrl: text("image_url"),
+    imageCheckedAt: timestamp("image_checked_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
   },
   (table) => [
     pgPolicy("Service role full write", {
@@ -129,16 +188,14 @@ export const upcomingMatches = pgTable(
   "upcomingMatches",
   {
     // You can use { mode: "bigint" } if numbers are exceeding js number limitations
-    id: bigint({ mode: "number" })
-      .primaryKey()
-      .generatedByDefaultAsIdentity({
-        name: "upcoming_matches_id_seq",
-        startWith: 1,
-        increment: 1,
-        minValue: 1,
-        maxValue: 9223372036854775807,
-        cache: 1,
-      }),
+    id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+      name: "upcoming_matches_id_seq",
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 9223372036854775807,
+      cache: 1,
+    }),
     matchDate: text("MatchDate").notNull(),
     homeTeam: text("HomeTeam").notNull(),
     awayTeam: text("AwayTeam").notNull(),
@@ -183,16 +240,14 @@ export const matchStats = pgTable(
   "matchStats",
   {
     // You can use { mode: "bigint" } if numbers are exceeding js number limitations
-    id: bigint({ mode: "number" })
-      .primaryKey()
-      .generatedByDefaultAsIdentity({
-        name: "match_stats_id_seq",
-        startWith: 1,
-        increment: 1,
-        minValue: 1,
-        maxValue: 9223372036854775807,
-        cache: 1,
-      }),
+    id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+      name: "match_stats_id_seq",
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 9223372036854775807,
+      cache: 1,
+    }),
     homeTeam: text("HomeTeam").notNull(),
     awayTeam: text("AwayTeam").notNull(),
     matchDate: text("MatchDate"),
@@ -218,6 +273,11 @@ export const matchStats = pgTable(
     events: jsonb("Events"),
     hposs: doublePrecision("HPoss"),
     aposs: doublePrecision("APoss"),
+    hbs: integer("HBS"),
+    abs: integer("ABS"),
+    hsv: integer("HSV"),
+    asv: integer("ASV"),
+    lineups: jsonb("Lineups"),
   },
   (table) => [
     foreignKey({
@@ -253,16 +313,14 @@ export const standings = pgTable(
   "standings",
   {
     // You can use { mode: "bigint" } if numbers are exceeding js number limitations
-    id: bigint({ mode: "number" })
-      .primaryKey()
-      .generatedByDefaultAsIdentity({
-        name: "standings_id_seq",
-        startWith: 1,
-        increment: 1,
-        minValue: 1,
-        maxValue: 9223372036854775807,
-        cache: 1,
-      }),
+    id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+      name: "standings_id_seq",
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 9223372036854775807,
+      cache: 1,
+    }),
     league: text().notNull(),
     name: text().notNull(),
     season: text().notNull(),
@@ -314,11 +372,13 @@ export const standings = pgTable(
   ],
 );
 
-export const goalScorers = pgTable(
-  "goalScorers",
+export const topPlayers = pgTable(
+  "topPlayers",
   {
     player: text().notNull(),
-    goals: integer().notNull(),
+    value: integer().notNull(),
+    category: text().notNull(),
+    appearances: integer(),
     season: text().notNull(),
     team: text().notNull(),
     league: text(),
@@ -340,7 +400,12 @@ export const goalScorers = pgTable(
       foreignColumns: [teams.teamName],
       name: "goalScorers_team_fkey",
     }).onUpdate("cascade"),
-    unique("goalscorers_name_season_unique").on(table.player, table.season),
+    unique("top_players_unique").on(
+      table.league,
+      table.season,
+      table.category,
+      table.player,
+    ),
     pgPolicy("Service role full write", {
       as: "permissive",
       for: "all",
@@ -359,21 +424,44 @@ export const goalScorers = pgTable(
 export const squad = pgTable(
   "squad",
   {
-    // You can use { mode: "bigint" } if numbers are exceeding js number limitations
-    id: bigint({ mode: "number" })
-      .primaryKey()
-      .generatedByDefaultAsIdentity({
-        name: "squad_id_seq",
-        startWith: 1,
-        increment: 1,
-        minValue: 1,
-        maxValue: 9223372036854775807,
-        cache: 1,
-      }),
+    id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+      name: "squad_id_seq",
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 9223372036854775807,
+      cache: 1,
+    }),
     player: text(),
     position: text(),
     number: integer(),
     team: text(),
+    league: text(),
+    espnId: text("espn_id"),
+    // Bio
+    nationality: text(),
+    nationalityCode: text("nationality_code"),
+    flagUrl: text("flag_url"),
+    dateOfBirth: date("date_of_birth"),
+    heightIn: integer("height_in"),
+    weightLbs: integer("weight_lbs"),
+    // League stats for statsSeason (null when ESPN sent no stats for the player)
+    statsSeason: text("stats_season"),
+    appearances: integer(),
+    subIns: integer("sub_ins"),
+    goals: integer(),
+    assists: integer(),
+    ownGoals: integer("own_goals"),
+    shots: integer(),
+    shotsOnTarget: integer("shots_on_target"),
+    yellowCards: integer("yellow_cards"),
+    redCards: integer("red_cards"),
+    foulsCommitted: integer("fouls_committed"),
+    foulsSuffered: integer("fouls_suffered"),
+    offsides: integer(),
+    saves: integer(),
+    goalsConceded: integer("goals_conceded"),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
   },
   (table) => [
     foreignKey({
@@ -387,6 +475,7 @@ export const squad = pgTable(
       name: "squad_team_fkey",
     }).onUpdate("cascade"),
     unique("squad_team_player_unique").on(table.player, table.team),
+    index("squad_espn_id_idx").on(table.espnId),
     pgPolicy("Allow public read", {
       as: "permissive",
       for: "select",

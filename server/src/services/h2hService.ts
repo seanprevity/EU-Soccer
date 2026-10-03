@@ -1,4 +1,4 @@
-import { head2Head, matchStats } from "../../drizzle/schema";
+import { head2Head, MatchPreview, matchStats } from "../../drizzle/schema";
 import { eq, and, or, desc, count } from "drizzle-orm";
 import { db } from "../lib/db";
 import { upcomingMatches } from "../../drizzle/schema";
@@ -16,14 +16,26 @@ export const get5H2HMatchesService = async (
   teamA: string,
   teamB: string,
   page = 0,
-): Promise<{ matches: MatchRow[] }> => {
+): Promise<{ matches: MatchPreview[] }> => {
   const [team1, team2] = [teamA, teamB].sort();
   const where = or(
     and(eq(matchStats.homeTeam, team1), eq(matchStats.awayTeam, team2)),
     and(eq(matchStats.homeTeam, team2), eq(matchStats.awayTeam, team1)),
   );
   const matches = await db
-    .select()
+    .select({
+      id: matchStats.id,
+      espnId: matchStats.espnId,
+      homeTeam: matchStats.homeTeam,
+      awayTeam: matchStats.awayTeam,
+      league: matchStats.league,
+      matchDate: matchStats.matchDate,
+      ftr: matchStats.ftr,
+      fthg: matchStats.fthg,
+      ftag: matchStats.ftag,
+      hr: matchStats.hr,
+      ar: matchStats.ar,
+    })
     .from(matchStats)
     .where(where)
     .orderBy(desc(matchStats.matchDate))

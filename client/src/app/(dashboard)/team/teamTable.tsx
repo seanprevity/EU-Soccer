@@ -2,13 +2,46 @@
 
 import { renderForm } from "@/lib/uiUtils";
 import { currentSeason, getLogoFile, HEADER_CONFIG } from "@/lib/utils";
-import { useGetRecentTableStandingsQuery } from "@/state/api";
-import { Standings } from "@/types/drizzleTypes";
+import {
+  useGetRecentTableStandingsQuery,
+  useGetTeamsExpectedStandingsQuery,
+} from "@/state/api";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useMemo, useState } from "react";
 
-// this will be the table that highlights the selected team
+function PerformanceArrow({
+  position,
+  expected,
+}: {
+  position: number;
+  expected: number;
+}) {
+  if (position === expected) return null;
+  const up = position < expected;
+  return (
+    <>
+      <svg
+        viewBox="0 0 10 8"
+        width={8}
+        height={7}
+        aria-hidden="true"
+        className="shrink-0"
+      >
+        <path
+          d={up ? "M5 0 10 8H0Z" : "M5 8 0 0H10Z"}
+          fill={up ? "#16a34a" : "#dc2626"}
+        />
+      </svg>
+      <span className="sr-only">
+        {up
+          ? "Outperforming expected position"
+          : "Underperforming expected position"}
+      </span>
+    </>
+  );
+}
+
 const TeamTable = ({
   teamName,
   league,
@@ -18,6 +51,32 @@ const TeamTable = ({
 }) => {
   const { data: teams, isLoading: isStandingsLoading } =
     useGetRecentTableStandingsQuery({ team: teamName });
+
+  const teamNames = useMemo(
+    () => (teams ?? []).map((t) => t.name).sort(),
+    [teams],
+  );
+  const { data: xPositions, isFetching: isXPositionsLoading } =
+    useGetTeamsExpectedStandingsQuery(
+      { teams: teamNames },
+      { skip: !teamNames.length },
+    );
+
+  const rows = useMemo(() => {
+    const byTeam = new Map((xPositions ?? []).map((x) => [x.team, x]));
+    return (teams ?? []).map((t) => {
+      const x = byTeam.get(t.name);
+      const hasHistory = x?.expectedPosition != null;
+      return {
+        ...t,
+        expectedPosition: hasHistory
+          ? Number(x!.expectedPosition!.toFixed(1))
+          : t.position,
+        expectedSeasons: x?.seasons ?? 0,
+        hasHistory,
+      };
+    });
+  }, [teams, xPositions]);
 
   const [sortConfig, setSortConfig] = useState({
     key: "position",
@@ -37,9 +96,9 @@ const TeamTable = ({
   };
 
   const sortedTeams = useMemo(() => {
-    if (!teams) return [];
-    return [...teams].sort((a, b) => {
-      const key = sortConfig.key as keyof Standings;
+    if (!rows.length) return [];
+    return [...rows].sort((a, b) => {
+      const key = sortConfig.key as keyof (typeof rows)[number];
       let aVal = a[key];
       let bVal = b[key];
 
@@ -58,7 +117,7 @@ const TeamTable = ({
       if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
       return 0;
     });
-  }, [teams, sortConfig]);
+  }, [rows, sortConfig]);
 
   if (isStandingsLoading) {
     return (
@@ -161,6 +220,28 @@ const TeamTable = ({
                       />
                     )}
                     <span className="relative z-10">{team.position}</span>
+                  </td>
+                  <td
+                    className="px-1 py-1 text-center tabular-nums text-black dark:text-gray-200"
+                    title={
+                      team.hasHistory
+                        ? `Average finish over ${team.expectedSeasons} season${team.expectedSeasons === 1 ? "" : "s"}`
+                        : "No previous seasons in this league, showing current position"
+                    }
+                  >
+                    {isXPositionsLoading ? (
+                      "…"
+                    ) : (
+                      <span className="inline-flex items-center justify-center gap-1">
+                        {team.hasHistory
+                          ? team.expectedPosition.toFixed(1)
+                          : team.expectedPosition}
+                        <PerformanceArrow
+                          position={team.position}
+                          expected={team.expectedPosition}
+                        />
+                      </span>
+                    )}
                   </td>
                   <td className="px-2 py-1 text-left font-medium">
                     <Link

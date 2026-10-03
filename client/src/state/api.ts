@@ -3,14 +3,17 @@ import {
   Standings,
   matchStats,
   upcomingMatches,
-  goalScorers,
+  topPlayers,
   head2Head,
   odds,
   teamStats,
   teams,
   leagues,
-  squad,
+  SquadPlayer,
   simulation,
+  matchPreview,
+  ExpectedStanding,
+  TopPlayerCategory,
 } from "@/types/drizzleTypes";
 import { withToast } from "@/lib/utils";
 
@@ -23,7 +26,7 @@ export const api = createApi({
     "Standings",
     "matchStats",
     "upcomingMatches",
-    "goalScorers",
+    "topPlayers",
     "head2Head",
     "odds",
     "teamStats",
@@ -80,23 +83,20 @@ export const api = createApi({
       },
     }),
 
-    // gets top goal scorers for a specific season + league from db
-    getGoalScorers: build.query<
-      goalScorers[],
-      { league: string; season: string }
+    // gets top players for a specific season, league, and category from db
+    getTopPlayers: build.query<
+      topPlayers[],
+      { league: string; season: string; category: TopPlayerCategory }
     >({
-      query: ({ league, season }) => {
-        const leagueParam = league.split(" ").join("_");
-        const seasonParams = season.split("/");
-        return {
-          url: `/standings/goal-scorers?league=${leagueParam}&season=${seasonParams[0]}`,
-          method: "GET",
-        };
-      },
+      query: ({ league, season, category }) => ({
+        url: `/squad/top-players`,
+        method: "GET",
+        params: { league, season: season.split("/")[0], category },
+      }),
       providesTags: ["Standings"],
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
-          error: "Failed to get top goal scorers.",
+          error: "Failed to get top players.",
         });
       },
     }),
@@ -175,7 +175,7 @@ export const api = createApi({
       },
     }),
 
-    getPastMatches: build.query<matchStats[], void>({
+    getPastMatches: build.query<matchPreview[], void>({
       query: () => ({
         url: `/matches/past`,
         method: "GET",
@@ -187,7 +187,7 @@ export const api = createApi({
       },
     }),
 
-    // gets stats for 1 or more matches
+    // gets stats for 1 or more matches (used right now for post match page with one id, needs all stats)
     getMatchStats: build.query<matchStats[], { ids: number[] | number }>({
       query: ({ ids }) => {
         const idParam = Array.isArray(ids) ? ids.join(",") : ids.toString();
@@ -203,32 +203,19 @@ export const api = createApi({
       },
     }),
 
-    // gets match stats for a team, fetches all matches a team has played in current season
-    getTeamMatchStats: build.query<matchStats[], { team: string }>({
-      query: ({ team }) => {
-        const teamParams = team.split(" ").join("_"); // Man United -> Man_United
-        return {
-          url: `/matches/teams?team=${teamParams}`,
-          method: "GET",
-        };
-      },
-      async onQueryStarted(_, { queryFulfilled }) {
-        await withToast(queryFulfilled, {
-          error: "Failed to fetch a team's match stats.",
-        });
-      },
-    }),
-
     // gets last 5 matches in league (not h2h)
     getLast5Matches: build.query<
-      { matches: matchStats[]; total: number },
+      { matches: matchPreview[]; total: number },
       { team: string; page?: number }
     >({
       query: ({ team, page = 0 }) => {
-        const teamParams = team.split(" ").join("_");
         return {
-          url: `/matches/last5?team=${teamParams}&page=${page}`,
+          url: `/matches/last5`,
           method: "GET",
+          params: {
+            team: team,
+            page: page,
+          },
         };
       },
       async onQueryStarted(_, { queryFulfilled }) {
@@ -270,7 +257,7 @@ export const api = createApi({
     }),
 
     get5H2HMatches: build.query<
-      { matches: matchStats[] },
+      { matches: matchPreview[] },
       { team1: string; team2: string; page: number }
     >({
       query: ({ team1, team2, page = 0 }) => {
@@ -278,8 +265,8 @@ export const api = createApi({
           url: "/h2h/matches",
           method: "GET",
           params: {
-            team1: team1.split(" ").join("_"),
-            team2: team2.split(" ").join("_"),
+            team1: team1,
+            team2: team2,
             page,
           },
         };
@@ -351,15 +338,19 @@ export const api = createApi({
       },
     }),
 
+    // gets recent matches for team history page
     getRecentMatches: build.query<
-      matchStats[],
-      { team: string; endDate: string }
+      { matches: matchPreview[]; total: number },
+      { team: string; page: number }
     >({
-      query: ({ team, endDate }) => {
-        const normalizedTeam = team.split(" ").join("_");
+      query: ({ team, page = 0 }) => {
         return {
-          url: `/matches/recent?team=${normalizedTeam}&endDate=${endDate}`,
+          url: `/matches/recent`,
           method: "GET",
+          params: {
+            team: team,
+            page: page,
+          },
         };
       },
       async onQueryStarted(_, { queryFulfilled }) {
@@ -369,12 +360,12 @@ export const api = createApi({
       },
     }),
 
-    getSquad: build.query<squad[], { team: string }>({
+    getSquad: build.query<SquadPlayer[], { team: string }>({
       query: ({ team }) => {
-        const normalizedTeam = team.split(" ").join("_");
         return {
-          url: `/squad?team=${normalizedTeam}`,
+          url: `/squad`,
           method: "GET",
+          params: { team },
         };
       },
       async onQueryStarted(_, { queryFulfilled }) {
@@ -402,6 +393,25 @@ export const api = createApi({
         });
       },
     }),
+
+    getTeamsExpectedStandings: build.query<
+      ExpectedStanding[],
+      { teams: string[] }
+    >({
+      query: ({ teams }) => {
+        return {
+          url: "standings/expected",
+          params: {
+            teams: teams.join(","),
+          },
+        };
+      },
+      async onQueryStarted(_, { queryFulfilled }) {
+        await withToast(queryFulfilled, {
+          error: "Failed to get expected standings.",
+        });
+      },
+    }),
   }),
 });
 
@@ -409,7 +419,7 @@ export const {
   useGetStandingsQuery,
   useGetRecentTeamStandingsQuery,
   useGetRecentTableStandingsQuery,
-  useGetGoalScorersQuery,
+  useGetTopPlayersQuery,
   useGetHead2HeadQuery,
   useGet5H2HMatchesQuery,
   useGetMatchStatsQuery,
@@ -420,7 +430,6 @@ export const {
   useGetTeamStandingsQuery,
   useGetSeasonTeamStatsQuery,
   useGetLast5TeamStatsQuery,
-  useGetTeamMatchStatsQuery,
   useGetUpcomingHead2HeadQuery,
   useGetUpcomingMatchByIdQuery,
   useGetTeamByNameQuery,
@@ -428,6 +437,7 @@ export const {
   useGetRecentMatchesQuery,
   useGetSquadQuery,
   useGetSimulationQuery,
+  useGetTeamsExpectedStandingsQuery,
 } = api;
 
 export const { endpoints } = api;

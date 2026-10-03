@@ -3,7 +3,6 @@ import {
   getLast5MatchesService,
   getMatchStatsService,
   getOddsService,
-  getTeamMatchStatsService,
   getUpcomingMatchByIdService,
   getUpcomingMatchesService,
   getRecentMatchesService,
@@ -88,27 +87,6 @@ export const getOdds = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-export const getTeamMatchStats = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  try {
-    const team = req.query.team as string;
-    if (!team) {
-      res.status(400).json({ message: "Missing 'team' parameter" });
-      return;
-    }
-    const normalizedTeam = team.split("_").join(" ");
-    const data = await getTeamMatchStatsService(normalizedTeam);
-    res.json(data);
-  } catch (err: any) {
-    console.error("Failed to fetch a team's match stats. ", err);
-    res.status(500).json({
-      message: `Error fetching a team's match stats: ${err.message}`,
-    });
-  }
-};
-
 export const getUpcomingMatchById = async (
   req: Request,
   res: Response,
@@ -139,9 +117,8 @@ export const getLast5Matches = async (
 ): Promise<void> => {
   try {
     const team = req.query.team as string;
-    const normalizedTeam = team.split("_").join(" ");
     const page = Math.max(0, Number(req.query.page ?? 0));
-    const data = await getLast5MatchesService(normalizedTeam, page);
+    const data = await getLast5MatchesService(team, page);
     res.json(data);
   } catch (err: any) {
     console.error("Failed to get last 5 matches: ", err);
@@ -157,9 +134,8 @@ export const getRecentMatches = async (
 ): Promise<void> => {
   try {
     const team = req.query.team as string;
-    const endDate = req.query.endDate as string;
-    const normalizedTeam = team.split("_").join(" ");
-    const data = await getRecentMatchesService(normalizedTeam, endDate);
+    const page = Math.max(0, Number(req.query.page ?? 0));
+    const data = await getRecentMatchesService(team, page);
     res.json(data);
   } catch (err: any) {
     console.error("Error fetching recent matches: ", err);

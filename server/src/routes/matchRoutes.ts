@@ -2,7 +2,6 @@ import express from "express";
 import {
   getMatchStats,
   getOdds,
-  getTeamMatchStats,
   getUpcomingMatches,
   getUpcomingMatchById,
   getLast5Matches,
@@ -19,7 +18,6 @@ router.get("/upcoming", getUpcomingMatches);
 router.get("/past", getPastMatches);
 router.get("/upcoming/:id", getUpcomingMatchById);
 router.get("/odds/:id", getOdds);
-router.get("/teams", getTeamMatchStats);
 router.get("/last5", getLast5Matches);
 router.get("/recent", getRecentMatches);
 router.get("/simulation", getSimulation);

@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { upcomingMatches, odds, teams, leagues, matchStats, standings, goalScorers, players, squad, head2Head } from "./schema";
+import { upcomingMatches, odds, teams, leagues, matchStats, standings, topPlayers, players, squad, head2Head } from "./schema";
 
 export const oddsRelations = relations(odds, ({one}) => ({
 	upcomingMatch: one(upcomingMatches, {
@@ -40,7 +40,7 @@ export const teamsRelations = relations(teams, ({many}) => ({
 		relationName: "matchStats_homeTeam_teams_teamName"
 	}),
 	standings: many(standings),
-	goalScorers: many(goalScorers),
+	topPlayers: many(topPlayers),
 	squads: many(squad),
 	head2Heads_team1: many(head2Head, {
 		relationName: "head2Head_team1_teams_teamName"
@@ -54,7 +54,7 @@ export const leaguesRelations = relations(leagues, ({many}) => ({
 	upcomingMatches: many(upcomingMatches),
 	matchStats: many(matchStats),
 	standings: many(standings),
-	goalScorers: many(goalScorers),
+	topPlayers: many(topPlayers),
 }));
 
 export const matchStatsRelations = relations(matchStats, ({one}) => ({
@@ -85,24 +85,24 @@ export const standingsRelations = relations(standings, ({one}) => ({
 	}),
 }));
 
-export const goalScorersRelations = relations(goalScorers, ({one}) => ({
-	league: one(leagues, {
-		fields: [goalScorers.league],
-		references: [leagues.name]
-	}),
-	player: one(players, {
-		fields: [goalScorers.player],
-		references: [players.name]
-	}),
-	team: one(teams, {
-		fields: [goalScorers.team],
-		references: [teams.teamName]
-	}),
+export const topPlayersRelations = relations(topPlayers, ({ one }) => ({
+  league: one(leagues, {
+    fields: [topPlayers.league],
+    references: [leagues.name],
+  }),
+  player: one(players, {
+    fields: [topPlayers.player],
+    references: [players.name],
+  }),
+  team: one(teams, {
+    fields: [topPlayers.team],
+    references: [teams.teamName],
+  }),
 }));
 
-export const playersRelations = relations(players, ({many}) => ({
-	goalScorers: many(goalScorers),
-	squads: many(squad),
+export const playersRelations = relations(players, ({ many }) => ({
+  	topPlayers: many(topPlayers),
+  	squads: many(squad),
 }));
 
 export const squadRelations = relations(squad, ({one}) => ({

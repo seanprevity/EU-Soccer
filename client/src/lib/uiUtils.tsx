@@ -1,6 +1,13 @@
-import { MatchEvent, Standings, teamStats } from "@/types/drizzleTypes";
+import {
+  LineupPlayer,
+  MatchEvent,
+  MatchLineups,
+  Standings,
+  TeamLineup,
+  teamStats,
+} from "@/types/drizzleTypes";
 import React from "react";
-import { calculatePercentage, cn, getLogoFile } from "./utils";
+import { calculatePercentage, cn, formationLayout, getLogoFile } from "./utils";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -492,183 +499,528 @@ export function RedCardBadge({ count }: { count: number | null | undefined }) {
   );
 }
 
-const isGoalKind = (kind: MatchEvent["kind"]) =>
+export function FormationPitch({ lineup }: { lineup: TeamLineup }) {
+  const placed = formationLayout(lineup);
+  if (!placed) return null; // show MatchLineupList instead
+
+  return (
+    <div className="relative aspect-[3/4] w-full rounded bg-green-700">
+      {placed.map(({ player, x, y }) => (
+        <div
+          key={player.espnId || player.name}
+          className="absolute flex w-16 -translate-x-1/2 -translate-y-1/2 flex-col items-center text-center"
+          style={{ left: `${x}%`, top: `${y}%` }}
+        >
+          {player.headshot ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={player.headshot}
+              alt=""
+              className="h-8 w-8 rounded-full bg-white object-cover"
+            />
+          ) : (
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-bold">
+              {player.jersey}
+            </span>
+          )}
+          <span className="w-full truncate text-[10px] text-white">
+            {player.shortName ?? player.name}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PlayerRow({
+  player,
+  subMinute,
+}: {
+  player: LineupPlayer;
+  subMinute: string | null;
+}) {
+  return (
+    <li className="flex items-center gap-2 py-1 text-sm">
+      {player.headshot ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={player.headshot}
+          alt=""
+          className="h-6 w-6 shrink-0 rounded-full bg-gray-200 object-cover dark:bg-gray-700"
+          onError={(e) =>
+            ((e.currentTarget as HTMLImageElement).style.visibility = "hidden")
+          }
+        />
+      ) : (
+        <span className="h-6 w-6 shrink-0 rounded-full bg-gray-200 dark:bg-gray-700" />
+      )}
+      <span className="w-5 shrink-0 text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">
+        {player.jersey}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-gray-900 dark:text-gray-100">
+        {player.name}
+      </span>
+      {player.subbedOut && (
+        <span className="shrink-0 text-xs tabular-nums text-red-600 dark:text-red-400">
+          ↓ {subMinute}
+        </span>
+      )}
+      {player.subbedIn && (
+        <span className="shrink-0 text-xs tabular-nums text-green-600 dark:text-green-400">
+          ↑ {subMinute}
+        </span>
+      )}
+      <span className="w-8 shrink-0 text-right text-xs text-gray-500 dark:text-gray-400">
+        {player.position}
+      </span>
+    </li>
+  );
+}
+
+function TeamLineupColumn({
+  team,
+  lineup,
+  subMinutes,
+}: {
+  team: string;
+  lineup: MatchLineups["home"];
+  subMinutes: Map<string, string>;
+}) {
+  const starters = lineup.players
+    .filter((p) => p.starter)
+    .sort((a, b) => (a.formationPlace ?? 99) - (b.formationPlace ?? 99));
+  const bench = lineup.players.filter((p) => !p.starter);
+
+  return (
+    <div className="min-w-0">
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <h5 className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+          {team}
+        </h5>
+        {lineup.formation && (
+          <span className="shrink-0 text-xs tabular-nums text-gray-500 dark:text-gray-400">
+            {lineup.formation}
+          </span>
+        )}
+      </div>
+      <ul className="divide-y divide-gray-100 dark:divide-gray-700">
+        {starters.map((p) => (
+          <PlayerRow
+            key={p.espnId || p.name}
+            player={p}
+            subMinute={subMinutes.get(p.name) ?? null}
+          />
+        ))}
+      </ul>
+      {bench.length > 0 && (
+        <>
+          <p className="mt-3 mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+            Bench
+          </p>
+          <ul className="divide-y divide-gray-100 dark:divide-gray-700">
+            {bench.map((p) => (
+              <PlayerRow
+                key={p.espnId || p.name}
+                player={p}
+                subMinute={subMinutes.get(p.name) ?? null}
+              />
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function MatchLineupList({
+  lineups,
+  events,
+  homeTeam,
+  awayTeam,
+}: {
+  lineups: MatchLineups | null | undefined;
+  events: MatchEvent[] | null | undefined;
+  homeTeam: string;
+  awayTeam: string;
+}) {
+  if (!lineups) return null;
+
+  // Player name -> minute they came on or went off
+  const subMinutes = new Map<string, string>();
+  for (const e of events ?? []) {
+    if (e.kind !== "sub") continue;
+    const minute = formatMinute(e);
+    if (e.player) subMinutes.set(e.player, minute);
+    if (e.playerOut) subMinutes.set(e.playerOut, minute);
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <TeamLineupColumn
+        team={homeTeam}
+        lineup={lineups.home}
+        subMinutes={subMinutes}
+      />
+      <TeamLineupColumn
+        team={awayTeam}
+        lineup={lineups.away}
+        subMinutes={subMinutes}
+      />
+    </div>
+  );
+}
+// Green arrow up (on) beside a red arrow down (off)
+export function SubArrows({ size = 14 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width={size}
+      height={size}
+      aria-label="Substitution"
+      className="shrink-0"
+    >
+      <path d="M4 1.5 7.5 6H5.2v8.5H2.8V6H.5Z" fill="#16a34a" />
+      <path d="M12 14.5 8.5 10h2.3V1.5h2.4V10h2.3Z" fill="#dc2626" />
+    </svg>
+  );
+}
+
+export const isGoalKind = (kind: MatchEvent["kind"]) =>
   kind === "goal" || kind === "penalty" || kind === "own_goal";
 
-const formatMinute = (e: MatchEvent) =>
+export const formatMinute = (e: MatchEvent) =>
   e.minute == null
     ? ""
     : `${e.minute}${e.extraMinute ? `+${e.extraMinute}` : ""}'`;
 
-const Badge = ({
-  label,
-  title,
-  className,
+export const EVENT_ICON: Record<
+  MatchEvent["kind"],
+  { src: string; alt: string }
+> = {
+  goal: { src: "/goal.svg", alt: "Goal" },
+  penalty: { src: "/penalty.svg", alt: "Penalty goal" },
+  own_goal: { src: "/own-goal.svg", alt: "Own goal" },
+  yellow: { src: "/yellow.svg", alt: "Yellow card" },
+  red: { src: "/Red.svg", alt: "Red card" },
+  second_yellow: { src: "/second-yellow.svg", alt: "Second yellow card" },
+  sub: { src: "/substitution.svg", alt: "Substitution" },
+};
+
+export function EventIcon({
+  kind,
+  size = 16,
 }: {
-  label: string;
-  title: string;
-  className: string;
-}) => (
-  <span
-    title={title}
-    className={cn(
-      "inline-flex h-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-bold leading-none",
-      className,
-    )}
-  >
-    {label}
-  </span>
-);
+  kind: MatchEvent["kind"];
+  size?: number;
+}) {
+  const { src, alt } = EVENT_ICON[kind];
+  const img = (
+    <Image
+      src={src}
+      alt={alt}
+      title={alt}
+      width={size}
+      height={size}
+      unoptimized
+      className="shrink-0 object-contain"
+      style={{ width: size, height: size }}
+    />
+  );
+  if (kind !== "penalty") return img;
 
-const Card = ({ color, title }: { color: "yellow" | "red"; title: string }) => (
-  <span
-    title={title}
-    aria-label={title}
-    className={cn(
-      "inline-block h-3.5 w-2.5 shrink-0 rounded-[2px]",
-      color === "yellow" ? "bg-yellow-400" : "bg-red-600",
-    )}
-  />
-);
-
-function EventIcon({ kind }: { kind: MatchEvent["kind"] }) {
-  switch (kind) {
-    case "penalty":
-      return (
-        <Badge
-          label="PEN"
-          title="Penalty"
-          className="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
-        />
-      );
-    case "own_goal":
-      return (
-        <Badge
-          label="OG"
-          title="Own goal"
-          className="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
-        />
-      );
-    case "yellow":
-      return <Card color="yellow" title="Yellow card" />;
-    case "red":
-      return <Card color="red" title="Red card" />;
-    case "second_yellow":
-      return (
-        <span
-          title="Second yellow"
-          aria-label="Second yellow"
-          className="relative inline-flex h-3.5 w-3.5 shrink-0"
-        >
-          <span className="absolute left-0 top-0 h-3 w-2 rounded-[2px] bg-yellow-400" />
-          <span className="absolute bottom-0 right-0 h-3 w-2 rounded-[2px] bg-red-600" />
-        </span>
-      );
-    default:
-      return (
-        <span
-          title="Goal"
-          aria-label="Goal"
-          className="shrink-0 text-sm leading-none"
-        >
-          ⚽
-        </span>
-      );
-  }
+  return (
+    <span className="relative inline-flex shrink-0">
+      {img}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute bottom-full left-1/2 mb-px -translate-x-1/2 whitespace-nowrap font-bold leading-none text-gray-900 dark:text-white"
+        style={{ fontSize: Math.max(7, Math.round(size * 0.5)) }}
+      >
+        PEN.
+      </span>
+    </span>
+  );
 }
 
-function EventDetail({
-  event,
-  align,
+const BADGE_CORNER = {
+  "top-right": "-right-1.5 -top-1.5",
+  "bottom-right": "-right-1.5 -bottom-1.5",
+} as const;
+
+export function ArrowBadge({
+  direction,
+  corner = "top-right",
+  size = 16,
 }: {
-  event: MatchEvent;
-  align: "left" | "right";
+  direction: "up" | "down";
+  corner?: keyof typeof BADGE_CORNER;
+  size?: number;
 }) {
-  const goal = isGoalKind(event.kind);
+  const up = direction === "up";
   return (
-    <div className={cn("min-w-0", align === "right" && "text-right")}>
-      <div
-        className={cn(
-          "flex items-center gap-1.5",
-          align === "right" && "flex-row-reverse",
-        )}
-      >
-        <EventIcon kind={event.kind} />
-        <span
-          className={cn(
-            "truncate",
-            goal
-              ? "font-medium text-gray-900 dark:text-gray-100"
-              : "text-gray-600 dark:text-gray-300",
-          )}
-        >
-          {event.player}
-        </span>
-      </div>
-      {goal && event.assist && (
-        <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-          Assist: {event.assist}
+    <Image
+      src={up ? "/sub-on.svg" : "/sub-off.svg"}
+      alt={up ? "Came on" : "Went off"}
+      title={up ? "Came on" : "Went off"}
+      width={size}
+      height={size}
+      unoptimized
+      className={cn("absolute rounded-full shadow", BADGE_CORNER[corner])}
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
+// Player coming on above, player going off below (smaller, faded)
+export function SubStack({
+  on,
+  off,
+  align = "left",
+}: {
+  on: string | null;
+  off: string | null | undefined;
+  align?: "left" | "right";
+}) {
+  return (
+    <div
+      className={cn("min-w-0 leading-tight", align === "right" && "text-right")}
+    >
+      <p className="truncate text-[14px] font-medium text-gray-900 dark:text-gray-100">
+        {on}
+      </p>
+      {off && (
+        <p className="truncate text-[13px] text-gray-500 opacity-70 dark:text-gray-400">
+          {off}
         </p>
       )}
     </div>
   );
 }
 
-// Home events on the left, away on the right; minute in the middle, plus the running score on goal rows.
-// events === null means the match hasn't been synced yet, so nothing renders.
+// Each kind of event has its own weight: goals lead, cards and subs sit quieter.
+function EventContent({
+  event,
+  align,
+}: {
+  event: MatchEvent;
+  align: "left" | "right";
+}) {
+  const row = cn(
+    "flex items-center gap-1.5",
+    align === "right" && "flex-row-reverse",
+  );
+
+  if (event.kind === "sub")
+    return (
+      <div className={row}>
+        <EventIcon kind="sub" size={16} />
+        <SubStack on={event.player} off={event.playerOut} align={align} />
+      </div>
+    );
+
+  if (!isGoalKind(event.kind))
+    return (
+      <div className={row}>
+        <EventIcon kind={event.kind} size={16} />
+        <span className="truncate text-[14px] text-gray-600 dark:text-gray-200">
+          {event.player}
+        </span>
+      </div>
+    );
+
+  return (
+    <div className={row}>
+      <EventIcon kind={event.kind} size={16} />
+      <div
+        className={cn(
+          "min-w-0 leading-tight",
+          align === "right" && "text-right",
+        )}
+      >
+        <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+          {event.player}
+        </p>
+        {event.assist && (
+          <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+            {event.assist}
+          </p>
+        )}
+        {event.kind === "own_goal" && (
+          <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+            Own Goal
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PeriodMarker({ label, score }: { label: string; score?: string }) {
+  return (
+    <li
+      className="flex items-center gap-3 py-1"
+      aria-label={score ? `${label} ${score}` : label}
+    >
+      <span className="h-px flex-1 bg-gray-300 dark:bg-gray-700" />
+      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+        {label}
+        {score && (
+          <span className="ml-2 font-bold tabular-nums text-gray-900 dark:text-gray-100">
+            {score}
+          </span>
+        )}
+      </span>
+      <span className="h-px flex-1 bg-gray-300 dark:bg-gray-700" />
+    </li>
+  );
+}
+
+const periodOf = (e: MatchEvent) => {
+  const m = e.minute ?? 0;
+  if (e.minute == 45 && e.kind == "sub") return 2;
+  return m <= 45 ? 1 : m <= 90 ? 2 : 3;
+};
+
+// Event content plus a connector that fades from the icon into the minute circle
+function SideCell({
+  row,
+  align,
+}: {
+  row: { event: MatchEvent } | undefined;
+  align: "left" | "right";
+}) {
+  if (!row) return <div className="min-w-0" />;
+
+  const connector = (
+    <span
+      aria-hidden
+      className={cn(
+        "h-px w-6 shrink-0 from-gray-400 to-transparent dark:from-gray-600",
+        align === "right" ? "bg-gradient-to-r" : "bg-gradient-to-l",
+      )}
+    />
+  );
+
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 items-center gap-1.5",
+        align === "right" ? "justify-end" : "justify-start",
+      )}
+    >
+      {align === "left" && connector}
+      <div className="min-w-0">
+        <EventContent event={row.event} align={align} />
+      </div>
+      {align === "right" && connector}
+    </div>
+  );
+}
+
 export function MatchTimeline({
   events,
 }: {
   events: MatchEvent[] | null | undefined;
 }) {
-  if (!events) return null;
-  if (!events.length)
+  if (!events?.length)
     return (
-      <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-        No goals or cards
+      <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+        No events recorded for this match.
       </p>
     );
 
   let home = 0;
   let away = 0;
   const rows = events.map((event) => {
-    if (isGoalKind(event.kind)) {
-      if (event.side === "home") home++;
-      else if (event.side === "away") away++;
-      return { event, score: `${home}–${away}` };
-    }
-    return { event, score: null };
+    const goal = isGoalKind(event.kind);
+    if (goal && event.side === "home") home++;
+    if (goal && event.side === "away") away++;
+    return { event, goal, period: periodOf(event), score: `${home}–${away}` };
   });
 
-  return (
-    <ol className="space-y-2">
-      {rows.map(({ event, score }, i) => (
+  const scoreAfter = (period: number) =>
+    [...rows].reverse().find((r) => r.period <= period)?.score ?? "0–0";
+  const hasExtraTime = rows.some((r) => r.period === 3);
+
+  type Row = (typeof rows)[number];
+  type Line = { first: Row; home?: Row; away?: Row };
+
+  // Subs made in the same minute by opposite teams share a line
+  const linesFor = (period: number): Line[] => {
+    const lines: Line[] = [];
+    const subLines = new Map<string, Line[]>(); // minute -> lines holding subs
+
+    for (const r of rows) {
+      if (r.period !== period) continue;
+      const side = r.event.side;
+
+      if (r.event.kind !== "sub" || !side) {
+        lines.push({
+          first: r,
+          home: side === "home" ? r : undefined,
+          away: side === "away" ? r : undefined,
+        });
+        continue;
+      }
+
+      const minute = formatMinute(r.event);
+      const sameMinute = subLines.get(minute) ?? [];
+      const open = sameMinute.find((l) => !l[side]);
+      if (open) {
+        open[side] = r;
+      } else {
+        const line: Line = { first: r, [side]: r };
+        sameMinute.push(line);
+        subLines.set(minute, sameMinute);
+        lines.push(line);
+      }
+    }
+    return lines;
+  };
+
+  const eventRows = (period: number) =>
+    linesFor(period).map(({ first, home, away }, i) => {
+      const { event, goal } = first;
+      return (
         <li
-          key={i}
-          className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-sm"
+          key={`${period}-${i}`}
+          className="grid grid-cols-[1fr_auto_1fr] items-center py-1.5"
         >
-          <div>
-            {event.side === "home" && (
-              <EventDetail event={event} align="right" />
+          <SideCell row={home} align="right" />
+          <span
+            className={cn(
+              "flex h-6 w-10 items-center justify-center rounded-full font-semibold tabular-nums",
+              event.extraMinute ? "text-[10px]" : "text-xs",
+              goal
+                ? "bg-white text-gray-900"
+                : "bg-gray-900 text-white dark:bg-gray-800",
             )}
-          </div>
-          <div className="flex w-12 flex-col items-center tabular-nums leading-tight">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {formatMinute(event)}
-            </span>
-            {score && (
-              <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
-                {score}
-              </span>
-            )}
-          </div>
-          <div>
-            {event.side === "away" && (
-              <EventDetail event={event} align="left" />
-            )}
-          </div>
+          >
+            {formatMinute(event)}
+          </span>
+          <SideCell row={away} align="left" />
         </li>
-      ))}
-    </ol>
-  );
+      );
+    });
+
+  // Built in match order, then reversed so the latest events sit at the top
+  const items = [
+    <PeriodMarker key="ko" label="Kick-off" />,
+    ...eventRows(1),
+    <PeriodMarker key="ht" label="Half-time" score={scoreAfter(1)} />,
+    ...eventRows(2),
+    ...(hasExtraTime
+      ? [
+          <PeriodMarker
+            key="90"
+            label="End of 90 minutes"
+            score={scoreAfter(2)}
+          />,
+          ...eventRows(3),
+        ]
+      : []),
+    <PeriodMarker key="ft" label="Full-time" score={scoreAfter(3)} />,
+  ].reverse();
+
+  return <ol className="space-y-1">{items}</ol>;
 }

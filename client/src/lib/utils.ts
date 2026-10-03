@@ -1,7 +1,13 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { toast } from "sonner";
-import { head2Head, matchStats } from "@/types/drizzleTypes";
+import {
+  head2Head,
+  LineupPlayer,
+  matchPreview,
+  matchStats,
+  TeamLineup,
+} from "@/types/drizzleTypes";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -173,7 +179,10 @@ export function calculatePercentage(value: number, oppositeValue: number) {
   return (value / total) * 100;
 }
 
-export const getMatchResult = (match: matchStats, teamName: string) => {
+export const getMatchResult = (
+  match: matchStats | matchPreview,
+  teamName: string,
+) => {
   const isHomeTeam = match.homeTeam === teamName;
   const teamScore = isHomeTeam ? match.fthg : match.ftag;
   const opponentScore = isHomeTeam ? match.ftag : match.fthg;
@@ -217,6 +226,8 @@ export const statsKeys = [
   { key: "hposs", label: "Possession" },
   { key: "hs", label: "Shots" },
   { key: "hst", label: "Shots on Target" },
+  { key: "hbs", label: "Blocked Shots" },
+  { key: "hsv", label: "Saves" },
   { key: "hc", label: "Corners" },
   { key: "hf", label: "Fouls" },
   { key: "hy", label: "Yellow Cards" },
@@ -224,6 +235,7 @@ export const statsKeys = [
 
 export const HEADER_CONFIG = [
   { label: "Position", key: "position" },
+  { label: "XPosition", key: "expectedPosition" },
   { label: "Club", key: "name" },
   { label: "P", key: "played" },
   { label: "W", key: "won" },
@@ -247,4 +259,109 @@ export function isPastMatch(matchDate: string) {
   console.log(match);
 
   return match < today;
+}
+
+const POSITION_DEPTH: Record<string, number> = {
+  G: 0,
+  LB: 1,
+  RB: 1,
+  CD: 1,
+  "CD-L": 1,
+  "CD-R": 1,
+  LWB: 1.5,
+  RWB: 1.5,
+  DM: 2,
+  "DM-L": 2,
+  "DM-R": 2,
+  LM: 2.5,
+  RM: 2.5,
+  CM: 2.5,
+  "CM-L": 2.5,
+  "CM-R": 2.5,
+  AM: 3,
+  "AM-L": 3,
+  "AM-R": 3,
+  LW: 3,
+  RW: 3,
+  CF: 3.5,
+  "CF-L": 3.5,
+  "CF-R": 3.5,
+  SS: 3.5,
+  LF: 3.5,
+  RF: 3.5,
+  F: 4,
+};
+
+// Left-to-right order within a line: wide positions (LB, LM, RW...) sit outside
+// the "-L"/"-R" central ones (CD-L, CM-R...), plain positions (CD, AM, F) in the middle.
+const lateral = (pos: string | null) => {
+  if (!pos) return 0;
+  if (/-L$/.test(pos)) return -1;
+  if (/-R$/.test(pos)) return 1;
+  if (/^L/.test(pos)) return -2;
+  if (/^R/.test(pos)) return 2;
+  return 0;
+};
+
+export type PitchPlayer = { player: LineupPlayer; x: number; y: number }; // percentages
+
+const KEEPER_Y = 86;
+const BACK_LINE_Y = 70;
+const FRONT_LINE_Y = 12;
+const SIDE_MARGIN = 12;
+const MAX_GAP = 34;
+
+// Returns each starter's position on a vertical pitch (own goal at the bottom),
+// or null when the data doesn't fit the formation, so callers can fall back to a list.
+export function formationLayout(lineup: TeamLineup): PitchPlayer[] | null {
+  const starters = lineup.players.filter((p) => p.starter);
+  const lines = (lineup.formation ?? "").split("-").map(Number);
+  if (
+    starters.length !== 11 ||
+    !lines.length ||
+    lines.some((n) => !Number.isInteger(n) || n <= 0) ||
+    lines.reduce((a, b) => a + b, 0) !== 10
+  )
+    return null;
+
+  const keeper =
+    starters.find((p) => p.position === "G") ??
+    starters.find((p) => p.formationPlace === 1);
+  if (!keeper) return null;
+
+  const place = (p: LineupPlayer) => p.formationPlace ?? 99;
+  const depth = (p: LineupPlayer) => POSITION_DEPTH[p.position ?? ""] ?? 2.5;
+
+  const outfield = starters
+    .filter((p) => p !== keeper)
+    .sort((a, b) => depth(a) - depth(b) || place(a) - place(b));
+
+  const placed: PitchPlayer[] = [{ player: keeper, x: 50, y: KEEPER_Y }];
+  let i = 0;
+
+  lines.forEach((size, lineIndex) => {
+    const y =
+      lines.length === 1
+        ? (FRONT_LINE_Y + BACK_LINE_Y) / 2
+        : BACK_LINE_Y -
+          (lineIndex * (BACK_LINE_Y - FRONT_LINE_Y)) / (lines.length - 1);
+
+    // Spread across the width between the margins
+    const gap =
+      size === 1 ? 0 : Math.min((100 - 2 * SIDE_MARGIN) / (size - 1), MAX_GAP);
+    const startX = 50 - (gap * (size - 1)) / 2;
+
+    const line = outfield
+      .slice(i, i + size)
+      .sort(
+        (a, b) =>
+          lateral(a.position) - lateral(b.position) || place(a) - place(b),
+      );
+    line.forEach((player, j) =>
+      placed.push({ player, x: startX + j * gap, y }),
+    );
+    i += size;
+  });
+
+  return placed;
 }

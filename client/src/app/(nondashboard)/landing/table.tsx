@@ -2,13 +2,12 @@
 
 import { useState, useMemo } from "react";
 import Image from "next/image";
-import { useGetGoalScorersQuery, useGetStandingsQuery } from "@/state/api";
-import { Standings } from "@/types/drizzleTypes";
+import { useGetTopPlayersQuery, useGetStandingsQuery } from "@/state/api";
+import { Standings, TopPlayerCategory } from "@/types/drizzleTypes";
 import {
   generateSeasons,
   LEAGUES,
   getLogoFile,
-  genCurrentSeason,
   getLeagueFile,
   HEADER_CONFIG,
 } from "@/lib/utils";
@@ -18,6 +17,23 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useDispatch } from "react-redux";
 import { setLeague, setSeason } from "@/state";
+
+const TOP_PLAYER_CATEGORIES: {
+  key: TopPlayerCategory;
+  label: string;
+  title: string;
+}[] = [
+  { key: "goals", label: "Goals", title: "Top Scorers" },
+  { key: "assists", label: "Assists", title: "Top Assists" },
+  { key: "saves", label: "Saves", title: "Most Saves" },
+  { key: "yellow_cards", label: "Yellows", title: "Most Yellow Cards" },
+  { key: "red_cards", label: "Reds", title: "Most Red Cards" },
+];
+
+// remove xPosition on this pages table
+const LEAGUE_HEADERS = HEADER_CONFIG.filter(
+  (h) => h.key !== "expectedPosition",
+);
 
 export default function Table() {
   const dispatch = useDispatch();
@@ -34,11 +50,16 @@ export default function Table() {
     league,
     season,
   });
-  const { data: scorers, isLoading: isGoalScorersLoading } =
-    useGetGoalScorersQuery({
+  const [category, setCategory] = useState<TopPlayerCategory>("goals");
+  const activeCategory = TOP_PLAYER_CATEGORIES.find((c) => c.key === category);
+
+  const { data: topPlayers, isFetching: isTopPlayersLoading } =
+    useGetTopPlayersQuery({
       league,
       season,
+      category,
     });
+
   const filteredTeams = useMemo(() => {
     if (!teams) return [];
     return teams.filter((t) => t.type === type);
@@ -80,16 +101,15 @@ export default function Table() {
     });
   }, [filteredTeams, sortConfig]);
 
-  // Sort and rank goal scorers
-  const rankedScorers = useMemo(() => {
-    if (!scorers) return [];
-    const sorted = [...scorers].sort((a, b) => b.goals - a.goals);
-    let currentRank = 1;
-    return sorted.map((s, i) => {
-      if (i > 0 && s.goals < sorted[i - 1].goals) currentRank = i + 1;
-      return { ...s, rank: currentRank };
+  // Sort and ranks top players
+  const rankedPlayers = useMemo(() => {
+    if (!topPlayers) return [];
+    let rank = 1;
+    return topPlayers.map((p, i) => {
+      if (i > 0 && p.value < topPlayers[i - 1].value) rank = i + 1;
+      return { ...p, rank };
     });
-  }, [scorers]);
+  }, [topPlayers]);
 
   return (
     <section
@@ -170,7 +190,7 @@ export default function Table() {
           <table className="w-full border-collapse shadow-sm text-[0.65rem] sm:text-[0.75rem] md:text-[0.85rem] lg:text-[0.9rem]">
             <thead className="bg-[#38003c] dark:bg-gray-900 text-white sticky top-0 z-10">
               <tr>
-                {HEADER_CONFIG.map(({ label, key }) => (
+                {LEAGUE_HEADERS.map(({ label, key }) => (
                   <th
                     key={key}
                     onClick={() => handleSort(key)}
@@ -190,7 +210,7 @@ export default function Table() {
               {isStandingsLoading ? (
                 <tr>
                   <td
-                    colSpan={HEADER_CONFIG.length}
+                    colSpan={LEAGUE_HEADERS.length}
                     className="py-8 text-center text-gray-600 dark:text-gray-400"
                   >
                     Loading {season}…
@@ -327,63 +347,88 @@ export default function Table() {
             transition={{ duration: 1, ease: [0.45, 0, 0.55, 1] }}
             className={`w-full lg:w-[280px] flex-shrink-0 overflow-hidden`}
           >
-            <h3 className="text-lg font-semibold text-[#38003c] dark:text-gray-200 mb-3 border-b border-gray-200 dark:border-gray-400 pb-1">
-              Top Scorer(s)
-            </h3>
-            {isGoalScorersLoading ? (
+            <div className="mb-3 flex items-center justify-between gap-2 border-b border-gray-200 pb-1 dark:border-gray-400">
+              <h3 className="truncate text-lg font-semibold text-[#38003c] dark:text-gray-200">
+                {activeCategory?.title}
+              </h3>
+              <select
+                value={category}
+                onChange={(e) =>
+                  setCategory(e.target.value as TopPlayerCategory)
+                }
+                aria-label="Top players category"
+                className="shrink-0 cursor-pointer rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              >
+                {season >= "2026" ? (
+                  TOP_PLAYER_CATEGORIES.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.label}
+                    </option>
+                  ))
+                ) : (
+                  <option key={"goals"} value={"goals"}>
+                    Goals
+                  </option>
+                )}
+              </select>
+            </div>
+
+            {isTopPlayersLoading ? (
               <p className="text-gray-500 dark:text-gray-200 text-sm text-center py-4">
-                Loading Goalscorers...
+                Loading…
               </p>
-            ) : rankedScorers.length === 0 ? (
+            ) : rankedPlayers.length === 0 ? (
               <p className="text-gray-500 dark:text-gray-200 text-sm text-center py-4">
-                No scorers available.
+                No {activeCategory?.label.toLowerCase()} data for {season}.
               </p>
             ) : (
               <div className="flex flex-col gap-3">
-                {rankedScorers.map((s, i) => {
-                  return (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between bg-[#f8f8f8] dark:bg-gray-700 px-3 py-2 rounded-md border-l-4 border-[#38003c] dark:border-indigo-400"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-bold text-gray-800 dark:text-gray-200 w-5 text-center">
-                          {s.rank}
+                {rankedPlayers.map((p) => (
+                  <div
+                    key={p.player}
+                    className="flex items-center justify-between bg-[#f8f8f8] dark:bg-gray-700 px-3 py-2 rounded-md border-l-4 border-[#38003c] dark:border-indigo-400"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="text-sm font-bold text-gray-800 dark:text-gray-200 w-5 text-center">
+                        {p.rank}
+                      </span>
+                      <div className="relative w-[38px] h-[38px] flex-shrink-0 rounded-full overflow-hidden">
+                        <Image
+                          src={p.imageUrl || "/placeholder-player.svg"}
+                          alt={`${p.player} picture`}
+                          fill
+                          className={`${p.imageUrl ? "scale-175" : "scale-100"} origin-top`}
+                        />
+                      </div>
+                      <div className="flex min-w-0 flex-col leading-tight">
+                        <span className="truncate font-medium text-sm text-gray-800 dark:text-gray-200">
+                          {p.player}
                         </span>
-                        <div className="relative w-[38px] h-[38px] flex-shrink-0 rounded-full overflow-hidden">
-                          <Image
-                            src={s.imageUrl || "/placeholder-player.svg"}
-                            alt={`${s.player} picture`}
-                            fill
-                            className={`${
-                              s.imageUrl ? "scale-175" : "scale-100"
-                            } origin-top`}
-                          />
-                        </div>
-
-                        <div className="flex flex-col leading-tight">
-                          <span className="font-medium text-sm text-gray-800 dark:text-gray-200">
-                            {s.player}
-                          </span>
-                          <div className="flex items-center gap-1 text-xs bold text-gray-500 dark:text-gray-300">
-                            <div className="relative w-[16px] h-[16px] flex-shrink-0">
-                              <Image
-                                src={`/${getLogoFile(s.team)}`}
-                                alt={`${s.team} logo`}
-                                fill
-                                className="object-contain"
-                              />
-                            </div>
-                            <span>{s.team}</span>
+                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-300">
+                          <div className="relative w-[16px] h-[16px] flex-shrink-0">
+                            <Image
+                              src={`/${getLogoFile(p.team)}`}
+                              alt={`${p.team} logo`}
+                              fill
+                              className="object-contain"
+                            />
                           </div>
+                          <span className="truncate">{p.team}</span>
                         </div>
                       </div>
-                      <span className="font-semibold text-[#38003c] dark:text-gray-200 text-sm">
-                        {s.goals}
-                      </span>
                     </div>
-                  );
-                })}
+                    <div className="ml-2 flex shrink-0 flex-col items-end leading-tight">
+                      <span className="font-semibold text-[#38003c] dark:text-gray-200 text-sm tabular-nums">
+                        {p.value}
+                      </span>
+                      {p.appearances != null && (
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
+                          {p.appearances} apps
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </motion.div>

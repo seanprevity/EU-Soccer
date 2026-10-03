@@ -131,6 +131,9 @@ export const ESPN_MAP = new Map<string, string>([
   ["AS Monaco", "Monaco"],
   ["Stade Rennais", "Rennes"],
   ["Internazionale", "Inter"],
+  ["Real Oviedo", "Oviedo"],
+  ["St. Pauli", "St Pauli"],
+  ["1. FC Heidenheim 1846", "Heidenheim"],
 ]);
 
 // this normalizes the-odds-api team names
@@ -144,16 +147,22 @@ export const ODDS_MAP = new Map<string, string>([
   ["Brighton and Hove Albion", "Brighton"],
   ["Nottingham Forest", "Nott'm Forest"],
   ["West Ham United", "West Ham"],
+  ["Hull City", "Hull"],
+  ["Coventry City", "Coventry"],
   // La Liga
   ["CA Osasuna", "Osasuna"],
   ["Atlético Madrid", "Atletico Madrid"],
   ["Alavés", "Alaves"],
   ["Athletic Bilbao", "Athletic Club"],
   ["Elche CF", "Elche"],
+  ["Málaga", "Malaga"],
+  ["Deportivo La Coruña", "Deportivo"],
+  ["Real Racing Club de Santander", "Racing Santander"],
   // Ligue 1
   ["Paris Saint Germain", "PSG"],
   ["AS Monaco", "Monaco"],
   ["RC Lens", "Lens"],
+  ["Le Mans FC", "Le Mans"],
   // Serie A
   ["AC Milan", "Milan"],
   ["AS Roma", "Roma"],
@@ -170,6 +179,10 @@ export const ODDS_MAP = new Map<string, string>([
   ["Borussia Dortmund", "Dortmund"],
   ["VfL Wolfsburg", "Wolfsburg"],
   ["Bayer Leverkusen", "Leverkusen"],
+  ["FC Schalke 04", "Schalke 04"],
+  ["SC Paderborn", "Paderborn"],
+  // Specifically for the matchStats, they store it as SV Elversberg
+  ["Elversberg", "SV Elversberg"],
 ]);
 
 // normalizes the names of teams from the football-data.co.uk match stats csv files.
