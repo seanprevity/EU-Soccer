@@ -1,7 +1,9 @@
 "use client";
 
 import { Standings } from "@/types/drizzleTypes";
-import { cn } from "@/lib/utils";
+import { cn, getLogoFile } from "@/lib/utils";
+import Image from "next/image";
+import { edgeFor, matchColors } from "@/lib/array";
 
 type Split = "HOME" | "AWAY";
 
@@ -10,24 +12,24 @@ type SplitStats = {
   won: number;
   draw: number;
   lost: number;
-  points: number;
   ppg: number | null;
   winPct: number | null;
-  drawPct: number | null;
-  lossPct: number | null;
+  goalsForPg: number | null;
+  goalsAgainstPg: number | null;
 };
 
 type Side = { team: string; split: Split; stats: SplitStats | null };
 
 type Metric = {
-  key: "ppg" | "winPct" | "drawPct" | "lossPct";
+  key: "ppg" | "winPct" | "goalsForPg" | "goalsAgainstPg";
   label: string;
-  max: number;
-  better: "high" | "low" | null;
+  max?: number;
+  better: "high" | "low";
   format: (v: number) => string;
 };
 
 const pct = (v: number) => `${v.toFixed(1)}%`;
+const twoDp = (v: number) => v.toFixed(2);
 
 // Rates rather than raw counts, so teams with different games played compare fairly.
 const METRICS: Metric[] = [
@@ -36,18 +38,17 @@ const METRICS: Metric[] = [
     label: "Points per game",
     max: 3,
     better: "high",
-    format: (v) => v.toFixed(2),
+    format: twoDp,
   },
   { key: "winPct", label: "Win rate", max: 100, better: "high", format: pct },
-  { key: "drawPct", label: "Draw rate", max: 100, better: null, format: pct },
-  { key: "lossPct", label: "Loss rate", max: 100, better: "low", format: pct },
+  { key: "goalsForPg", label: "Goals Scored", better: "high", format: twoDp },
+  {
+    key: "goalsAgainstPg",
+    label: "Goals Conceded",
+    better: "low",
+    format: twoDp,
+  },
 ];
-
-const LEFT = { bar: "bg-sky-500", text: "text-sky-600 dark:text-sky-400" };
-const RIGHT = {
-  bar: "bg-orange-500",
-  text: "text-orange-600 dark:text-orange-400",
-};
 
 function toSplitStats(r?: Standings): SplitStats | null {
   if (!r) return null;
@@ -56,53 +57,79 @@ function toSplitStats(r?: Standings): SplitStats | null {
   const draw = r.draw ?? 0;
   const lost = r.lost ?? 0;
   const points = r.points ?? won * 3 + draw;
-  const rate = (n: number) => (played ? (n / played) * 100 : null);
+  const perGame = (n: number) => (played ? n / played : null);
   return {
     played,
     won,
     draw,
     lost,
-    points,
-    ppg: played ? points / played : null,
-    winPct: rate(won),
-    drawPct: rate(draw),
-    lossPct: rate(lost),
+    ppg: perGame(points),
+    winPct: played ? (won / played) * 100 : null,
+    goalsForPg: perGame(r.goalsFor ?? 0),
+    goalsAgainstPg: perGame(r.goalsAgainst ?? 0),
   };
 }
 
-const splitLabel = (split: Split) => (split === "HOME" ? "at home" : "away");
-
 function RecordStrip({ stats }: { stats: SplitStats }) {
   if (!stats.played)
-    return <div className="h-1.5 rounded-full bg-gray-200 dark:bg-gray-800" />;
-  const w = (n: number) => `${(n / stats.played) * 100}%`;
+    return <div className="h-1.5 rounded-full bg-gray-200 dark:bg-gray-700" />;
+
+  const segments = [
+    {
+      key: "won",
+      count: stats.won,
+      label: "Won",
+      className: "bg-gradient-to-r from-emerald-400 to-emerald-600",
+    },
+    {
+      key: "draw",
+      count: stats.draw,
+      label: "Drawn",
+      className: "bg-slate-400 dark:bg-slate-500",
+    },
+    {
+      key: "lost",
+      count: stats.lost,
+      label: "Lost",
+      className: "bg-gradient-to-r from-rose-500 to-rose-600",
+    },
+  ];
+
   return (
-    <div className="flex h-1.5 overflow-hidden rounded-full" aria-hidden>
-      <div className="bg-green-500" style={{ width: w(stats.won) }} />
-      <div className="bg-gray-500" style={{ width: w(stats.draw) }} />
-      <div className="bg-red-500" style={{ width: w(stats.lost) }} />
+    <div
+      className="flex h-1.5 gap-0.5 overflow-hidden rounded-full"
+      aria-hidden
+    >
+      {segments.map((s) =>
+        s.count > 0 ? (
+          <div
+            key={s.key}
+            title={`${s.label} ${s.count}`}
+            className={cn("h-full transition-all duration-500", s.className)}
+            style={{ width: `${(s.count / stats.played) * 100}%` }}
+          />
+        ) : null,
+      )}
     </div>
   );
 }
 
-function SideHeader({
-  side,
-  align,
-  color,
-}: {
-  side: Side;
-  align: "left" | "right";
-  color: string;
-}) {
+function SideHeader({ side, align }: { side: Side; align: "left" | "right" }) {
   const s = side.stats;
   return (
     <div
       className={cn("min-w-0 space-y-1.5", align === "right" && "text-right")}
     >
-      <p className="truncate font-semibold text-gray-900 dark:text-white">
-        {side.team}
-      </p>
-      <p className={cn("text-sm", color)}>{splitLabel(side.split)}</p>
+      <Image
+        src={`/${getLogoFile(side.team)}`}
+        alt={`${side.team} logo`}
+        width={20}
+        height={20}
+        className={cn(
+          "h-6 w-6 shrink-0 object-contain sm:h-9 sm:w-9",
+          align === "right" && "ml-auto",
+        )}
+      />
       {s ? (
         <>
           <p className="text-sm tabular-nums text-gray-600 dark:text-gray-300">
@@ -127,13 +154,14 @@ function CompareRow({
   b: number | null;
 }) {
   const winner =
-    a == null || b == null || metric.better == null || a === b
+    a == null || b == null || a === b
       ? null
       : (metric.better === "high") === a > b
         ? "a"
         : "b";
+  const scale = metric.max ?? (a ?? 0) + (b ?? 0);
   const width = (v: number | null) =>
-    `${v == null ? 0 : Math.min(v / metric.max, 1) * 100}%`;
+    `${v == null || !scale ? 0 : Math.min(v / scale, 1) * 100}%`;
   const valueClass = (isWinner: boolean) =>
     cn(
       "w-14 shrink-0 text-sm tabular-nums",
@@ -150,18 +178,31 @@ function CompareRow({
         </span>
         <div className="flex h-2 flex-1 justify-end overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
           <div
-            className={cn("h-full rounded-full", LEFT.bar)}
+            className={cn(
+              "h-full rounded-full transition-all duration-500",
+              winner === "a"
+                ? "bg-gradient-to-l from-emerald-400 to-emerald-600 shadow-[0_0_6px] shadow-emerald-500/40"
+                : "bg-gray-400 dark:bg-gray-500",
+            )}
             style={{ width: width(a) }}
           />
         </div>
       </div>
-      <span className="w-24 text-center text-xs text-gray-500 dark:text-gray-400 sm:w-28">
+      <span
+        className="w-24 text-center text-xs text-gray-500 dark:text-gray-400 sm:w-28"
+        title={metric.better === "low" ? "Lower is better" : undefined}
+      >
         {metric.label}
       </span>
       <div className="flex items-center gap-2">
         <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
           <div
-            className={cn("h-full rounded-full", RIGHT.bar)}
+            className={cn(
+              "h-full rounded-full transition-all duration-500",
+              winner === "b"
+                ? "bg-gradient-to-r from-emerald-400 to-emerald-600 shadow-[0_0_6px] shadow-emerald-500/40"
+                : "bg-gray-400 dark:bg-gray-500",
+            )}
             style={{ width: width(b) }}
           />
         </div>
@@ -175,21 +216,23 @@ function CompareRow({
 
 function MatchupPanel({
   title,
+  matchup,
   left,
   right,
 }: {
   title: string;
+  matchup: string;
   left: Side;
   right: Side;
 }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-800">
       <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
-        {title}
+        {title} - {matchup}
       </h3>
       <div className="mb-5 grid grid-cols-2 gap-6">
-        <SideHeader side={left} align="left" color={LEFT.text} />
-        <SideHeader side={right} align="right" color={RIGHT.text} />
+        <SideHeader side={left} align="left" />
+        <SideHeader side={right} align="right" />
       </div>
       <div className="space-y-3">
         {METRICS.map((m) => (
@@ -228,6 +271,7 @@ const HomeAwayRecord = ({
   const homeAway = get(homeTeam, "AWAY");
   const awayAtHome = get(awayTeam, "HOME");
   const awayAway = get(awayTeam, "AWAY");
+  const colors = matchColors(homeTeam, awayTeam);
 
   return (
     <section className="space-y-4 rounded-lg bg-gray-100 p-4 dark:bg-gray-900">
@@ -238,11 +282,13 @@ const HomeAwayRecord = ({
       <div className="grid gap-4 lg:grid-cols-2">
         <MatchupPanel
           title="This fixture"
+          matchup={`${homeTeam} (H) vs ${awayTeam} (A)`}
           left={{ team: homeTeam, split: "HOME", stats: homeAtHome }}
           right={{ team: awayTeam, split: "AWAY", stats: awayAway }}
         />
         <MatchupPanel
           title="Reverse fixture"
+          matchup={`${homeTeam} (A) vs ${awayTeam} (H)`}
           left={{ team: homeTeam, split: "AWAY", stats: homeAway }}
           right={{ team: awayTeam, split: "HOME", stats: awayAtHome }}
         />

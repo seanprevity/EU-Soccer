@@ -10,15 +10,11 @@ import {
 } from "@/types/drizzleTypes";
 import { cn, formationLayout, getLogoFile } from "@/lib/utils";
 import { ArrowBadge, EventIcon, formatMinute, SubStack } from "@/lib/uiUtils";
+import { edgeFor, matchColors } from "@/lib/array";
 
 type Side = "home" | "away";
 type CardKind = "yellow" | "red" | "second_yellow";
 type PlayerMarks = { goals: number; ownGoals: number; card: CardKind | null };
-
-const TEAM_COLOR: Record<Side, string> = {
-  home: "bg-sky-600",
-  away: "bg-orange-500",
-};
 
 const LABEL_FONT_PX = 10;
 const LABEL_PADDING_PX = 8; // px-1 on each side
@@ -26,45 +22,35 @@ const LABEL_GAP_PX = 4; // minimum space kept between two neighbouring names
 
 function NumberCircle({
   player,
-  side,
   size = "md",
   children,
+  isPitch,
+  color,
 }: {
   player: LineupPlayer;
-  side: Side;
   size?: "sm" | "md";
   children?: ReactNode;
+  isPitch?: boolean;
+  color?: { bg: string; text: string };
 }) {
   return (
     <span
       className={cn(
-        "relative flex shrink-0 items-center justify-center rounded-full font-bold tabular-nums text-white",
+        "relative flex shrink-0 items-center justify-center rounded-full font-bold tabular-nums",
         size === "md"
           ? "h-8 w-8 text-sm ring-2 ring-white/80"
           : "h-7 w-7 text-xs",
-        TEAM_COLOR[side],
+        color
+          ? "ring-1 ring-white"
+          : cn("text-white", isPitch ? "bg-gray-600/30" : "bg-gray-600"),
       )}
+      style={
+        color ? { backgroundColor: color.bg, color: color.text } : undefined
+      }
     >
       {player.jersey ?? "–"}
       {children}
     </span>
-  );
-}
-
-function TeamHeading({ team }: { team: string }) {
-  return (
-    <div className="mb-2 flex items-center gap-2">
-      <Image
-        src={`/${getLogoFile(team)}`}
-        alt=""
-        width={20}
-        height={20}
-        className="h-[18px] w-[18px] object-contain"
-      />
-      <span className="truncate text-[18px] font-medium text-gray-900 dark:text-white">
-        {team}
-      </span>
-    </div>
   );
 }
 
@@ -236,7 +222,7 @@ function Pitch({
         aria-hidden
         width={320}
         height={320}
-        className="pointer-events-none absolute left-[-20%] top-[5%] h-auto w-[46%] object-contain opacity-15"
+        className="pointer-events-none absolute left-[-20%] top-[5%] h-[46%] w-[46%] object-contain opacity-15"
       />
       <Image
         src={`/${getLogoFile(match.homeTeam)}`}
@@ -244,19 +230,39 @@ function Pitch({
         aria-hidden
         width={320}
         height={320}
-        className="pointer-events-none absolute bottom-[5%] right-[-20%] h-auto w-[46%] object-contain opacity-15"
+        className="pointer-events-none absolute bottom-[5%] right-[-20%] h-[46%] w-[46%] object-contain opacity-15"
       />
 
-      {/* Formations: away top-right, home bottom-left */}
+      {/* Formations: away top-right (logo below), home bottom-left (logo above) */}
       {lineups.away.formation && (
-        <span className="absolute right-2 top-2 rounded bg-black/40 px-1.5 py-0.5 text-[11px] tabular-nums text-white">
-          {lineups.away.formation}
-        </span>
+        <div className="absolute right-2 top-2 flex flex-col items-center gap-1">
+          <span className="rounded bg-black/40 px-1.5 py-0.5 text-[11px] tabular-nums text-white">
+            {lineups.away.formation}
+          </span>
+          <Image
+            src={`/${getLogoFile(match.awayTeam)}`}
+            alt={`${match.awayTeam} logo`}
+            title={match.awayTeam}
+            width={32}
+            height={32}
+            className="h-8 w-8 object-contain drop-shadow"
+          />
+        </div>
       )}
       {lineups.home.formation && (
-        <span className="absolute bottom-2 left-2 rounded bg-black/40 px-1.5 py-0.5 text-[11px] tabular-nums text-white">
-          {lineups.home.formation}
-        </span>
+        <div className="absolute bottom-2 left-2 flex flex-col items-center gap-1">
+          <Image
+            src={`/${getLogoFile(match.homeTeam)}`}
+            alt={`${match.homeTeam} logo`}
+            title={match.homeTeam}
+            width={32}
+            height={32}
+            className="h-8 w-8 object-contain drop-shadow"
+          />
+          <span className="rounded bg-black/40 px-1.5 py-0.5 text-[11px] tabular-nums text-white">
+            {lineups.home.formation}
+          </span>
+        </div>
       )}
 
       {!away && (
@@ -279,7 +285,7 @@ function Pitch({
             className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
             style={{ left: `${p.x}%`, top: `${p.y}%` }}
           >
-            <NumberCircle player={p.player} side={p.side}>
+            <NumberCircle player={p.player} isPitch={true}>
               <PlayerBadges
                 marks={marks.get(`${p.side}|${p.player.name}`)}
                 subbedOff={p.player.subbedOut}
@@ -302,10 +308,9 @@ function Pitch({
   );
 }
 
-function SubColumn({ team, subs }: { team: string; subs: MatchEvent[] }) {
+function SubColumn({ subs }: { subs: MatchEvent[] }) {
   return (
     <div className="min-w-0">
-      <TeamHeading team={team} />
       {subs.length ? (
         <ol className="divide-y divide-gray-100 dark:divide-gray-800">
           {subs.map((s, i) => (
@@ -328,26 +333,25 @@ function SubColumn({ team, subs }: { team: string; subs: MatchEvent[] }) {
 }
 
 function BenchColumn({
-  team,
   side,
   lineup,
   subMinutes,
   marks,
+  color,
 }: {
-  team: string;
   side: Side;
   lineup: TeamLineup;
   subMinutes: Map<string, string>;
   marks: Map<string, PlayerMarks>;
+  color: { bg: string; text: string };
 }) {
   const bench = lineup.players.filter((p) => !p.starter);
   return (
     <div className="min-w-0">
-      <TeamHeading team={team} />
       <ul className="space-y-4.5">
         {bench.map((p) => (
           <li key={p.espnId || p.name} className="flex items-center gap-2.5">
-            <NumberCircle player={p} side={side} size="sm">
+            <NumberCircle player={p} size="sm" color={color}>
               <PlayerBadges
                 marks={marks.get(`${side}|${p.name}`)}
                 subbedIn={p.subbedIn}
@@ -391,6 +395,7 @@ export default function Lineups({ match }: { match: matchStats }) {
     subs.filter((s) => s.player).map((s) => [s.player!, formatMinute(s)]),
   );
   const marks = marksByPlayer(match.events);
+  const colors = matchColors(match.homeTeam, match.awayTeam);
 
   return (
     <div className="space-y-6">
@@ -402,14 +407,8 @@ export default function Lineups({ match }: { match: matchStats }) {
             Substitutions
           </h3>
           <div className="grid gap-6 sm:grid-cols-2">
-            <SubColumn
-              team={match.homeTeam}
-              subs={subs.filter((s) => s.side === "home")}
-            />
-            <SubColumn
-              team={match.awayTeam}
-              subs={subs.filter((s) => s.side === "away")}
-            />
+            <SubColumn subs={subs.filter((s) => s.side === "home")} />
+            <SubColumn subs={subs.filter((s) => s.side === "away")} />
           </div>
         </section>
 
@@ -419,18 +418,18 @@ export default function Lineups({ match }: { match: matchStats }) {
           </h3>
           <div className="grid gap-14 sm:grid-cols-2">
             <BenchColumn
-              team={match.homeTeam}
               side="home"
               lineup={match.lineups.home}
               subMinutes={subMinutes}
               marks={marks}
+              color={colors.home}
             />
             <BenchColumn
-              team={match.awayTeam}
               side="away"
               lineup={match.lineups.away}
               subMinutes={subMinutes}
               marks={marks}
+              color={colors.away}
             />
           </div>
         </section>

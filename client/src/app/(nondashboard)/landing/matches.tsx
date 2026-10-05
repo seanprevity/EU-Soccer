@@ -12,6 +12,7 @@ import {
   normalizeTeams,
   LEAGUES,
   getLeagueFile,
+  cn,
 } from "@/lib/utils";
 import { useEffect, useMemo, useRef } from "react";
 import { head2Head, upcomingMatches } from "@/types/drizzleTypes";
@@ -20,6 +21,7 @@ import { PastMatchesList } from "./pastMatches";
 import { useAppSelector } from "@/state/redux";
 import { useDispatch } from "react-redux";
 import { setMatchDate } from "@/state";
+import { edgeFor, matchColors } from "@/lib/array";
 
 function UpcomingMatchCard({
   match: m,
@@ -32,6 +34,18 @@ function UpcomingMatchCard({
 }) {
   const winsFor = (team: string) =>
     h2h ? (h2h.team1 === team ? h2h.team1Wins : h2h.team2Wins) : null;
+
+  const homeWins = winsFor(m.homeTeam) ?? 0;
+  const awayWins = winsFor(m.awayTeam) ?? 0;
+  const draws = h2h?.draws ?? 0;
+  const total = homeWins + draws + awayWins;
+  const colors = matchColors(m.homeTeam, m.awayTeam);
+
+  const segments = [
+    { key: "home", count: homeWins, color: colors.home.bg },
+    { key: "draw", count: draws, color: null },
+    { key: "away", count: awayWins, color: colors.away.bg },
+  ];
 
   const teamBlock = (team: string) => (
     <div className="flex flex-col items-center gap-1 w-2/5 font-semibold text-sm text-gray-800 dark:text-gray-300 text-center">
@@ -60,33 +74,86 @@ function UpcomingMatchCard({
 
         <p className="text-sm text-gray-600 dark:text-gray-200 mb-3 text-center">
           {new Date(m.matchDate).toLocaleTimeString([], {
-            hour: "2-digit",
+            hour: "numeric",
             minute: "2-digit",
           })}{" "}
-          (GMT)
         </p>
 
-        {/* H2H wins, draws, and losses */}
-        <div className="grid grid-cols-3 gap-2 bg-white dark:bg-gray-600 p-3 rounded text-xs md:grid-cols-1">
+        {/* Head to head */}
+        <div className="rounded bg-white p-3 dark:bg-gray-600">
           {h2hLoading ? (
-            <p className="col-span-3 text-center text-gray-400 dark:text-gray-200 text-[0.7rem]">
+            <p className="text-center text-[0.7rem] text-gray-400 dark:text-gray-200">
               Loading H2H…
+            </p>
+          ) : total === 0 ? (
+            <p className="text-center text-[0.7rem] text-gray-500 dark:text-gray-300">
+              First meeting
             </p>
           ) : (
             <>
-              <div className="flex justify-between text-[0.7rem] text-gray-600 dark:text-gray-200 font-semibold mb-1">
-                <span className="text-left w-1/3">{m.homeTeam}</span>
-                <span className="text-center w-1/3">Draws</span>
-                <span className="text-right w-1/3">{m.awayTeam}</span>
+              <p className="mb-1.5 text-center text-[0.65rem] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-300">
+                Head to head · {total} {total === 1 ? "meeting" : "meetings"}
+              </p>
+              <div className="mb-1.5 grid grid-cols-3 items-center text-[0.7rem] text-gray-500 dark:text-gray-300">
+                <span className="flex min-w-0 items-center gap-1">
+                  <Image
+                    src={`/${getLogoFile(m.homeTeam)}`}
+                    alt={`${m.homeTeam} logo`}
+                    width={20}
+                    height={20}
+                    className="h-6 w-6 shrink-0 object-contain"
+                  />
+                  <span className="text-sm font-bold tabular-nums text-gray-900 dark:text-white">
+                    {homeWins}
+                  </span>
+                  <span className="truncate">
+                    {homeWins === 1 ? "Win" : "Wins"}
+                  </span>
+                </span>
+                <span className="flex items-center justify-center gap-1">
+                  <span className="text-sm font-bold tabular-nums text-gray-900 dark:text-white">
+                    {draws}
+                  </span>
+                  <span>{draws === 1 ? "Draw" : "Draws"}</span>
+                </span>
+                <span className="flex min-w-0 items-center justify-end gap-1">
+                  <span className="text-sm font-bold tabular-nums text-gray-900 dark:text-white">
+                    {awayWins}
+                  </span>
+                  <span className="truncate">
+                    {awayWins === 1 ? "Win" : "Wins"}
+                  </span>
+                  <Image
+                    src={`/${getLogoFile(m.awayTeam)}`}
+                    alt={`${m.awayTeam} logo`}
+                    width={20}
+                    height={20}
+                    className="h-6 w-6 shrink-0 object-contain"
+                  />
+                </span>
               </div>
-              <div className="flex justify-between text-[0.75rem] text-gray-800 dark:text-gray-300 font-medium">
-                <span className="text-left w-1/3">
-                  {winsFor(m.homeTeam) ?? "0"}
-                </span>
-                <span className="text-center w-1/3">{h2h?.draws ?? "0"}</span>
-                <span className="text-right w-1/3">
-                  {winsFor(m.awayTeam) ?? "0"}
-                </span>
+              <div
+                className="flex h-1.5 gap-0.5 overflow-hidden rounded-full"
+                role="img"
+                aria-label={`${m.homeTeam} ${homeWins} wins, ${draws} draws, ${m.awayTeam} ${awayWins} wins`}
+              >
+                {segments.map((s) =>
+                  s.count > 0 ? (
+                    <div
+                      key={s.key}
+                      className={cn(
+                        "h-full",
+                        s.color
+                          ? edgeFor(s.color)
+                          : "bg-gray-400 dark:bg-gray-500",
+                      )}
+                      style={{
+                        width: `${(s.count / total) * 100}%`,
+                        ...(s.color && { backgroundColor: s.color }),
+                      }}
+                    />
+                  ) : null,
+                )}
               </div>
             </>
           )}

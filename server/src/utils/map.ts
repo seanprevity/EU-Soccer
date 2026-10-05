@@ -102,11 +102,11 @@ export const upcoming_map = new Map<string, string>([
   ["Coventry City", "Coventry"],
   ["Hull City", "Hull"],
   ["SC Paderborn", "Paderborn"],
-  ["Elversberg", "SV Elversberg"],
   ["Schalke", "Schalke 04"],
   ["Venezia FC", "Venezia"],
   ["Málaga", "Malaga"],
   ["Santander", "Racing Santander"],
+  ["SV Elversberg", "Elversberg"],
 ]);
 
 export const ESPN_MAP = new Map<string, string>([
@@ -181,8 +181,6 @@ export const ODDS_MAP = new Map<string, string>([
   ["Bayer Leverkusen", "Leverkusen"],
   ["FC Schalke 04", "Schalke 04"],
   ["SC Paderborn", "Paderborn"],
-  // Specifically for the matchStats, they store it as SV Elversberg
-  ["Elversberg", "SV Elversberg"],
 ]);
 
 // normalizes the names of teams from the football-data.co.uk match stats csv files.

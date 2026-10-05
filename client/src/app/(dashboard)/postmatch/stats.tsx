@@ -1,6 +1,21 @@
 import { matchStats } from "@/types/drizzleTypes";
 import { statsKeys } from "@/lib/utils";
 import { StatBar } from "@/lib/uiUtils";
+import Image from "next/image";
+import { getLogoFile } from "@/lib/utils";
+
+function TeamLogo({ team }: { team: string }) {
+  return (
+    <Image
+      src={`/${getLogoFile(team)}`}
+      alt={`${team} logo`}
+      title={team}
+      width={40}
+      height={40}
+      className="h-7 w-7 object-contain sm:h-9 sm:w-9"
+    />
+  );
+}
 
 const readStat = (
   m: matchStats,
@@ -11,7 +26,7 @@ const readStat = (
   return typeof v === "number" ? v : null;
 };
 
-// Stats stored as 0-0 when the source didn't record them
+// Stats stored as 0-0 before being recorded
 const ZERO_MEANS_MISSING = new Set(["hxg", "hposs"]);
 
 // Total shots minus shots on target minus blocked shots. Null unless all three are known.
@@ -64,14 +79,20 @@ export default function Stats({ match }: { match: matchStats }) {
       className="space-y-3 rounded-lg bg-white p-4 dark:bg-gray-900"
     >
       {rows.length ? (
-        rows.map(({ key, label, home, away }) => (
-          <StatBar
-            key={key}
-            label={label}
-            homeValue={home ?? 0}
-            awayValue={away ?? 0}
-          />
-        ))
+        <>
+          <div className="flex items-center justify-between pb-1">
+            <TeamLogo team={match.homeTeam} />
+            <TeamLogo team={match.awayTeam} />
+          </div>
+          {rows.map(({ key, label, home, away }) => (
+            <StatBar
+              key={key}
+              label={label}
+              homeValue={home ?? 0}
+              awayValue={away ?? 0}
+            />
+          ))}
+        </>
       ) : (
         <p className="text-center text-sm text-gray-500 dark:text-gray-400">
           No stats were recorded for this match.

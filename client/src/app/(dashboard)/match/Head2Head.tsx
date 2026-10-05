@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { cn, getLogoFile } from "@/lib/utils";
+import { edgeFor, luminance, matchColors } from "@/lib/array";
 import { head2Head, matchPreview } from "@/types/drizzleTypes";
 import { useGet5H2HMatchesQuery } from "@/state/api";
 import { RedCardBadge } from "@/lib/uiUtils";
@@ -14,15 +15,6 @@ import Pager from "@/components/Pager";
 
 type Segment = "home" | "draw" | "away";
 const PAGE_SIZE = 5;
-
-const COLORS: Record<Segment, { bar: string; text: string }> = {
-  home: { bar: "bg-sky-500", text: "text-sky-600 dark:text-sky-400" },
-  draw: {
-    bar: "bg-gray-400 dark:bg-gray-500",
-    text: "text-gray-500 dark:text-gray-400",
-  },
-  away: { bar: "bg-orange-500", text: "text-orange-600 dark:text-orange-400" },
-};
 
 const panel =
   "rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-800";
@@ -164,7 +156,7 @@ const Head2Head = ({
   const [hovered, setHovered] = useState<Segment | null>(null);
   const dispatch = useDispatch();
   const page = useAppSelector((state) => state.global.h2hPage);
-  const { matches, isLoading, total: pagedTotal } = useH2HMatches(h2h, page);
+  const { matches, isLoading } = useH2HMatches(h2h, page);
   const setPage = (page: number) => {
     dispatch(setH2HPage(page));
   };
@@ -195,10 +187,12 @@ const Head2Head = ({
     { key: "away", label: awayTeam ?? "Away", count: awayWins, pct: awayPct },
   ];
 
-  const verdict =
-    homeWins === awayWins
-      ? "The series is level"
-      : `${homeWins > awayWins ? homeTeam : awayTeam} lead the series ${Math.max(homeWins, awayWins)}–${Math.min(homeWins, awayWins)}`;
+  // Club colours, with the away side switching to its secondary if the two clash
+  const colors = matchColors(homeTeam, awayTeam ?? "");
+  const segmentColor: Record<Exclude<Segment, "draw">, string> = {
+    home: colors.home.bg,
+    away: colors.away.bg,
+  };
 
   const dim = (key: Segment) =>
     hovered !== null && hovered !== key && "opacity-30";
@@ -216,13 +210,63 @@ const Head2Head = ({
         <>
           {/* Series summary */}
           <div className={cn(panel, "mx-auto w-full p-3 lg:w-3/5")}>
-            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                {verdict}
-              </p>
-              <p className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
-                {total} {total === 1 ? "meeting" : "meetings"}
-              </p>
+            <div className="mb-2 grid grid-cols-3 gap-2">
+              {segments.map((s, i) => {
+                const logo = (
+                  <Image
+                    src={`/${getLogoFile(s.label)}`}
+                    alt={`${s.label} logo`}
+                    width={32}
+                    height={32}
+                    className="h-5 w-5 shrink-0 object-contain sm:h-7 sm:w-7"
+                  />
+                );
+                const count = (
+                  <span className="text-lg font-bold tabular-nums text-gray-900 dark:text-white">
+                    {s.count}
+                  </span>
+                );
+                const word = (singular: string, plural: string) => (
+                  <span className="truncate text-[14px] text-gray-400">
+                    {s.count === 1 ? singular : plural}
+                  </span>
+                );
+
+                return (
+                  <div
+                    key={s.key}
+                    onMouseEnter={() => setHovered(s.key)}
+                    onMouseLeave={() => setHovered(null)}
+                    className={cn(
+                      "flex min-w-0 cursor-default items-center gap-1.5 transition-opacity duration-200",
+                      i === 1 && "justify-center",
+                      i === 2 && "justify-end",
+                      dim(s.key),
+                    )}
+                  >
+                    {s.key === "home" && (
+                      <>
+                        {logo}
+                        {count}
+                        {word("Win", "Wins")}
+                      </>
+                    )}
+                    {s.key === "draw" && (
+                      <>
+                        {count}
+                        {word("Draw", "Draws")}
+                      </>
+                    )}
+                    {s.key === "away" && (
+                      <>
+                        {count}
+                        {word("Win", "Wins")}
+                        {logo}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div
@@ -230,46 +274,33 @@ const Head2Head = ({
               role="img"
               aria-label={`${homeTeam} ${homeWins} wins, ${drawCount} draws, ${awayTeam} ${awayWins} wins`}
             >
-              {segments.map(
-                (s) =>
-                  s.count > 0 && (
+              {segments.map((s) => {
+                if (s.count === 0) return null;
+                const style = { width: `${(s.count / total) * 100}%` };
+                if (s.key === "draw")
+                  return (
                     <div
                       key={s.key}
                       className={cn(
-                        "h-full transition-opacity duration-200",
-                        COLORS[s.key].bar,
+                        "h-full bg-gray-400 transition-opacity duration-200 dark:bg-gray-500",
                         dim(s.key),
                       )}
-                      style={{ width: `${(s.count / total) * 100}%` }}
+                      style={style}
                     />
-                  ),
-              )}
-            </div>
-
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              {segments.map((s, i) => (
-                <div
-                  key={s.key}
-                  onMouseEnter={() => setHovered(s.key)}
-                  onMouseLeave={() => setHovered(null)}
-                  className={cn(
-                    "flex min-w-0 cursor-default items-baseline gap-1.5 transition-opacity duration-200",
-                    i === 1 && "justify-center",
-                    i === 2 && "justify-end",
-                    dim(s.key),
-                  )}
-                >
-                  <span className="text-lg font-bold tabular-nums text-gray-900 dark:text-white">
-                    {s.count}
-                  </span>
-                  <span className={cn("truncate text-xs", COLORS[s.key].text)}>
-                    {s.label}
-                  </span>
-                  <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
-                    {s.pct}%
-                  </span>
-                </div>
-              ))}
+                  );
+                const color = segmentColor[s.key];
+                return (
+                  <div
+                    key={s.key}
+                    className={cn(
+                      "h-full transition-opacity duration-200",
+                      edgeFor(color),
+                      dim(s.key),
+                    )}
+                    style={{ ...style, backgroundColor: color }}
+                  />
+                );
+              })}
             </div>
           </div>
 

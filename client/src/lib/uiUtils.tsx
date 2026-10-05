@@ -184,11 +184,13 @@ function TeamStatsRow({
   value,
   percentage,
   isPositive,
+  isEqual,
 }: {
   label: string;
   value: number;
   percentage: number;
   isPositive: boolean;
+  isEqual: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -198,7 +200,9 @@ function TeamStatsRow({
           className={`text-xl font-semibold ${
             isPositive
               ? "text-emerald-600 dark:text-emerald-400"
-              : "text-red-600 dark:text-red-400"
+              : isEqual
+                ? "text-gray-600 dark:text-gray-400"
+                : "text-red-600 dark:text-red-400"
           }`}
         >
           {value}
@@ -206,7 +210,7 @@ function TeamStatsRow({
       </div>
       <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r from-blue-500 to-blue-600`}
+          className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${isPositive ? "from-sky-500 to-sky-600" : "from-gray-500 to-gray-500"}`}
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -235,9 +239,6 @@ export function TeamStatsCard({
   const avgYellowsPg = Number(
     (teamStandings.yellows / teamStandings.played).toFixed(2),
   );
-  const avgRedsPg = Number(
-    (teamStandings.reds / teamStandings.played).toFixed(2),
-  );
   const avgXgPg = Number((teamStandings.xg / teamStandings.played).toFixed(2));
 
   const oppAvgGpg = Number(
@@ -258,9 +259,6 @@ export function TeamStatsCard({
   const oppAvgYellowsPg = Number(
     (opponentStats.yellows / opponentStats.played).toFixed(2),
   );
-  const oppAvgRedsPg = Number(
-    (opponentStats.reds / opponentStats.played).toFixed(2),
-  );
   const oppAvgXgPg = Number(
     (opponentStats.xg / opponentStats.played).toFixed(2),
   );
@@ -274,13 +272,12 @@ export function TeamStatsCard({
   );
   const cornersPercentage = calculatePercentage(avgCornerPg, oppAvgCornersPg);
   const yellowsPercentage = calculatePercentage(avgYellowsPg, oppAvgYellowsPg);
-  const redsPercentage = calculatePercentage(avgRedsPg, oppAvgRedsPg);
   const xgPercentage = calculatePercentage(avgXgPg, oppAvgXgPg);
   const xgTotal = teamStandings.xg;
   const goalsMinusXg = teamStandings.gf - teamStandings.xg;
   return (
     <div
-      className={`flex flex-col gap-2 min-w-[250px] max-w-[350px] flex-1 p-6 rounded-xl shadow-md bg-blue-500/5 dark:bg-blue-900/20`}
+      className={`flex flex-col gap-2 min-w-[250px] max-w-[350px] flex-1 p-6 rounded-xl shadow-md bg-gray-100 dark:bg-gray-800/40`}
     >
       <div className="flex justify-center items-center">
         <Image
@@ -327,56 +324,56 @@ export function TeamStatsCard({
           label="Goals (per game)"
           value={avgGpg}
           percentage={goalsScoredPercentage}
-          isPositive={avgGpg >= oppAvgGpg}
+          isPositive={avgGpg > oppAvgGpg}
+          isEqual={avgGpg === oppAvgGpg}
         />
 
         <TeamStatsRow
           label="Expected Goals (xG)"
           value={avgXgPg}
           percentage={xgPercentage}
-          isPositive={avgXgPg >= oppAvgXgPg}
+          isPositive={avgXgPg > oppAvgXgPg}
+          isEqual={avgXgPg === oppAvgXgPg}
         />
 
         <TeamStatsRow
           label="Shots"
           value={avgShotsPg}
           percentage={shotsPercentage}
-          isPositive={avgShotsPg >= oppAvgShotsPg}
+          isPositive={avgShotsPg > oppAvgShotsPg}
+          isEqual={avgShotsPg === oppAvgShotsPg}
         />
 
         <TeamStatsRow
           label="Shots on target"
           value={avgShotsOnTargetPg}
           percentage={shotsOnTargetPercentage}
-          isPositive={avgShotsOnTargetPg >= oppAvgShotsOnTargetPg}
+          isPositive={avgShotsOnTargetPg > oppAvgShotsOnTargetPg}
+          isEqual={avgShotsOnTargetPg === oppAvgShotsOnTargetPg}
         />
 
         <TeamStatsRow
           label="Corners"
           value={avgCornerPg}
           percentage={cornersPercentage}
-          isPositive={avgCornerPg >= oppAvgCornersPg}
+          isPositive={avgCornerPg > oppAvgCornersPg}
+          isEqual={avgCornerPg === oppAvgCornersPg}
         />
 
         <TeamStatsRow
           label="Conceded"
           value={avgGaPg}
           percentage={goalsConcededPercentage}
-          isPositive={avgGaPg <= oppAvgGaPg}
+          isPositive={avgGaPg < oppAvgGaPg}
+          isEqual={avgGaPg === oppAvgGaPg}
         />
 
         <TeamStatsRow
           label="Yellow Cards"
           value={avgYellowsPg}
           percentage={yellowsPercentage}
-          isPositive={avgYellowsPg <= oppAvgYellowsPg}
-        />
-
-        <TeamStatsRow
-          label="Red Cards"
-          value={avgRedsPg}
-          percentage={redsPercentage}
-          isPositive={avgRedsPg <= oppAvgRedsPg}
+          isPositive={avgYellowsPg < oppAvgYellowsPg}
+          isEqual={avgYellowsPg === oppAvgYellowsPg}
         />
       </div>
 

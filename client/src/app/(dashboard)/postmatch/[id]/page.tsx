@@ -13,8 +13,9 @@ import Timeline from "../timeline";
 import Lineups from "../lineups";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import MatchTable from "../matchTable";
 
-type Tab = "timeline" | "stats" | "lineups";
+type Tab = "timeline" | "table" | "stats" | "lineups";
 
 const teamHref = (team: string) => `/team/${team.split(" ").join("_")}`;
 
@@ -175,6 +176,7 @@ function Tabs({
   const tabs: { key: Tab; label: string }[] = [
     { key: "timeline", label: "Timeline" },
     { key: "stats", label: "Stats" },
+    { key: "table", label: "Table" },
     { key: "lineups", label: "Lineups" },
   ];
   return (
@@ -230,6 +232,7 @@ export default function PostMatchPage() {
 
   const available: Record<Tab, boolean> = {
     timeline: Boolean(match.events?.length),
+    table: true,
     stats: true,
     lineups: Boolean(match.lineups),
   };
@@ -258,6 +261,7 @@ export default function PostMatchPage() {
             <Timeline match={match} onShowStats={() => setTab("stats")} />
           )}
           {active === "stats" && <Stats match={match} />}
+          {active === "table" && <MatchTable match={match} />}
           {active === "lineups" && <Lineups match={match} />}
         </div>
       </main>

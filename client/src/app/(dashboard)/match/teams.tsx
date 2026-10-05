@@ -87,16 +87,14 @@ const Teams = ({
           </span>
         )}
         <p className="text-center text-gray-600 dark:text-gray-400">
-          {new Date(matchDate).toLocaleString("en-GB", {
-            timeZone: "UTC",
+          {new Date(matchDate).toLocaleString("en-US", {
             weekday: "short",
             day: "numeric",
             month: "short",
             year: "numeric",
-            hour: "2-digit",
+            hour: "numeric",
             minute: "2-digit",
           })}{" "}
-          (GMT)
         </p>
       </div>
     </div>

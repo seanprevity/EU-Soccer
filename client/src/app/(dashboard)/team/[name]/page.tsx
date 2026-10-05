@@ -43,12 +43,14 @@ export default function Page({
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => router.push("/")}
+        onClick={() =>
+          window.history.length > 1 ? router.back() : router.push("/")
+        }
         className="absolute top-4 left-4 z-20 text-sm sm:text-base font-medium cursor-pointer 
                    dark:text-gray-100 dark:hover:bg-gray-700 flex items-center gap-1"
       >
         <ArrowLeft className="size-4" />
-        Home
+        Back
       </Button>
 
       <div className="w-full flex justify-center px-4">
@@ -73,8 +75,8 @@ export default function Page({
                 {t === "History"
                   ? "Matches"
                   : t === "Table"
-                  ? "Table"
-                  : "Squad"}
+                    ? "Table"
+                    : "Squad"}
               </button>
 
               {/* Divider */}

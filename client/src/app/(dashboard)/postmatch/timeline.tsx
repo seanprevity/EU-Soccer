@@ -1,5 +1,7 @@
 import { matchStats } from "@/types/drizzleTypes";
 import { MatchTimeline } from "@/lib/uiUtils";
+import { edgeFor, matchColors } from "@/lib/array";
+import { cn } from "@/lib/utils";
 
 type KeyStat = {
   label: string;
@@ -26,10 +28,12 @@ function KeyStatItem({
   stat,
   homeName,
   awayName,
+  colors,
 }: {
   stat: KeyStat;
   homeName: string;
   awayName: string;
+  colors: { home: string; away: string };
 }) {
   const { label, home, away, format } = stat;
   const total = home + away;
@@ -72,13 +76,12 @@ function KeyStatItem({
       </div>
       <div className="flex h-1.5 gap-0.5 overflow-hidden rounded-full">
         <div
-          className={homeShare > 50 ? "bg-green-400" : "bg-gray-500"}
-          style={{ width: `${homeShare}%` }}
+          className={edgeFor(colors.home)}
+          style={{ width: `${homeShare}%`, backgroundColor: colors.home }}
         />
         <div
-          className={
-            homeShare >= 50 ? "flex-1 bg-gray-500" : "flex-1 bg-green-400"
-          }
+          className={cn("flex-1", edgeFor(colors.away))}
+          style={{ backgroundColor: colors.away }}
         />
       </div>
     </div>
@@ -94,6 +97,8 @@ function KeyStatistics({
 }) {
   const homeName = match.homeTeam;
   const awayName = match.awayTeam;
+  const { home, away } = matchColors(homeName, awayName);
+  const colors = { home: home.bg, away: away.bg };
 
   const candidates: (KeyStat | null)[] = [
     match.hposs != null && match.aposs != null
@@ -140,6 +145,7 @@ function KeyStatistics({
             stat={s}
             homeName={homeName}
             awayName={awayName}
+            colors={colors}
           />
         ))}
       </div>

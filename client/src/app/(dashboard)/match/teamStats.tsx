@@ -5,7 +5,13 @@ import {
   useGetLast5TeamStatsQuery,
   useGetSeasonTeamStatsQuery,
 } from "@/state/api";
+import { cn } from "@/lib/utils";
 import { useState } from "react";
+
+const MODES: ["season" | "last5", string][] = [
+  ["season", "Season"],
+  ["last5", "Last 5"],
+];
 
 const TeamStats = ({
   homeTeam,
@@ -14,12 +20,9 @@ const TeamStats = ({
   homeTeam: string;
   awayTeam: string;
 }) => {
-  const [mode, setMode] = useState<"last5" | "season">("season");
+  const [mode, setMode] = useState<"season" | "last5">("season");
   const { data: last5TeamStats, isLoading: last5TeamStatsLoading } =
-    useGetLast5TeamStatsQuery({
-      team1: homeTeam,
-      team2: awayTeam,
-    });
+    useGetLast5TeamStatsQuery({ team1: homeTeam, team2: awayTeam });
   const { data: seasonTeamStats, isLoading: seasonTeamStatsLoading } =
     useGetSeasonTeamStatsQuery({ team1: homeTeam, team2: awayTeam });
 
@@ -30,53 +33,47 @@ const TeamStats = ({
       </p>
     );
 
-  const homeSeasonStats = seasonTeamStats?.[0];
-  const awaySeasonStats = seasonTeamStats?.[1];
-  const homeLast5Stats = last5TeamStats?.[0];
-  const awayLast5Stats = last5TeamStats?.[1];
-
-  // Select correct data for current mode
-  const homeStats = mode === "season" ? homeSeasonStats : homeLast5Stats;
-  const awayStats = mode === "season" ? awaySeasonStats : awayLast5Stats;
+  const homeStats =
+    mode === "season" ? seasonTeamStats?.[0] : last5TeamStats?.[0];
+  const awayStats =
+    mode === "season" ? seasonTeamStats?.[1] : last5TeamStats?.[1];
 
   return (
     <div>
-      <h3 className="text-xl text-semibold text-center dark:text-gray-200 mb-6 relative after:content-[''] after:absolute after:-bottom-2 after:left-1/2 after:-translate-x-1/2 after:w-12 after:h-[3px] after:bg-gray-300">
+      <h2 className="mx-auto max-w-3xl text-center text-2xl font-bold text-gray-800 dark:border-gray-400 dark:text-gray-200">
         Team Stats
-      </h3>
-
-      <div className="flex justify-center my-6 gap-4">
-        <button
-          onClick={() => setMode("season")}
-          className={`border-2 px-4 py-2 rounded-lg transition-all duration-200 cursor-pointer ${
-            mode === "season"
-              ? "font-bold border-blue-500 bg-blue-50 dark:bg-gray-700 dark:text-gray-200 dark:border-purple-800 dark:hover:bg-gray-600"
-              : "border-gray-200 hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-400 dark:hover:bg-gray-500 dark:text-gray-200"
-          }`}
-        >
-          Season
-        </button>
-        <button
-          onClick={() => setMode("last5")}
-          className={`border-2 px-4 py-2 rounded-lg transition-all duration-200 cursor-pointer ${
-            mode === "last5"
-              ? "font-bold border-blue-500 bg-blue-50 dark:bg-gray-700 dark:text-gray-200 dark:border-purple-800 dark:hover:bg-gray-600"
-              : "border-gray-200 hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-400 dark:hover:bg-gray-500 dark:text-gray-200"
-          }`}
-        >
-          Last 5
-        </button>
+      </h2>
+      <div
+        role="tablist"
+        className="mx-auto my-6 flex w-fit rounded-lg bg-gray-200 p-1 dark:bg-gray-700"
+      >
+        {MODES.map(([key, label]) => (
+          <button
+            key={key}
+            role="tab"
+            aria-selected={mode === key}
+            onClick={() => setMode(key)}
+            className={cn(
+              "cursor-pointer rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
+              mode === key
+                ? "bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-white"
+                : "text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white",
+            )}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="flex justify-around max-w-3xl mx-auto flex-col md:flex-row md:items-start items-center gap-4 md:gap-0">
         {homeStats && awayStats ? (
-          <TeamStatsCard teamStandings={homeStats} opponentStats={awayStats}/>
+          <TeamStatsCard teamStandings={homeStats} opponentStats={awayStats} />
         ) : (
           <div>No home team stats available</div>
         )}
 
         {awayStats && homeStats ? (
-          <TeamStatsCard teamStandings={awayStats} opponentStats={homeStats}/>
+          <TeamStatsCard teamStandings={awayStats} opponentStats={homeStats} />
         ) : (
           <div>No away team stats available</div>
         )}

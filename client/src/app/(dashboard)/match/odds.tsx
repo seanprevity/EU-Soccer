@@ -4,35 +4,15 @@ import Image from "next/image";
 import { useGetOddsQuery, useGetSimulationQuery } from "@/state/api";
 import { upcomingMatches } from "@/types/drizzleTypes";
 import { cn, getLogoFile } from "@/lib/utils";
+import { edgeFor, matchColors } from "@/lib/array";
 
 type Outcome = "home" | "draw" | "away";
 type OddsKey = "oddsHome" | "oddsDraw" | "oddsAway";
 
-const OUTCOME_STYLE: Record<
-  Outcome,
-  { bar: string; text: string; badge: string; best: string; label: string }
-> = {
-  home: {
-    bar: "bg-sky-600",
-    text: "text-sky-600 dark:text-sky-400",
-    badge: "bg-sky-600 text-white",
-    best: "bg-sky-100 text-sky-800 ring-1 ring-sky-300 dark:bg-sky-900/50 dark:text-sky-200 dark:ring-sky-700",
-    label: "Home favourite",
-  },
-  draw: {
-    bar: "bg-gray-400 dark:bg-gray-500",
-    text: "text-gray-500 dark:text-gray-400",
-    badge: "bg-gray-500 text-white",
-    best: "bg-gray-200 text-gray-900 ring-1 ring-gray-300 dark:bg-gray-600 dark:text-white dark:ring-gray-500",
-    label: "Draw favoured",
-  },
-  away: {
-    bar: "bg-orange-500",
-    text: "text-orange-600 dark:text-orange-400",
-    badge: "bg-orange-500 text-white",
-    best: "bg-orange-100 text-orange-800 ring-1 ring-orange-300 dark:bg-orange-900/50 dark:text-orange-200 dark:ring-orange-700",
-    label: "Away favourite",
-  },
+const OUTCOME_LABEL: Record<Outcome, string> = {
+  home: "Home favourite",
+  draw: "Draw favoured",
+  away: "Away favourite",
 };
 
 // Whole-number percentages that always total exactly 100 (largest-remainder method)
@@ -50,14 +30,6 @@ const toPercents = (shares: number[]) => {
     });
   return result;
 };
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="mb-1 border-b-2 border-[#38003c] pb-2 text-center text-xl font-bold text-gray-800 dark:border-gray-400 dark:text-gray-200">
-      {children}
-    </h2>
-  );
-}
 
 function TeamLabel({ team, align }: { team: string; align: "left" | "right" }) {
   return (
@@ -124,6 +96,16 @@ const Odds = ({
         ? match.awayTeam
         : "Draw";
 
+  // Club colours, with the away side switching to its secondary if the two clash
+  const colors = matchColors(match.homeTeam, match.awayTeam);
+  const teamColor: Record<
+    Exclude<Outcome, "draw">,
+    { bg: string; text: string }
+  > = {
+    home: colors.home,
+    away: colors.away,
+  };
+
   // Bookmaker consensus: average odds -> implied probability, with the margin removed
   const avg = (key: OddsKey) =>
     rows.reduce((sum, r) => sum + r[key], 0) / rows.length;
@@ -152,49 +134,80 @@ const Odds = ({
   ];
 
   return (
-    <section className="my-4 space-y-6 rounded-lg bg-white p-4 shadow-md sm:my-8 md:p-6 dark:bg-gray-800">
+    <section className="my-4 space-y-6 rounded-lg bg-white p-4 shadow-md sm:my-8 md:p-6 dark:bg-gray-800/40">
       {simulation && (
         <div className="space-y-4">
           <div>
-            <SectionTitle>Prediction</SectionTitle>
+            <h2 className="text-center text-xl font-bold text-gray-800 dark:text-gray-200">
+              Prediction
+            </h2>
             <p className="text-center text-xs italic text-gray-500 dark:text-gray-400">
               Based on Monte Carlo simulations
             </p>
           </div>
 
-          <div className="mx-auto max-w-3xl space-y-4 rounded-md bg-[#f8f8f8] p-4 sm:p-6 dark:bg-gray-700">
+          <div className="mx-auto max-w-3xl space-y-4 rounded-md bg-[#f8f8f8] p-4 sm:p-5 dark:bg-gray-700">
             {/* Favourite */}
-            <div className="flex flex-col items-center gap-2 text-center">
+            <div className="flex flex-col items-center gap-1 text-center">
               <span className="text-lg font-bold text-gray-900 sm:text-xl dark:text-white">
                 {favouriteName}
               </span>
-              <span
-                className={cn(
-                  "rounded-full px-2.5 py-0.5 text-xs font-semibold",
-                  OUTCOME_STYLE[favourite].badge,
-                )}
-              >
-                {OUTCOME_STYLE[favourite].label}
-              </span>
+              {favourite === "draw" ? (
+                <span className="rounded-full bg-gray-600 px-2.5 py-0.5 text-xs font-semibold text-white">
+                  {OUTCOME_LABEL.draw}
+                </span>
+              ) : (
+                <span
+                  className={cn(
+                    "rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                    edgeFor(teamColor[favourite].bg),
+                  )}
+                  style={{
+                    backgroundColor: teamColor[favourite].bg,
+                    color: teamColor[favourite].text,
+                  }}
+                >
+                  {OUTCOME_LABEL[favourite]}
+                </span>
+              )}
             </div>
 
             {/* Probability bar */}
-            <div className="flex h-9 gap-0.5 overflow-hidden rounded-full sm:h-10">
-              {segments.map(({ outcome, pct, name }) =>
-                pct > 0 ? (
+            <div className="flex h-7 gap-0.5 overflow-hidden rounded-full sm:h-8">
+              {segments.map(({ outcome, pct, name }) => {
+                if (pct <= 0) return null;
+                const base =
+                  "flex min-w-0 items-center justify-center text-xs sm:text-sm font-semibold tabular-nums transition-all duration-500";
+                const size = { flexGrow: pct, flexBasis: 0 };
+                const label = pct >= 8 && `${pct}%`;
+
+                if (outcome === "draw")
+                  return (
+                    <div
+                      key={outcome}
+                      title={`${name}: ${pct}%`}
+                      className={cn(
+                        base,
+                        "bg-gray-400 text-white dark:bg-gray-500",
+                      )}
+                      style={size}
+                    >
+                      {label}
+                    </div>
+                  );
+
+                const { bg, text } = teamColor[outcome];
+                return (
                   <div
                     key={outcome}
                     title={`${name}: ${pct}%`}
-                    className={cn(
-                      "flex min-w-0 items-center justify-center text-xs font-semibold tabular-nums text-white transition-all duration-500 sm:text-sm",
-                      OUTCOME_STYLE[outcome].bar,
-                    )}
-                    style={{ flexGrow: pct, flexBasis: 0 }}
+                    className={cn(base, edgeFor(bg))}
+                    style={{ ...size, backgroundColor: bg, color: text }}
                   >
-                    {pct >= 8 && `${pct}%`}
+                    {label}
                   </div>
-                ) : null,
-              )}
+                );
+              })}
             </div>
 
             <div className="flex items-center gap-3">
@@ -218,15 +231,15 @@ const Odds = ({
               {marketPct && (
                 <p className="tabular-nums">
                   Bookmakers:{" "}
-                  <span className={OUTCOME_STYLE.home.text}>
+                  <span className="font-semibold text-gray-900 dark:text-white">
                     {marketPct[0]}%
                   </span>
                   {" · "}
-                  <span className={OUTCOME_STYLE.draw.text}>
+                  <span className="text-gray-500 dark:text-gray-400">
                     {marketPct[1]}%
                   </span>
                   {" · "}
-                  <span className={OUTCOME_STYLE.away.text}>
+                  <span className="font-semibold text-gray-900 dark:text-white">
                     {marketPct[2]}%
                   </span>
                 </p>
@@ -238,11 +251,9 @@ const Odds = ({
 
       {hasOdds && (
         <div className="mx-auto max-w-3xl space-y-2">
-          <SectionTitle>Bookmaker Odds</SectionTitle>
-          <p className="text-center text-xs italic text-gray-500 dark:text-gray-400">
-            Highlighted cells are the best odds for each outcome
-          </p>
-
+          <h2 className="text-center text-xl font-bold text-gray-800 dark:text-gray-200">
+            Bookmaker Odds
+          </h2>
           <div className="overflow-x-auto rounded-lg shadow-sm">
             <table className="w-full min-w-[420px] border-collapse text-sm">
               <thead className="bg-[#38003c] text-white dark:bg-gray-900">
@@ -270,30 +281,26 @@ const Odds = ({
                     <td className="truncate px-3 py-2 font-medium text-gray-800 dark:text-gray-200">
                       {r.bookmaker}
                     </td>
-                    {(
-                      [
-                        ["oddsHome", "home"],
-                        ["oddsDraw", "draw"],
-                        ["oddsAway", "away"],
-                      ] as [OddsKey, Outcome][]
-                    ).map(([key, outcome]) => {
-                      const isBest = best[key].has(r.bookmaker);
-                      return (
-                        <td key={key} className="px-2 py-1.5 text-center">
-                          <span
-                            title={isBest ? "Best available odds" : undefined}
-                            className={cn(
-                              "inline-block min-w-[3.25rem] rounded px-2 py-1 font-semibold tabular-nums",
-                              isBest
-                                ? OUTCOME_STYLE[outcome].best
-                                : "text-gray-700 dark:text-gray-300",
-                            )}
-                          >
-                            {r[key].toFixed(2)}
-                          </span>
-                        </td>
-                      );
-                    })}
+                    {(["oddsHome", "oddsDraw", "oddsAway"] as OddsKey[]).map(
+                      (key) => {
+                        const isBest = best[key].has(r.bookmaker);
+                        return (
+                          <td key={key} className="px-2 py-1.5 text-center">
+                            <span
+                              title={isBest ? "Best available odds" : undefined}
+                              className={cn(
+                                "inline-block min-w-[3.25rem] rounded px-2 py-1 font-semibold tabular-nums",
+                                isBest
+                                  ? "bg-green-100 text-green-800 ring-1 ring-green-300 dark:bg-green-900/50 dark:text-green-200 dark:ring-green-700"
+                                  : "text-gray-700 dark:text-gray-300",
+                              )}
+                            >
+                              {r[key].toFixed(2)}
+                            </span>
+                          </td>
+                        );
+                      },
+                    )}
                   </tr>
                 ))}
               </tbody>
