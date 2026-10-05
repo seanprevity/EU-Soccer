@@ -3,7 +3,6 @@
 import { Standings } from "@/types/drizzleTypes";
 import { cn, getLogoFile } from "@/lib/utils";
 import Image from "next/image";
-import { edgeFor, matchColors } from "@/lib/array";
 
 type Split = "HOME" | "AWAY";
 
@@ -79,7 +78,7 @@ function RecordStrip({ stats }: { stats: SplitStats }) {
       key: "won",
       count: stats.won,
       label: "Won",
-      className: "bg-gradient-to-r from-emerald-400 to-emerald-600",
+      className: "bg-green-600",
     },
     {
       key: "draw",
@@ -91,22 +90,22 @@ function RecordStrip({ stats }: { stats: SplitStats }) {
       key: "lost",
       count: stats.lost,
       label: "Lost",
-      className: "bg-gradient-to-r from-rose-500 to-rose-600",
+      className: "bg-red-600",
     },
   ];
 
   return (
-    <div
-      className="flex h-1.5 gap-0.5 overflow-hidden rounded-full"
-      aria-hidden
-    >
+    <div className="flex h-1.5 gap-1" aria-hidden>
       {segments.map((s) =>
         s.count > 0 ? (
           <div
             key={s.key}
             title={`${s.label} ${s.count}`}
-            className={cn("h-full transition-all duration-500", s.className)}
-            style={{ width: `${(s.count / stats.played) * 100}%` }}
+            className={cn(
+              "min-w-0 rounded-full transition-all duration-500 ",
+              s.className,
+            )}
+            style={{ flexGrow: s.count, flexBasis: 0 }}
           />
         ) : null,
       )}
@@ -181,8 +180,8 @@ function CompareRow({
             className={cn(
               "h-full rounded-full transition-all duration-500",
               winner === "a"
-                ? "bg-gradient-to-l from-emerald-400 to-emerald-600 shadow-[0_0_6px] shadow-emerald-500/40"
-                : "bg-gray-400 dark:bg-gray-500",
+                ? "bg-green-600"
+                : "bg-slate-400 dark:bg-slate-500",
             )}
             style={{ width: width(a) }}
           />
@@ -200,8 +199,8 @@ function CompareRow({
             className={cn(
               "h-full rounded-full transition-all duration-500",
               winner === "b"
-                ? "bg-gradient-to-r from-emerald-400 to-emerald-600 shadow-[0_0_6px] shadow-emerald-500/40"
-                : "bg-gray-400 dark:bg-gray-500",
+                ? "bg-green-600"
+                : "bg-slate-400 dark:bg-slate-500",
             )}
             style={{ width: width(b) }}
           />
@@ -271,7 +270,6 @@ const HomeAwayRecord = ({
   const homeAway = get(homeTeam, "AWAY");
   const awayAtHome = get(awayTeam, "HOME");
   const awayAway = get(awayTeam, "AWAY");
-  const colors = matchColors(homeTeam, awayTeam);
 
   return (
     <section className="space-y-4 rounded-lg bg-gray-100 p-4 dark:bg-gray-900">

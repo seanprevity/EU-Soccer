@@ -74,15 +74,23 @@ function KeyStatItem({
           {format(away)}
         </span>
       </div>
-      <div className="flex h-1.5 gap-0.5 overflow-hidden rounded-full">
-        <div
-          className={edgeFor(colors.home)}
-          style={{ width: `${homeShare}%`, backgroundColor: colors.home }}
-        />
-        <div
-          className={cn("flex-1", edgeFor(colors.away))}
-          style={{ backgroundColor: colors.away }}
-        />
+      <div className="flex h-1.5 gap-1">
+        {[
+          { key: "home", value: total ? home : 1, color: colors.home },
+          { key: "away", value: total ? away : 1, color: colors.away },
+        ].map((s) =>
+          s.value > 0 ? (
+            <div
+              key={s.key}
+              className={cn("min-w-0 rounded-full", edgeFor(s.color))}
+              style={{
+                flexGrow: s.value,
+                flexBasis: 0,
+                backgroundColor: s.color,
+              }}
+            />
+          ) : null,
+        )}
       </div>
     </div>
   );

@@ -270,22 +270,22 @@ const Head2Head = ({
             </div>
 
             <div
-              className="flex h-2 gap-0.5 overflow-hidden rounded-full"
+              className="flex h-2 gap-1"
               role="img"
               aria-label={`${homeTeam} ${homeWins} wins, ${drawCount} draws, ${awayTeam} ${awayWins} wins`}
             >
               {segments.map((s) => {
                 if (s.count === 0) return null;
-                const style = { width: `${(s.count / total) * 100}%` };
+                const size = { flexGrow: s.count, flexBasis: 0 };
                 if (s.key === "draw")
                   return (
                     <div
                       key={s.key}
                       className={cn(
-                        "h-full bg-gray-400 transition-opacity duration-200 dark:bg-gray-500",
+                        "min-w-0 rounded-full bg-gray-300 transition-opacity duration-200 dark:bg-gray-500",
                         dim(s.key),
                       )}
-                      style={style}
+                      style={size}
                     />
                   );
                 const color = segmentColor[s.key];
@@ -293,11 +293,11 @@ const Head2Head = ({
                   <div
                     key={s.key}
                     className={cn(
-                      "h-full transition-opacity duration-200",
+                      "min-w-0 rounded-full transition-opacity duration-200",
                       edgeFor(color),
                       dim(s.key),
                     )}
-                    style={{ ...style, backgroundColor: color }}
+                    style={{ ...size, backgroundColor: color }}
                   />
                 );
               })}

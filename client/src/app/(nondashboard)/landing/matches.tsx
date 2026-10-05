@@ -133,7 +133,7 @@ function UpcomingMatchCard({
                 </span>
               </div>
               <div
-                className="flex h-1.5 gap-0.5 overflow-hidden rounded-full"
+                className="flex h-1.5 gap-1"
                 role="img"
                 aria-label={`${m.homeTeam} ${homeWins} wins, ${draws} draws, ${m.awayTeam} ${awayWins} wins`}
               >
@@ -142,13 +142,14 @@ function UpcomingMatchCard({
                     <div
                       key={s.key}
                       className={cn(
-                        "h-full",
+                        "min-w-0 rounded-full",
                         s.color
                           ? edgeFor(s.color)
-                          : "bg-gray-400 dark:bg-gray-500",
+                          : "bg-gray-300 dark:bg-gray-400",
                       )}
                       style={{
-                        width: `${(s.count / total) * 100}%`,
+                        flexGrow: s.count,
+                        flexBasis: 0,
                         ...(s.color && { backgroundColor: s.color }),
                       }}
                     />

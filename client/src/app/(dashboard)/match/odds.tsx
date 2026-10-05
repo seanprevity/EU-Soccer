@@ -31,27 +31,23 @@ const toPercents = (shares: number[]) => {
   return result;
 };
 
-function TeamLabel({ team, align }: { team: string; align: "left" | "right" }) {
+function TeamLogo({ team }: { team: string }) {
   return (
-    <div
-      className={cn(
-        "flex min-w-0 flex-1 items-center gap-2",
-        align === "right" && "flex-row-reverse text-right",
-      )}
-    >
-      <Image
-        src={`/${getLogoFile(team)}`}
-        alt=""
-        width={24}
-        height={24}
-        className="h-6 w-6 shrink-0 object-contain"
-      />
-      <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
-        {team}
-      </span>
-    </div>
+    <Image
+      src={`/${getLogoFile(team)}`}
+      alt=""
+      width={24}
+      height={24}
+      className="h-5 w-5 shrink-0 object-contain sm:h-6 sm:w-6"
+    />
   );
 }
+
+const Pct = ({ value }: { value: number }) => (
+  <span className="text-base font-bold tabular-nums text-gray-900 sm:text-lg dark:text-white">
+    {value}%
+  </span>
+);
 
 const Odds = ({
   match,
@@ -134,9 +130,9 @@ const Odds = ({
   ];
 
   return (
-    <section className="my-4 space-y-6 rounded-lg bg-white p-4 shadow-md sm:my-8 md:p-6 dark:bg-gray-800/40">
+    <section className="my-4 space-y-8 rounded-lg bg-white p-4 shadow-md sm:my-8 md:p-6 dark:bg-gray-800/40">
       {simulation && (
-        <div className="space-y-4">
+        <div className="mx-auto max-w-3xl space-y-5">
           <div>
             <h2 className="text-center text-xl font-bold text-gray-800 dark:text-gray-200">
               Prediction
@@ -146,114 +142,118 @@ const Odds = ({
             </p>
           </div>
 
-          <div className="mx-auto max-w-3xl space-y-4 rounded-md bg-[#f8f8f8] p-4 sm:p-5 dark:bg-gray-700">
-            {/* Favourite */}
-            <div className="flex flex-col items-center gap-1 text-center">
-              <span className="text-lg font-bold text-gray-900 sm:text-xl dark:text-white">
+          {/* Favourite */}
+          <div className="flex justify-center">
+            {favourite === "draw" ? (
+              <span className="rounded-full bg-gray-600 px-3.5 py-1 text-lg font-bold text-white dark:bg-gray-500">
+                Draw
+              </span>
+            ) : (
+              <span
+                className={cn(
+                  "rounded-full px-3.5 py-1 text-lg font-bold",
+                  edgeFor(teamColor[favourite].bg),
+                )}
+                style={{
+                  backgroundColor: `${teamColor[favourite].bg}cc`,
+                  color: teamColor[favourite].text,
+                }}
+              >
                 {favouriteName}
               </span>
-              {favourite === "draw" ? (
-                <span className="rounded-full bg-gray-600 px-2.5 py-0.5 text-xs font-semibold text-white">
-                  {OUTCOME_LABEL.draw}
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {/* Labels with their percentages */}
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <TeamLogo team={match.homeTeam} />
+                <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
+                  {match.homeTeam}
                 </span>
-              ) : (
-                <span
-                  className={cn(
-                    "rounded-full px-2.5 py-0.5 text-xs font-semibold",
-                    edgeFor(teamColor[favourite].bg),
-                  )}
-                  style={{
-                    backgroundColor: teamColor[favourite].bg,
-                    color: teamColor[favourite].text,
-                  }}
-                >
-                  {OUTCOME_LABEL[favourite]}
+                <Pct value={homePct} />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                  Draw
                 </span>
-              )}
+                <Pct value={drawPct} />
+              </div>
+              <div className="flex min-w-0 items-center justify-end gap-2">
+                <Pct value={awayPct} />
+                <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
+                  {match.awayTeam}
+                </span>
+                <TeamLogo team={match.awayTeam} />
+              </div>
             </div>
 
-            {/* Probability bar */}
-            <div className="flex h-7 gap-0.5 overflow-hidden rounded-full sm:h-8">
+            {/* Probability bar: three rounded segments */}
+            <div
+              className="flex h-2.5 gap-1"
+              role="img"
+              aria-label={`${match.homeTeam} ${homePct}%, draw ${drawPct}%, ${match.awayTeam} ${awayPct}%`}
+            >
               {segments.map(({ outcome, pct, name }) => {
                 if (pct <= 0) return null;
-                const base =
-                  "flex min-w-0 items-center justify-center text-xs sm:text-sm font-semibold tabular-nums transition-all duration-500";
                 const size = { flexGrow: pct, flexBasis: 0 };
-                const label = pct >= 8 && `${pct}%`;
-
                 if (outcome === "draw")
                   return (
                     <div
                       key={outcome}
                       title={`${name}: ${pct}%`}
-                      className={cn(
-                        base,
-                        "bg-gray-400 text-white dark:bg-gray-500",
-                      )}
+                      className="min-w-0 rounded-full bg-gray-300 transition-all duration-500 dark:bg-gray-500"
                       style={size}
-                    >
-                      {label}
-                    </div>
+                    />
                   );
-
-                const { bg, text } = teamColor[outcome];
+                const { bg } = teamColor[outcome];
                 return (
                   <div
                     key={outcome}
                     title={`${name}: ${pct}%`}
-                    className={cn(base, edgeFor(bg))}
-                    style={{ ...size, backgroundColor: bg, color: text }}
-                  >
-                    {label}
-                  </div>
+                    className={cn(
+                      "min-w-0 rounded-full transition-all duration-500",
+                      edgeFor(bg),
+                    )}
+                    style={{ ...size, backgroundColor: bg }}
+                  />
                 );
               })}
             </div>
-
-            <div className="flex items-center gap-3">
-              <TeamLabel team={match.homeTeam} align="left" />
-              <span className="shrink-0 text-sm font-semibold text-gray-500 dark:text-gray-400">
-                Draw
-              </span>
-              <TeamLabel team={match.awayTeam} align="right" />
-            </div>
-
-            <div className="flex flex-col items-center gap-1 border-t border-gray-200 pt-3 text-xs text-gray-600 sm:text-sm dark:border-gray-600 dark:text-gray-300">
-              <p>
-                Most likely scoreline{" "}
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  {simulation.most_likely_score}
-                </span>{" "}
-                <span className="tabular-nums text-gray-500 dark:text-gray-400">
-                  ({Math.round(simulation.most_likely_score_prob * 100)}%)
-                </span>
-              </p>
-              {marketPct && (
-                <p className="tabular-nums">
-                  Bookmakers:{" "}
-                  <span className="font-semibold text-gray-900 dark:text-white">
-                    {marketPct[0]}%
-                  </span>
-                  {" · "}
-                  <span className="text-gray-500 dark:text-gray-400">
-                    {marketPct[1]}%
-                  </span>
-                  {" · "}
-                  <span className="font-semibold text-gray-900 dark:text-white">
-                    {marketPct[2]}%
-                  </span>
-                </p>
-              )}
-            </div>
           </div>
+
+          <p className="text-center text-xs text-gray-600 sm:text-sm dark:text-gray-300">
+            Most likely scoreline{" "}
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {simulation.most_likely_score}
+            </span>{" "}
+            <span className="tabular-nums text-gray-500 dark:text-gray-400">
+              ({Math.round(simulation.most_likely_score_prob * 100)}%)
+            </span>
+          </p>
         </div>
       )}
 
       {hasOdds && (
         <div className="mx-auto max-w-3xl space-y-2">
           <h2 className="text-center text-xl font-bold text-gray-800 dark:text-gray-200">
-            Bookmaker Odds
+            Odds
           </h2>
+          {marketPct && (
+            <p className="text-center text-xs tabular-nums text-gray-600 sm:text-sm dark:text-gray-300">
+              Implied chances:{" "}
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {match.homeTeam} {marketPct[0]}%
+              </span>
+              {" · "}
+              <span>Draw {marketPct[1]}%</span>
+              {" · "}
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {match.awayTeam} {marketPct[2]}%
+              </span>
+            </p>
+          )}
           <div className="overflow-x-auto rounded-lg shadow-sm">
             <table className="w-full min-w-[420px] border-collapse text-sm">
               <thead className="bg-[#38003c] text-white dark:bg-gray-900">
