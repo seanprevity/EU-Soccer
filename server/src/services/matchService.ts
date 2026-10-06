@@ -1,11 +1,12 @@
 import {
+  HomeAwayStats,
   MatchPreview,
   matchStats,
   odds,
   upcomingMatches,
 } from "../../drizzle/schema";
 import { db } from "../lib/db";
-import { eq, or, and, lt, gt, desc, count } from "drizzle-orm";
+import { eq, or, and, lt, gt, desc, count, gte, inArray } from "drizzle-orm";
 import { curSeason } from "../utils/map";
 import {
   computeFormScore,
@@ -288,5 +289,46 @@ export const getSimulationService = async (
     lambda_away: lamAway,
     most_likely_score: mostLikelyScore,
     most_likely_score_prob: mostLikelyScoreProb,
+  };
+};
+
+export const getHomeAwayMatchesService = async (
+  homeTeam: string,
+  awayTeam: string,
+): Promise<{
+  homeHome: HomeAwayStats[];
+  homeAway: HomeAwayStats[];
+  awayHome: HomeAwayStats[];
+  awayAway: HomeAwayStats[];
+}> => {
+  const teams = [homeTeam, awayTeam];
+  const rows = await db
+    .select({
+      id: matchStats.id,
+      homeTeam: matchStats.homeTeam,
+      awayTeam: matchStats.awayTeam,
+      hst: matchStats.hst,
+      ast: matchStats.ast,
+      hxg: matchStats.hxg,
+      axg: matchStats.axg,
+      hposs: matchStats.hposs,
+      aposs: matchStats.aposs,
+    })
+    .from(matchStats)
+    .where(
+      and(
+        gte(matchStats.matchDate, `${curSeason}-07`),
+        or(
+          inArray(matchStats.homeTeam, teams),
+          inArray(matchStats.awayTeam, teams),
+        ),
+      ),
+    );
+
+  return {
+    homeHome: rows.filter((r) => r.homeTeam === homeTeam),
+    homeAway: rows.filter((r) => r.awayTeam === homeTeam),
+    awayHome: rows.filter((r) => r.homeTeam === awayTeam),
+    awayAway: rows.filter((r) => r.awayTeam === awayTeam),
   };
 };

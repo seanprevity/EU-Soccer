@@ -1,8 +1,9 @@
 "use client";
 
-import { Standings } from "@/types/drizzleTypes";
+import { HomeAwayStats, Standings } from "@/types/drizzleTypes";
 import { cn, getLogoFile } from "@/lib/utils";
 import Image from "next/image";
+import { useGetHomeAwayMatchStatsQuery } from "@/state/api";
 
 type Split = "HOME" | "AWAY";
 
@@ -11,16 +12,18 @@ type SplitStats = {
   won: number;
   draw: number;
   lost: number;
-  ppg: number | null;
-  winPct: number | null;
   goalsForPg: number | null;
   goalsAgainstPg: number | null;
+  xgPg: number | null;
+  xgaPg: number | null;
+  shotsOnTargetPg: number | null;
+  possession: number | null;
 };
 
 type Side = { team: string; split: Split; stats: SplitStats | null };
 
 type Metric = {
-  key: "ppg" | "winPct" | "goalsForPg" | "goalsAgainstPg";
+  key: Exclude<keyof SplitStats, "played" | "won" | "draw" | "lost">;
   label: string;
   max?: number;
   better: "high" | "low";
@@ -32,14 +35,6 @@ const twoDp = (v: number) => v.toFixed(2);
 
 // Rates rather than raw counts, so teams with different games played compare fairly.
 const METRICS: Metric[] = [
-  {
-    key: "ppg",
-    label: "Points per game",
-    max: 3,
-    better: "high",
-    format: twoDp,
-  },
-  { key: "winPct", label: "Win rate", max: 100, better: "high", format: pct },
   { key: "goalsForPg", label: "Goals Scored", better: "high", format: twoDp },
   {
     key: "goalsAgainstPg",
@@ -47,25 +42,55 @@ const METRICS: Metric[] = [
     better: "low",
     format: twoDp,
   },
+  { key: "xgPg", label: "xG", better: "high", format: twoDp },
+  { key: "xgaPg", label: "xG Against", better: "low", format: twoDp },
+  {
+    key: "shotsOnTargetPg",
+    label: "Shots On Target",
+    better: "high",
+    format: twoDp,
+  },
+  { key: "possession", label: "Possession", better: "high", format: pct },
 ];
 
-function toSplitStats(r?: Standings): SplitStats | null {
+const avg = (values: (number | null)[]) => {
+  const known = values.filter((v): v is number => v != null);
+  return known.length ? known.reduce((a, b) => a + b, 0) / known.length : null;
+};
+
+const fromTeamView = (m: HomeAwayStats, split: Split) => {
+  const home = split === "HOME";
+  return {
+    xg: home ? m.hxg : m.axg,
+    xga: home ? m.axg : m.hxg,
+    shotsOnTarget: home ? m.hst : m.ast,
+    possession: home ? m.hposs : m.aposs,
+  };
+};
+
+function toSplitStats(
+  r: Standings | undefined,
+  matches: HomeAwayStats[] | undefined,
+  split: Split,
+): SplitStats | null {
   if (!r) return null;
   const played = r.played ?? 0;
   const won = r.won ?? 0;
   const draw = r.draw ?? 0;
   const lost = r.lost ?? 0;
-  const points = r.points ?? won * 3 + draw;
   const perGame = (n: number) => (played ? n / played : null);
+  const views = (matches ?? []).map((m) => fromTeamView(m, split));
   return {
     played,
     won,
     draw,
     lost,
-    ppg: perGame(points),
-    winPct: played ? (won / played) * 100 : null,
     goalsForPg: perGame(r.goalsFor ?? 0),
     goalsAgainstPg: perGame(r.goalsAgainst ?? 0),
+    xgPg: avg(views.map((v) => v.xg)),
+    xgaPg: avg(views.map((v) => v.xga)),
+    shotsOnTargetPg: avg(views.map((v) => v.shotsOnTarget)),
+    possession: avg(views.map((v) => v.possession)),
   };
 }
 
@@ -256,6 +281,11 @@ const HomeAwayRecord = ({
   homeTeam: string;
   awayTeam: string;
 }) => {
+  const { data: homeAwayMatches, isFetching } = useGetHomeAwayMatchStatsQuery({
+    homeTeam,
+    awayTeam,
+  });
+
   if (!stats)
     return (
       <p className="py-8 text-center italic text-gray-500 dark:text-gray-200">
@@ -263,13 +293,17 @@ const HomeAwayRecord = ({
       </p>
     );
 
-  const get = (team: string, split: Split) =>
-    toSplitStats(stats.find((s) => s.name === team && s.type === split));
+  const get = (team: string, split: Split, matches?: HomeAwayStats[]) =>
+    toSplitStats(
+      stats.find((s) => s.name === team && s.type === split),
+      matches,
+      split,
+    );
 
-  const homeAtHome = get(homeTeam, "HOME");
-  const homeAway = get(homeTeam, "AWAY");
-  const awayAtHome = get(awayTeam, "HOME");
-  const awayAway = get(awayTeam, "AWAY");
+  const homeAtHome = get(homeTeam, "HOME", homeAwayMatches?.homeHome);
+  const homeAway = get(homeTeam, "AWAY", homeAwayMatches?.homeAway);
+  const awayAtHome = get(awayTeam, "HOME", homeAwayMatches?.awayHome);
+  const awayAway = get(awayTeam, "AWAY", homeAwayMatches?.awayAway);
 
   return (
     <section className="space-y-4 rounded-lg bg-gray-100 p-4 dark:bg-gray-900">
@@ -277,7 +311,12 @@ const HomeAwayRecord = ({
         Home and away form
       </h2>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div
+        className={cn(
+          "grid gap-4 transition-opacity lg:grid-cols-2",
+          isFetching && "opacity-60",
+        )}
+      >
         <MatchupPanel
           title="This fixture"
           matchup={`${homeTeam} (H) vs ${awayTeam} (A)`}

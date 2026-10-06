@@ -129,6 +129,18 @@ export interface matchStats {
   asv: number | null;
 }
 
+export type HomeAwayStats = {
+  id: number;
+  homeTeam: string;
+  awayTeam: string;
+  hst: number | null;
+  ast: number | null;
+  hxg: number | null;
+  axg: number | null;
+  hposs: number | null;
+  aposs: number | null;
+};
+
 export type matchPreview = {
   id: number;
   espnId: string | null;

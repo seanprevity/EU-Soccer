@@ -8,6 +8,7 @@ import {
   getRecentMatchesService,
   getSimulationService,
   getPastMatchesService,
+  getHomeAwayMatchesService,
 } from "../services/matchService";
 
 export const getMatchStats = async (
@@ -170,6 +171,23 @@ export const getSimulation = async (
     console.error("Error fetching simulation: ", err);
     res.status(500).json({
       message: `Error Fetching simulation: ${err.message}`,
+    });
+  }
+};
+
+export const getHomeAwayMatches = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const homeTeam = req.query.homeTeam as string;
+    const awayTeam = req.query.awayTeam as string;
+    const data = await getHomeAwayMatchesService(homeTeam, awayTeam);
+    res.json(data);
+  } catch (err: any) {
+    console.error("Error fetching home and away matches: ", err);
+    res.status(500).json({
+      message: `Error fetching home and away matches: ${err.message}`,
     });
   }
 };

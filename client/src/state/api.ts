@@ -14,6 +14,7 @@ import {
   matchPreview,
   ExpectedStanding,
   TopPlayerCategory,
+  HomeAwayStats,
 } from "@/types/drizzleTypes";
 import { withToast } from "@/lib/utils";
 
@@ -406,10 +407,32 @@ export const api = createApi({
           },
         };
       },
+
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get expected standings.",
         });
+      },
+    }),
+
+    getHomeAwayMatchStats: build.query<
+      {
+        homeHome: HomeAwayStats[];
+        homeAway: HomeAwayStats[];
+        awayHome: HomeAwayStats[];
+        awayAway: HomeAwayStats[];
+      },
+      { homeTeam: string; awayTeam: string }
+    >({
+      query: ({ homeTeam, awayTeam }) => {
+        return {
+          url: "matches/home-away",
+          method: "GET",
+          params: {
+            homeTeam,
+            awayTeam,
+          },
+        };
       },
     }),
   }),
@@ -438,6 +461,7 @@ export const {
   useGetSquadQuery,
   useGetSimulationQuery,
   useGetTeamsExpectedStandingsQuery,
+  useGetHomeAwayMatchStatsQuery,
 } = api;
 
 export const { endpoints } = api;

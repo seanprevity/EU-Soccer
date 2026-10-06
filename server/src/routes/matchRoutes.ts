@@ -8,11 +8,11 @@ import {
   getRecentMatches,
   getSimulation,
   getPastMatches,
+  getHomeAwayMatches,
 } from "../controllers/matchController";
 
 const router = express.Router();
 
-// All Works
 router.get("/stats", getMatchStats);
 router.get("/upcoming", getUpcomingMatches);
 router.get("/past", getPastMatches);
@@ -21,5 +21,6 @@ router.get("/odds/:id", getOdds);
 router.get("/last5", getLast5Matches);
 router.get("/recent", getRecentMatches);
 router.get("/simulation", getSimulation);
+router.get("/home-away", getHomeAwayMatches);
 
 export default router;
