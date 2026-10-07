@@ -217,6 +217,20 @@ export default function Matches() {
 
   const todayKey = new Date().toDateString();
   const selectedKey = new Date(selectedDate).toDateString();
+  const dayStart = (d: Date | string) => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x.getTime();
+  };
+  const daysFromToday = Math.round(
+    (dayStart(selectedDate) - dayStart(new Date())) / 86_400_000,
+  );
+  const emptyMessage =
+    daysFromToday < 0
+      ? "No matches were played."
+      : daysFromToday === 0
+        ? "No matches today."
+        : "No matches scheduled.";
   const isLoading = isUpcomingLoading || isPastLoading;
 
   return (
@@ -280,7 +294,7 @@ export default function Matches() {
           </p>
         ) : past.count + upcoming.count === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-200 py-6">
-            No matches scheduled for this date.
+            {emptyMessage}
           </p>
         ) : (
           LEAGUES.map((league) => {
