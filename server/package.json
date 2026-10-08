@@ -6,8 +6,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon --exec ts-node src/index.ts",
-    "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "start": "node dist/src/index.js",
+    "typecheck": "tsc --noEmit",
+    "update-all": "ts-node --transpile-only src/scripts/updateAll.ts",
+    "build": "tsc"
   },
   "keywords": [],
   "author": "",
@@ -19,7 +21,7 @@
     "cors": "^2.8.5",
     "csv-parser": "^3.2.0",
     "dotenv": "^17.0.0",
-    "drizzle-orm": "^0.44.2",
+    "drizzle-orm": "^0.45.4",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
@@ -34,7 +36,7 @@
     "@types/morgan": "^1.9.10",
     "@types/node": "^24.0.7",
     "@types/pg": "^8.15.4",
-    "drizzle-kit": "^0.31.4",
+    "drizzle-kit": "^0.31.11",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"

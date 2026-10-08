@@ -99,7 +99,7 @@ const runStep = async (
   }
 };
 
-const runFullUpdate = async () => {
+export const runFullUpdate = async () => {
   const results: StepResult[] = [];
   const started = Date.now();
 

@@ -225,7 +225,7 @@ export default function PostMatchPage() {
   const match = data?.[0];
 
   if (!validId)
-    return <p className="p-8 text-center">This match link isn't valid.</p>;
+    return <p className="p-8 text-center">This match link isn&apos;t valid.</p>;
   if (isLoading) return <p className="p-8 text-center">Loading match…</p>;
   if (isError || !match)
     return <p className="p-8 text-center">Match not found.</p>;

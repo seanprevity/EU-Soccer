@@ -366,17 +366,11 @@ export default function Table() {
                 aria-label="Top players category"
                 className="shrink-0 cursor-pointer rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
               >
-                {season >= "2026" ? (
-                  TOP_PLAYER_CATEGORIES.map((c) => (
-                    <option key={c.key} value={c.key}>
-                      {c.label}
-                    </option>
-                  ))
-                ) : (
-                  <option key={"goals"} value={"goals"}>
-                    Goals
+                {TOP_PLAYER_CATEGORIES.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
                   </option>
-                )}
+                ))}
               </select>
             </div>
 
