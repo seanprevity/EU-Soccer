@@ -10,6 +10,7 @@ import {
   getLogoFile,
   getLeagueFile,
   HEADER_CONFIG,
+  cn,
 } from "@/lib/utils";
 import { renderForm } from "@/lib/uiUtils";
 import { useAppSelector } from "@/state/redux";
@@ -117,8 +118,8 @@ export default function Table() {
     >
       {/* LHS: Standings Table */}
       <div className="flex-1 min-w-0">
-        <div className="flex justify-between items-center w-full mb-4 flex-wrap gap-3">
-          <div className="flex gap-2 flex-wrap w-full sm:w-auto">
+        <div className="@container flex w-full flex-wrap items-center gap-3 mb-4 sm:flex-nowrap">
+          <div className="flex gap-2 flex-wrap w-full sm:w-auto sm:shrink-0">
             <select
               value={league}
               onChange={(e) => dispatch(setLeague(e.target.value))}
@@ -166,8 +167,11 @@ export default function Table() {
               })}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative w-[24px] h-[24px] sm:w-[28px] sm:h-[28px] flex-shrink-0 md:w-[36px] md:h-[36px]">
+          <div className="ml-auto hidden shrink-0 items-center gap-2 sm:flex">
+            <div
+              className="relative h-[28px] w-[28px] shrink-0 md:h-[36px] md:w-[36px]"
+              title={league}
+            >
               <Image
                 src={getLeagueFile(league)}
                 alt={`${league} logo`}
@@ -176,9 +180,12 @@ export default function Table() {
               />
             </div>
             <span
-              className={`text-[#38003c] dark:text-gray-200 font-semibold text-base md:text-lg ${
-                league === "Premier League" ? "text-sm md:text-base" : ""
-              } w-full sm:w-auto text-center sm:text-right`}
+              className={cn(
+                "whitespace-nowrap font-semibold text-[#38003c] dark:text-gray-200",
+                league === "Premier League"
+                  ? "hidden text-sm md:text-base @min-[641px]:inline"
+                  : "text-base md:text-lg",
+              )}
             >
               {league}
             </span>

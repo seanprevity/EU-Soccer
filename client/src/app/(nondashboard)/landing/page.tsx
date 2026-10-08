@@ -45,8 +45,8 @@ const Landing = () => {
           <div
             className={`w-full transition-all duration-500 ${
               priority === "upcoming"
-                ? "lg:w-[560px] lg:max-w-[560px]"
-                : "lg:w-[370px] lg:max-w-[370px]"
+                ? "lg:w-[560px] lg:max-w-[560px] xl:w-[610px] xl:max-w-[610px]"
+                : "lg:w-[370px] lg:max-w-[370px] xl:w-[400px] xl:max-w-[400px]"
             }`}
           >
             <Matches />
