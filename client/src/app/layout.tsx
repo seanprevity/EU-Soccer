@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "EU Football",
-    template: "%s | EU Football",
+    default: "EU Football Stats",
+    template: "%s | EU Football Stats",
   },
   description: "Made by Sean Previty",
 };
