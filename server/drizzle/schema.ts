@@ -14,6 +14,7 @@ import {
   jsonb,
   index,
   date,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -318,6 +319,7 @@ export const matchStats = pgTable(
       for: "all",
       to: ["public"],
     }),
+    uniqueIndex("match_stats_espn_id_unique").on(table.espnId),
   ],
 );
 

@@ -2,22 +2,19 @@ import { Request, Response } from "express";
 import {
   updateStandingsService,
   updateFutureMatchesService,
-  updateMatchStatsService,
   updateOddsService,
-  syncEspnMatchDataService,
-  backfillEspnMatchDataService,
   updateLeagueSquadsService,
   updateTopPlayersService,
 } from "../services/managementService";
 import {
   competition_codes,
-  csv_urls,
   espn_leagues,
   Leagues,
   odds_sports,
 } from "../config/arrays";
 import { curSeason } from "../utils/map";
 import { updatePlayerImagesService } from "../services/imageService";
+import { importEspnMatchesService } from "../services/espnService";
 
 const DAILY_WINDOW_DAYS = 10;
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
@@ -25,7 +22,6 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 // Your parallel arrays, zipped once so each league's settings stay together
 const LEAGUE_CONFIG = Leagues.map((name, i) => ({
   name,
-  csvUrl: csv_urls[i],
   espnLeague: espn_leagues[i],
   competitionCode: competition_codes[i],
   oddsSport: odds_sports[i],
@@ -34,9 +30,8 @@ const LEAGUE_CONFIG = Leagues.map((name, i) => ({
 let updateRunning = false;
 
 const STEP = {
-  csv: "Match stats (CSV)",
+  import: "Match import (ESPN)",
   standings: "Standings",
-  espn: "ESPN match data",
   upcoming: "Upcoming matches + H2H",
   odds: "Odds",
   squads: "Squads + top players + images",
@@ -103,10 +98,10 @@ export const runFullUpdate = async () => {
   const results: StepResult[] = [];
   const started = Date.now();
 
-  // Update match stats using CSV data
+  // Update match stats/data using ESPN
   for (const l of LEAGUE_CONFIG)
-    await runStep(results, STEP.csv, l.name, () =>
-      updateMatchStatsService(l.csvUrl, l.name),
+    await runStep(results, STEP.import, l.name, () =>
+      importEspnMatchesService(l.name, l.espnLeague, daysAgo(3)),
     );
 
   // Update Standings using match stats obtained from CSV
@@ -116,24 +111,9 @@ export const runFullUpdate = async () => {
       STEP.standings,
       l.name,
       () => updateStandingsService(l.name, curSeason),
-      [STEP.csv],
+      [STEP.import],
     );
-  
-  // Add ESPN match data to match stats
-  for (const l of LEAGUE_CONFIG)
-    await runStep(
-      results,
-      STEP.espn,
-      l.name,
-      () =>
-        syncEspnMatchDataService(
-          l.name,
-          l.espnLeague,
-          daysAgo(DAILY_WINDOW_DAYS),
-        ),
-      [STEP.csv],
-    );
-  
+
   // Update Upcoming Matches
   for (const l of LEAGUE_CONFIG)
     await runStep(results, STEP.upcoming, l.name, () =>
@@ -149,7 +129,7 @@ export const runFullUpdate = async () => {
       () => updateOddsService(l.oddsSport),
       [STEP.upcoming],
     );
-  
+
   // Update League Squads through ESPN
   for (const l of LEAGUE_CONFIG)
     await runStep(results, STEP.squads, l.name, () =>
@@ -202,20 +182,6 @@ export const updateStandings = async (
     for (let i = 0; i < 5; i++)
       await updateStandingsService(Leagues[i], curSeason);
     res.status(200).send("Standings updated successfully");
-  } catch (err: any) {
-    res.status(500).send(err.message);
-  }
-};
-
-// updates match stats from csv urls
-export const updateMatchStats = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  try {
-    for (let i = 0; i < 5; i++)
-      await updateMatchStatsService(csv_urls[i], Leagues[i]);
-    res.status(200).send("Match stats updated successfully");
   } catch (err: any) {
     res.status(500).send(err.message);
   }
@@ -293,48 +259,5 @@ export const updateSquad = async (
   } catch (err: any) {
     console.error("updateSquad:", err);
     res.status(500).json({ message: err.message });
-  }
-};
-
-// last 10 days, all leagues
-export const updateMatchEvents = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  try {
-    const results = [];
-    for (let i = 0; i < 5; i++)
-      results.push({
-        league: Leagues[i],
-        ...(await syncEspnMatchDataService(
-          Leagues[i],
-          espn_leagues[i],
-          daysAgo(DAILY_WINDOW_DAYS),
-        )),
-      });
-    res.status(200).json(results);
-  } catch (err: any) {
-    res.status(500).send(err.message);
-  }
-};
-
-// whole current season for ONE league, e.g. ?league=<a value from Leagues>
-export const backfillMatchEvents = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  try {
-    const i = Leagues.indexOf(String(req.query.league));
-    if (i === -1) {
-      res.status(400).send(`league must be one of: ${Leagues.join(", ")}`);
-      return;
-    }
-    const result = await backfillEspnMatchDataService(
-      Leagues[i],
-      espn_leagues[i],
-    );
-    res.status(200).json({ league: Leagues[i], ...result });
-  } catch (err: any) {
-    res.status(500).send(err.message);
   }
 };
