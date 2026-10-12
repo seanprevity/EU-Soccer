@@ -99,25 +99,48 @@ function EventRow({
 }
 
 function Header({ match }: { match: matchStats }) {
-  const team = (name: string) => (
+  const events = match.events ?? [];
+  const redsFor = (side: Side) => {
+    const fromEvents = events.filter(
+      (e) =>
+        e.side === side && (e.kind === "red" || e.kind === "second_yellow"),
+    ).length;
+    const stored = (side === "home" ? match.hr : match.ar) ?? 0;
+    return Math.max(fromEvents, stored);
+  };
+
+  const team = (name: string, reds: number) => (
     <Link
       href={teamHref(name)}
       className="flex min-w-0 flex-col items-center gap-2 text-center transition-opacity hover:opacity-60"
     >
-      <Image
-        src={`/${getLogoFile(name)}`}
-        alt=""
-        width={64}
-        height={64}
-        className="h-16 w-16 object-contain"
-      />
+      <div className="relative">
+        <Image
+          src={`/${getLogoFile(name)}`}
+          alt=""
+          width={64}
+          height={64}
+          className="h-16 w-16 object-contain"
+        />
+        {reds > 0 && (
+          <span
+            className="absolute -right-2 -top-1"
+            title={`${reds} red card${reds > 1 ? "s" : ""}`}
+          >
+            <EventIcon kind="red" size={20} />
+            {reds > 1 && (
+              <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-gray-900 px-1 text-[10px] font-bold leading-none text-white dark:bg-white dark:text-gray-900">
+                {reds}
+              </span>
+            )}
+          </span>
+        )}
+      </div>
       <span className="w-full truncate text-sm font-semibold text-gray-900 sm:text-base dark:text-white">
         {name}
       </span>
     </Link>
   );
-
-  const events = match.events ?? [];
 
   return (
     <header className="space-y-4">
@@ -135,7 +158,7 @@ function Header({ match }: { match: matchStats }) {
         )}
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-        {team(match.homeTeam)}
+        {team(match.homeTeam, redsFor("home"))}
         <div className="text-center">
           <p className="text-4xl font-bold tabular-nums text-gray-900 sm:text-5xl dark:text-white">
             {match.fthg ?? "–"}
@@ -146,7 +169,7 @@ function Header({ match }: { match: matchStats }) {
             Full-time
           </p>
         </div>
-        {team(match.awayTeam)}
+        {team(match.awayTeam, redsFor("away"))}
       </div>
       <div className="space-y-3">
         <EventRow
