@@ -25,10 +25,19 @@ const searchSportsDbImage = async (name: string, team?: string | null) => {
         return theirs && (theirs.includes(t) || t.includes(theirs));
       })
     : undefined;
-  return ((atTeam ?? results[0])?.strCutout as string | undefined) ?? null;
+  const url = (atTeam ?? results[0])?.strCutout as string | undefined;
+  return url
+    ? url.replace(
+        "://www.thesportsdb.com/images/",
+        "://r2.thesportsdb.com/images/",
+      )
+    : null;
 };
 
-export const updatePlayerImagesService = async (league: string, limit = 100) => {
+export const updatePlayerImagesService = async (
+  league: string,
+  limit = 100,
+) => {
   const recheckBefore = new Date(
     Date.now() - RECHECK_DAYS * 86_400_000,
   ).toISOString();
