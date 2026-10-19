@@ -9,18 +9,15 @@ jobs:
   update:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    defaults:
-      run:
-        working-directory: server
     steps:
-      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: server/package-lock.json
-      - run: npm ci
-      - run: npm run update-all
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter server...
+      - run: pnpm --filter @epl/shared build
+      - run: pnpm --filter server update-all
         env:
           NODE_ENV: production
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

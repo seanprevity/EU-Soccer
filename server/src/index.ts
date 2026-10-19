@@ -13,6 +13,7 @@ import teamStatsRoutes from "./routes/teamStatsRoutes";
 import teamsRoutes from "./routes/teamsRoutes";
 import squadRoutes from "./routes/squadRoutes";
 import { requireAdminKey } from "./middleware/requireAdminKey";
+import SHARED_OK from "@epl/shared";
 
 const allowedOrigins =
   process.env.FRONTEND_URL?.split(",") // split different urls by comma

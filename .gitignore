@@ -1,24 +1,23 @@
-**/node_modules/
-**/dist/
+# Dependencies
+node_modules/
 
+# Build output (server/dist, packages/shared/dist, client/.next)
+dist/
+.next/
+*.tsbuildinfo
+
+# Environment files (keep .env.example files committed)
 .env
-client/.env.local
-client/.env.development
-client/.env.production
-server/.env
+.env.*
+!.env.example
 
-client/.next/
+# npm lockfiles, so an accidental `npm install` never gets committed
+package-lock.json
 
+# Logs
+*.log
+
+# OS and editor files
 .DS_Store
 Thumbs.db
-
 .vscode/
-
-client/node_modules/
-server/node_modules/
-client/dist/
-server/dist/
-client/.env
-server/.env
-client/.next/
-node_modules
