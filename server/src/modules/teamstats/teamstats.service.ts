@@ -1,12 +1,11 @@
-import { standings } from "../../drizzle/schema";
+import { standings, matchStats } from "../../../drizzle/schema";
 import { and, eq } from "drizzle-orm";
-import { db } from "../lib/db";
-import { curSeason } from "../config/map";
+import { db } from "../../lib/db";
+import { curSeason } from "../../config/map";
 import {
   getLast5MatchStatsService,
   getTeamMatchStatsService,
-} from "./matchService";
-import { matchStats } from "../../drizzle/schema";
+} from "../matches/matches.service";
 
 // Helper to calculate aggregate stats
 const calculateStats = (

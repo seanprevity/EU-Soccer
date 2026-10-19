@@ -5,16 +5,16 @@ import {
   updateOddsService,
   updateLeagueSquadsService,
   updateTopPlayersService,
-} from "../services/managementService";
+} from "./management.service";
 import {
   competition_codes,
   espn_leagues,
   Leagues,
   odds_sports,
-} from "../config/arrays";
-import { curSeason } from "../config/map";
-import { updatePlayerImagesService } from "../services/imageService";
-import { importEspnMatchesService } from "../services/espnService";
+} from "../../config/arrays";
+import { curSeason } from "../../config/map";
+import { updatePlayerImagesService } from "./management.imageService";
+import { importEspnMatchesService } from "./management.espnService";
 
 const DAILY_WINDOW_DAYS = 10;
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);

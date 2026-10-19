@@ -5,11 +5,10 @@ import {
   getRecentTeamStandings,
   getRecentTableStandings,
   getTeamsExpectedStandings,
-} from "../controllers/standingsController";
+} from "./standings.controller";
 
 const router = express.Router();
 
-// Works
 router.get("/", getStandings);
 router.get("/recent", getRecentTeamStandings);
 router.get("/table", getRecentTableStandings);

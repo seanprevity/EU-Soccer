@@ -7,7 +7,7 @@ import {
   updateImageUrls,
   updateSquad,
   updateTopPlayers,
-} from "../controllers/managementController";
+} from "./management.controller";
 
 const router = express.Router();
 

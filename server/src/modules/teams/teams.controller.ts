@@ -1,12 +1,9 @@
 import { Request, Response } from "express";
-import {
-  getLeagueByTeamService,
-  getTeamByIdService,
-} from "../services/teamsService";
+import { getLeagueByTeamService, getTeamByIdService } from "./teams.service";
 
 export const getTeamByName = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const name = req.query.team as string;
@@ -23,7 +20,7 @@ export const getTeamByName = async (
 
 export const getLeagueByTeam = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const team = req.query.team as string;

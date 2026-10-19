@@ -4,8 +4,8 @@ import {
   squad,
   TopPlayerCategory,
   topPlayers,
-} from "../../drizzle/schema";
-import { db } from "../lib/db";
+} from "../../../drizzle/schema";
+import { db } from "../../lib/db";
 
 export const getSquadService = (team: string) =>
   db

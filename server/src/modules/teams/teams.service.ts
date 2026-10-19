@@ -1,6 +1,6 @@
-import { leagues, standings, teams } from "../../drizzle/schema";
-import { db } from "../lib/db";
-import { eq, or, and, lt, gt, desc } from "drizzle-orm";
+import { leagues, standings, teams } from "../../../drizzle/schema";
+import { db } from "../../lib/db";
+import { eq, and } from "drizzle-orm";
 
 export const getTeamByIdService = async (name: string) => {
   return await db.select().from(teams).where(eq(teams.teamName, name));

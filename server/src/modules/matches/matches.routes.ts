@@ -9,7 +9,7 @@ import {
   getSimulation,
   getPastMatches,
   getHomeAwayMatches,
-} from "../controllers/matchController";
+} from "./matches.controller";
 
 const router = express.Router();
 

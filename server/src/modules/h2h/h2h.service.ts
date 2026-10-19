@@ -1,8 +1,8 @@
-import { head2Head, MatchPreview, matchStats } from "../../drizzle/schema";
+import { head2Head, MatchPreview, matchStats } from "../../../drizzle/schema";
 import { eq, and, or, desc, count } from "drizzle-orm";
-import { db } from "../lib/db";
-import { upcomingMatches } from "../../drizzle/schema";
-import { MatchRow, PAGE_SIZE } from "./matchService";
+import { db } from "../../lib/db";
+import { upcomingMatches } from "../../../drizzle/schema";
+import { PAGE_SIZE } from "../matches/matches.service";
 
 export const getH2HService = async (teamA: string, teamB: string) => {
   const [team1, team2] = [teamA, teamB].sort();

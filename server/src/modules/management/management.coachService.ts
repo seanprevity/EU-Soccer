@@ -1,6 +1,6 @@
 import { and, eq, inArray, ne } from "drizzle-orm";
-import { players, squad, teams } from "../../drizzle/schema";
-import { db } from "../lib/db";
+import { players, squad, teams } from "../../../drizzle/schema";
+import { db } from "../../lib/db";
 
 const TEAM_COACH: Record<string, string> = {
   // Premier League
@@ -38,7 +38,7 @@ const TEAM_COACH: Record<string, string> = {
   Malaga: "Juanfran Funes",
   "Racing Santander": "José Alberto López",
   "Rayo Vallecano": "Beñat San José",
-  "Deportivo": "Antonio Hidalgo",
+  Deportivo: "Antonio Hidalgo",
   Espanyol: "Manolo González",
   "Real Betis": "Manuel Pellegrini",
   "Real Madrid": "José Mourinho",

@@ -5,15 +5,14 @@ import helmet from "helmet";
 import morgan from "morgan";
 import "../drizzle/relations";
 import "./lib/db";
-import standingsRoutes from "./routes/standingsRoutes";
-import managementRoutes from "./routes/managementRoutes";
-import matchRoutes from "./routes/matchRoutes";
-import h2hRoutes from "./routes/h2hRoutes";
-import teamStatsRoutes from "./routes/teamStatsRoutes";
-import teamsRoutes from "./routes/teamsRoutes";
-import squadRoutes from "./routes/squadRoutes";
+import standingsRoutes from "./modules/standings/standings.routes";
+import managementRoutes from "./modules/management/management.routes";
+import matchRoutes from "./modules/matches/matches.routes";
+import h2hRoutes from "./modules/h2h/h2h.routes";
+import teamStatsRoutes from "./modules/teamstats/teamstats.routes";
+import teamsRoutes from "./modules/teams/teams.routes";
+import squadRoutes from "./modules/squads/squads.routes";
 import { requireAdminKey } from "./middleware/requireAdminKey";
-import SHARED_OK from "@epl/shared";
 
 const allowedOrigins =
   process.env.FRONTEND_URL?.split(",") // split different urls by comma

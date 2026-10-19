@@ -1,12 +1,9 @@
 import { Request, Response } from "express";
-import {
-  getSquadService,
-  getTopPlayersService,
-} from "../services/squadService";
+import { getSquadService, getTopPlayersService } from "./squads.service";
 import {
   isTopPlayerCategory,
   TOP_PLAYER_CATEGORIES,
-} from "../../drizzle/schema";
+} from "../../../drizzle/schema";
 
 export const getSquad = async (req: Request, res: Response): Promise<void> => {
   try {

@@ -1,7 +1,7 @@
 import axios from "axios";
 import { and, eq, isNull, like, lt, or, sql } from "drizzle-orm";
-import { players, squad } from "../../drizzle/schema";
-import { db } from "../lib/db";
+import { players, squad } from "../../../drizzle/schema";
+import { db } from "../../lib/db";
 
 const SPORTSDB_DELAY_MS = 2100; // free key allows about 30 requests a minute
 const RECHECK_DAYS = 30; // players not found are searched again after this

@@ -9,7 +9,7 @@ import {
   getSimulationService,
   getPastMatchesService,
   getHomeAwayMatchesService,
-} from "../services/matchService";
+} from "./matches.service";
 
 export const getMatchStats = async (
   req: Request,

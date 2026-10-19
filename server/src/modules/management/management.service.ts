@@ -10,7 +10,7 @@ import {
   topPlayers,
   TopPlayerCategory,
   TOP_PLAYER_CATEGORIES,
-} from "../../drizzle/schema";
+} from "../../../drizzle/schema";
 import {
   and,
   eq,
@@ -23,7 +23,7 @@ import {
   ne,
   notInArray,
 } from "drizzle-orm";
-import { db } from "../lib/db";
+import { db } from "../../lib/db";
 import csv from "csv-parser";
 import { Readable } from "stream";
 import axios from "axios";
@@ -36,10 +36,10 @@ import {
   ODDS_MAP,
   curSeason,
   espnTeam,
-} from "../config/map";
-import { StandingsStats, bookmakers } from "../config/arrays";
-import { updatePlayerImagesService } from "./imageService";
-import { ESPN_DELAY_MS, sleep } from "./espnService";
+} from "../../config/map";
+import { StandingsStats, bookmakers } from "../../config/arrays";
+import { updatePlayerImagesService } from "./management.imageService";
+import { ESPN_DELAY_MS, sleep } from "./management.espnService";
 
 dotenv.config();
 

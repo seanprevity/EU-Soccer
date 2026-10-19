@@ -1,6 +1,6 @@
 import axios from "axios";
 import { and, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
-import { db } from "../lib/db";
+import { db } from "../../lib/db";
 import {
   LineupPlayer,
   MatchEvent,
@@ -9,8 +9,8 @@ import {
   players,
   TeamLineup,
   teams,
-} from "../../drizzle/schema";
-import { curSeason, espnTeam } from "../config/map";
+} from "../../../drizzle/schema";
+import { curSeason, espnTeam } from "../../config/map";
 
 // Shared ESPN plumbing (also used by the squad sync)
 export const espn = axios.create({

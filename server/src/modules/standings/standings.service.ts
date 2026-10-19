@@ -1,7 +1,7 @@
-import { standings } from "../../drizzle/schema";
+import { standings } from "../../../drizzle/schema";
 import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
-import { db } from "../lib/db";
-import { curSeason } from "../config/map";
+import { db } from "../../lib/db";
+import { curSeason } from "../../config/map";
 
 export const getStandingsService = async (league: string, season: string) => {
   return await db

@@ -3,7 +3,7 @@ import {
   getH2HService,
   get5H2HMatchesService,
   getUpcomingH2HService,
-} from "../services/h2hService";
+} from "./h2h.service";
 
 export const getH2H = async (req: Request, res: Response): Promise<void> => {
   try {

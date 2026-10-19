@@ -1,12 +1,8 @@
 import express from "express";
-import {
-  getLast5TeamStats,
-  getSeasonTeamStats,
-} from "../controllers/teamStatsController";
+import { getLast5TeamStats, getSeasonTeamStats } from "./teamstats.controller";
 
 const router = express.Router();
 
-// Works
 router.get("/season", getSeasonTeamStats);
 router.get("/last5", getLast5TeamStats);
 

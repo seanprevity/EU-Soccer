@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { runFullUpdate } from "../controllers/managementController";
+import { runFullUpdate } from "../modules/management/management.controller";
 
 runFullUpdate()
   .then((results) => {

@@ -2,11 +2,11 @@ import { Request, Response } from "express";
 import {
   getLast5TeamStatsService,
   getSeasonTeamStatsService,
-} from "../services/teamStatsService";
+} from "./teamstats.service";
 
 export const getSeasonTeamStats = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const team1 = req.query.team1 as string;
@@ -16,7 +16,7 @@ export const getSeasonTeamStats = async (
 
     const data = await getSeasonTeamStatsService(
       normalizedTeam1,
-      normalizedTeam2
+      normalizedTeam2,
     );
     res.json(data);
   } catch (err: any) {
@@ -29,7 +29,7 @@ export const getSeasonTeamStats = async (
 
 export const getLast5TeamStats = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const team1 = req.query.team1 as string;
@@ -39,7 +39,7 @@ export const getLast5TeamStats = async (
 
     const data = await getLast5TeamStatsService(
       normalizedTeam1,
-      normalizedTeam2
+      normalizedTeam2,
     );
     res.json(data);
   } catch (err: any) {

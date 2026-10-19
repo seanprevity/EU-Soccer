@@ -1,9 +1,8 @@
 import express from "express";
-import { getLeagueByTeam, getTeamByName } from "../controllers/teamsController";
+import { getLeagueByTeam, getTeamByName } from "./teams.controller";
 
 const router = express.Router();
 
-// Works
 router.get("/", getTeamByName);
 router.get("/league", getLeagueByTeam);
 

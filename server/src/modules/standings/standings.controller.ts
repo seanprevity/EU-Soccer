@@ -5,7 +5,7 @@ import {
   getRecentTeamStandingsService,
   getRecentTableStandingsService,
   getTeamsExpectedStandingsService,
-} from "../services/standingsService";
+} from "./standings.service";
 
 // gets standings for a specific league + season
 export const getStandings = async (
