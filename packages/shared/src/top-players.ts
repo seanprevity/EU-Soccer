@@ -33,4 +33,27 @@ export const topPlayerSchema = z.object({
   imageUrl: z.string().nullable(),
 });
 
+export const topPlayersQuerySchema = z.object({
+  league: z.enum([
+    "Bundesliga",
+    "La Liga",
+    "Ligue 1",
+    "Premier League",
+    "Serie A",
+  ]),
+  season: z.string().regex(/^\d{4}$/, "season must be a year like 2026"),
+  category: topPlayerCategorySchema.default("goals"),
+});
+
+// One row of a leaderboard: what getTopPlayersService selects.
+export const topPlayerEntrySchema = topPlayerSchema.pick({
+  player: true,
+  team: true,
+  value: true,
+  appearances: true,
+  imageUrl: true,
+});
+
 export type TopPlayer = z.infer<typeof topPlayerSchema>;
+export type TopPlayersQuery = z.infer<typeof topPlayersQuerySchema>;
+export type TopPlayerEntry = z.infer<typeof topPlayerEntrySchema>;

@@ -11,21 +11,6 @@ export interface upcomingMatches {
   league: string;
 }
 
-export type TopPlayerCategory =
-  | "goals"
-  | "assists"
-  | "saves"
-  | "yellow_cards"
-  | "red_cards";
-
-export interface topPlayers {
-  player: string;
-  team: string;
-  value: number;
-  appearances: number | null;
-  imageUrl: string | null;
-}
-
 export type MatchEvent = {
   minute: number | null;
   extraMinute: number | null;
@@ -138,39 +123,6 @@ export interface odds {
   oddsAway: string | null;
   updatedAt: string | null;
   match: upcomingMatches | null;
-}
-
-export interface SquadPlayer {
-  id: number;
-  player: string;
-  position: string | null;
-  number: number | null;
-  team: string | null;
-  league: string | null;
-  espnId: string | null;
-  nationality: string | null;
-  nationalityCode: string | null;
-  flagUrl: string | null;
-  dateOfBirth: string | null;
-  heightIn: number | null;
-  weightLbs: number | null;
-  statsSeason: string | null;
-  appearances: number | null;
-  subIns: number | null;
-  goals: number | null;
-  assists: number | null;
-  ownGoals: number | null;
-  shots: number | null;
-  shotsOnTarget: number | null;
-  yellowCards: number | null;
-  redCards: number | null;
-  foulsCommitted: number | null;
-  foulsSuffered: number | null;
-  offsides: number | null;
-  saves: number | null;
-  goalsConceded: number | null;
-  updatedAt: string | null;
-  imageUrl: string | null; // obtained from players table in squad query
 }
 
 export interface simulation {

@@ -4,7 +4,7 @@ const count = z.number().int().nullable();
 
 export const squadPlayerSchema = z.object({
   id: z.number().int(),
-  player: z.string().nullable(),
+  player: z.string(),
   position: z.string().nullable(),
   number: count,
   team: z.string().nullable(),
@@ -34,4 +34,14 @@ export const squadPlayerSchema = z.object({
   updatedAt: z.string().nullable(),
 });
 
+export const squadPlayerWithImageSchema = squadPlayerSchema.extend({
+  imageUrl: z.string().nullable(),
+});
+
+export const squadTeamQuerySchema = z.object({
+  team: z.string().trim().min(1),
+});
+
 export type SquadPlayer = z.infer<typeof squadPlayerSchema>;
+export type SquadPlayerWithImage = z.infer<typeof squadPlayerWithImageSchema>;
+export type SquadTeamQuery = z.infer<typeof squadTeamQuerySchema>;

@@ -3,7 +3,6 @@
 import { useState, useMemo } from "react";
 import Image from "next/image";
 import { useGetTopPlayersQuery, useGetStandingsQuery } from "@/state/api";
-import { TopPlayerCategory } from "@/types/drizzleTypes";
 import {
   generateSeasons,
   LEAGUES,
@@ -18,7 +17,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useDispatch } from "react-redux";
 import { setLeague, setSeason } from "@/state";
-import { Standing } from "@epl/shared";
+import { Standing, TopPlayerCategory } from "@epl/shared";
 
 const TOP_PLAYER_CATEGORIES: {
   key: TopPlayerCategory;
@@ -225,7 +224,7 @@ export default function Table() {
                   </td>
                 </tr>
               ) : (
-                sortedTeams.map((team: any, idx: number) => {
+                sortedTeams.map((team, idx) => {
                   const logo = getLogoFile(team.name);
 
                   // Border color by rank + league
@@ -353,7 +352,7 @@ export default function Table() {
               transition: { duration: 0.15 },
             }}
             transition={{ duration: 1, ease: [0.45, 0, 0.55, 1] }}
-            className={`w-full lg:w-280px flex-shrink-0 overflow-hidden`}
+            className={`w-full lg:w-[280px] flex-shrink-0 overflow-hidden`}
           >
             <div className="mb-3 flex items-center justify-between gap-2 border-b border-gray-200 pb-1 dark:border-gray-400">
               <h3 className="truncate text-lg font-semibold text-[#38003c] dark:text-gray-200">

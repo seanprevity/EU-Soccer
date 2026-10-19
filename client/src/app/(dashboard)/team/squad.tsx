@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useMemo } from "react";
 import { useGetSquadQuery } from "@/state/api";
-import { SquadPlayer } from "@/types/drizzleTypes";
+import { SquadPlayerWithImage } from "@epl/shared";
 
 const POSITION_ORDER = [
   "Coach",
@@ -83,7 +83,7 @@ function PlayerRow({
   stats,
   isCoach,
 }: {
-  player: SquadPlayer;
+  player: SquadPlayerWithImage;
   stats: StatColumn[];
   isCoach: boolean;
 }) {
@@ -164,7 +164,7 @@ const Squad = ({ team }: { team: string }) => {
 
   const grouped = useMemo(() => {
     if (!squad?.length) return [];
-    const groups: Record<string, SquadPlayer[]> = {};
+    const groups: Record<string, SquadPlayerWithImage[]> = {};
     for (const p of squad) (groups[p.position || "Unknown"] ??= []).push(p);
 
     // Known positions in order, then anything else ESPN sends, so no player is dropped

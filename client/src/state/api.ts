@@ -2,11 +2,8 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import {
   matchStats,
   upcomingMatches,
-  topPlayers,
   odds,
-  SquadPlayer,
   simulation,
-  TopPlayerCategory,
   HomeAwayStats,
   matchPreview,
 } from "@/types/drizzleTypes";
@@ -24,6 +21,11 @@ import {
   leagueSchema,
   TeamStatsPair,
   teamStatsPairSchema,
+  TopPlayerEntry,
+  TopPlayerCategory,
+  SquadPlayerWithImage,
+  squadPlayerWithImageSchema,
+  topPlayerEntrySchema,
 } from "@epl/shared";
 import { withToast } from "@/lib/utils";
 import { z } from "zod";
@@ -124,24 +126,6 @@ export const api = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get expected standings.",
-        });
-      },
-    }),
-
-    // gets top players for a specific season, league, and category from db
-    getTopPlayers: build.query<
-      topPlayers[],
-      { league: string; season: string; category: TopPlayerCategory }
-    >({
-      query: ({ league, season, category }) => ({
-        url: `/squad/top-players`,
-        method: "GET",
-        params: { league, season: season.split("/")[0], category },
-      }),
-      providesTags: ["Standings"],
-      async onQueryStarted(_, { queryFulfilled }) {
-        await withToast(queryFulfilled, {
-          error: "Failed to get top players.",
         });
       },
     }),
@@ -376,17 +360,37 @@ export const api = createApi({
       },
     }),
 
-    getSquad: build.query<SquadPlayer[], { team: string }>({
-      query: ({ team }) => {
-        return {
-          url: `/squad`,
-          method: "GET",
-          params: { team },
-        };
-      },
+    getSquad: build.query<SquadPlayerWithImage[], { team: string }>({
+      query: ({ team }) => ({
+        url: `/squad`,
+        method: "GET",
+        params: { team },
+      }),
+      transformResponse: (raw: unknown) =>
+        z.array(squadPlayerWithImageSchema).parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get squad.",
+        });
+      },
+    }),
+
+    // gets top players for a specific season, league, and category from db
+    getTopPlayers: build.query<
+      TopPlayerEntry[],
+      { league: string; season: string; category: TopPlayerCategory }
+    >({
+      query: ({ league, season, category }) => ({
+        url: `/squad/top-players`,
+        method: "GET",
+        params: { league, season: season.split("/")[0], category },
+      }),
+      transformResponse: (raw: unknown) =>
+        z.array(topPlayerEntrySchema).parse(raw),
+      providesTags: ["Standings"],
+      async onQueryStarted(_, { queryFulfilled }) {
+        await withToast(queryFulfilled, {
+          error: "Failed to get top players.",
         });
       },
     }),

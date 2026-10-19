@@ -1,24 +1,27 @@
 import { and, eq, asc, desc, sql, getTableColumns } from "drizzle-orm";
-import {
-  players,
-  squad,
-  topPlayers,
-} from "../../../drizzle/schema";
+import { players, squad, topPlayers } from "../../../drizzle/schema";
 import { db } from "../../lib/db";
-import { TopPlayerCategory } from "@epl/shared";
+import {
+  SquadPlayerWithImage,
+  TopPlayerCategory,
+  TopPlayerEntry,
+} from "@epl/shared";
 
-export const getSquadService = (team: string) =>
-  db
+export const getSquadService = async (
+  team: string,
+): Promise<SquadPlayerWithImage[]> => {
+  return await db
     .select({ ...getTableColumns(squad), imageUrl: players.imageUrl })
     .from(squad)
     .leftJoin(players, eq(players.name, squad.player))
     .where(eq(squad.team, team));
+};
 
 export const getTopPlayersService = async (
   league: string,
   season: string,
   category: TopPlayerCategory,
-) => {
+): Promise<TopPlayerEntry[]> => {
   return await db
     .select({
       player: topPlayers.player,

@@ -373,7 +373,7 @@ export const squad = pgTable(
       maxValue: 9223372036854775807,
       cache: 1,
     }),
-    player: text(),
+    player: text().notNull(),
     position: text(),
     number: integer(),
     team: text(),
