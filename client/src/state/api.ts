@@ -1,23 +1,29 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import {
-  Standings,
   matchStats,
   upcomingMatches,
   topPlayers,
-  head2Head,
   odds,
   teamStats,
   teams,
   leagues,
   SquadPlayer,
   simulation,
-  ExpectedStanding,
   TopPlayerCategory,
   HomeAwayStats,
   matchPreview,
 } from "@/types/drizzleTypes";
-import { h2hMatchesResponseSchema, type H2HMatchesResponse } from "@epl/shared";
+import {
+  h2hMatchesResponseSchema,
+  type H2HMatchesResponse,
+  type ExpectedStanding,
+  H2H,
+  Standing,
+  expectedStandingSchema,
+  standingSchema,
+} from "@epl/shared";
 import { withToast } from "@/lib/utils";
+import { z } from "zod";
 
 export const api = createApi({
   baseQuery: fetchBaseQuery({
@@ -38,15 +44,16 @@ export const api = createApi({
   ],
   endpoints: (build) => ({
     // gets standings for a specific league + season
-    getStandings: build.query<Standings[], { league: string; season: string }>({
-      query: ({ league, season }) => {
-        const leagueParams = league.split(" ").join("_");
-        const seasonParams = season.split("/"); // splits 2010/11 to get 2010 only, handles 2025 as well
-        return {
-          url: `/standings?league=${leagueParams}&season=${seasonParams[0]}`,
-          method: "GET",
-        };
-      },
+    getStandings: build.query<Standing[], { league: string; season: string }>({
+      query: ({ league, season }) => ({
+        url: `/standings`,
+        method: "GET",
+        params: {
+          league,
+          season: season.split("/")[0],
+        },
+      }),
+      transformResponse: (raw: unknown) => z.array(standingSchema).parse(raw),
       providesTags: ["Standings"],
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
@@ -55,14 +62,13 @@ export const api = createApi({
       },
     }),
 
-    getRecentTeamStandings: build.query<Standings, { team: string }>({
-      query: ({ team }) => {
-        const normalizedTeam = team.split(" ").join("_");
-        return {
-          url: `/standings/recent?team=${normalizedTeam}`,
-          method: "GET",
-        };
-      },
+    getRecentTeamStandings: build.query<Standing, { team: string }>({
+      query: ({ team }) => ({
+        url: `/standings/recent`,
+        method: "GET",
+        params: { team },
+      }),
+      transformResponse: (raw: unknown) => standingSchema.parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get standings.",
@@ -70,17 +76,51 @@ export const api = createApi({
       },
     }),
 
-    getRecentTableStandings: build.query<Standings[], { team: string }>({
-      query: ({ team }) => {
-        const normalizedTeam = team.split(" ").join("_");
-        return {
-          url: `/standings/table?team=${normalizedTeam}`,
-          method: "GET",
-        };
-      },
+    getRecentTableStandings: build.query<Standing[], { team: string }>({
+      query: ({ team }) => ({
+        url: `/standings/table`,
+        method: "GET",
+        params: { team },
+      }),
+      transformResponse: (raw: unknown) => z.array(standingSchema).parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get standings.",
+        });
+      },
+    }),
+
+    // gets standings for the two teams in a match
+    getTeamStandings: build.query<Standing[], { team1: string; team2: string }>(
+      {
+        query: ({ team1, team2 }) => ({
+          url: `/standings/teams`,
+          method: "GET",
+          params: { team1, team2 },
+        }),
+        transformResponse: (raw: unknown) => z.array(standingSchema).parse(raw),
+        async onQueryStarted(_, { queryFulfilled }) {
+          await withToast(queryFulfilled, {
+            error: "Failed to fetch team standings.",
+          });
+        },
+      },
+    ),
+
+    getTeamsExpectedStandings: build.query<
+      ExpectedStanding[],
+      { teams: string[] }
+    >({
+      query: ({ teams }) => ({
+        url: "standings/expected",
+        method: "GET",
+        params: { teams: teams.join(",") },
+      }),
+      transformResponse: (raw: unknown) =>
+        z.array(expectedStandingSchema).parse(raw),
+      async onQueryStarted(_, { queryFulfilled }) {
+        await withToast(queryFulfilled, {
+          error: "Failed to get expected standings.",
         });
       },
     }),
@@ -99,26 +139,6 @@ export const api = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get top players.",
-        });
-      },
-    }),
-
-    // gets standings for the two teams in a match
-    getTeamStandings: build.query<
-      Standings[],
-      { team1: string; team2: string }
-    >({
-      query: ({ team1, team2 }) => {
-        const team1Params = team1.split(" ").join("_");
-        const team2Params = team2.split(" ").join("_");
-        return {
-          url: `/standings/teams?team1=${team1Params}&team2=${team2Params}`,
-          method: "GET",
-        };
-      },
-      async onQueryStarted(_, { queryFulfilled }) {
-        await withToast(queryFulfilled, {
-          error: "Failed to fetch team standings.",
         });
       },
     }),
@@ -241,13 +261,15 @@ export const api = createApi({
     }),
 
     // pulls h2h data from db
-    getHead2Head: build.query<head2Head, { team1: string; team2: string }>({
+    getHead2Head: build.query<H2H, { team1: string; team2: string }>({
       query: ({ team1, team2 }) => {
-        const team1Param = team1.split(" ").join("_");
-        const team2Param = team2.split(" ").join("_");
         return {
-          url: `/h2h/teams?team1=${team1Param}&team2=${team2Param}`,
+          url: `/h2h/teams`,
           method: "GET",
+          params: {
+            team1,
+            team2,
+          },
         };
       },
       providesTags: ["upcomingMatches"],
@@ -276,10 +298,7 @@ export const api = createApi({
     }),
 
     // gets h2h data for each upcoming match - pass in upcomingMatch ids.
-    getUpcomingHead2Head: build.query<
-      head2Head[],
-      { ids: number[] | undefined }
-    >({
+    getUpcomingHead2Head: build.query<H2H[], { ids: number[] | undefined }>({
       query: ({ ids }) => {
         const idParams = ids?.join(",");
         return {
@@ -387,26 +406,6 @@ export const api = createApi({
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get simulation.",
-        });
-      },
-    }),
-
-    getTeamsExpectedStandings: build.query<
-      ExpectedStanding[],
-      { teams: string[] }
-    >({
-      query: ({ teams }) => {
-        return {
-          url: "standings/expected",
-          params: {
-            teams: teams.join(","),
-          },
-        };
-      },
-
-      async onQueryStarted(_, { queryFulfilled }) {
-        await withToast(queryFulfilled, {
-          error: "Failed to get expected standings.",
         });
       },
     }),

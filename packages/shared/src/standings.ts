@@ -20,4 +20,49 @@ export const standingSchema = z.object({
   recentGa: z.number().int().nullable(),
 });
 
+export const standingsQuerySchema = z.object({
+  league: z.enum([
+    "Bundesliga",
+    "La Liga",
+    "Ligue 1",
+    "Premier League",
+    "Serie A",
+  ]),
+  season: z.string().regex(/^\d{4}$/, "season must be a year like 2026"),
+});
+
+export const recentStandingsQuerySchema = z.object({
+  team: z.string().trim().min(1),
+});
+
+export const teamStandingsQuerySchema = z.object({
+  team1: z.string().trim().min(1),
+  team2: z.string().trim().min(1),
+});
+
+export const expectedStandingsQuerySchema = z.object({
+  teams: z
+    .string()
+    .transform((s) =>
+      s
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t !== ""),
+    )
+    .pipe(z.array(z.string()).min(1).max(30)),
+});
+
+export const expectedStandingSchema = z.object({
+  team: z.string(),
+  expectedPosition: z.number().nullable(),
+  seasons: z.number().int().min(0),
+});
+
 export type Standing = z.infer<typeof standingSchema>;
+export type StandingsQuery = z.infer<typeof standingsQuerySchema>;
+export type RecentStandingsQuery = z.infer<typeof recentStandingsQuerySchema>;
+export type TeamStandingsQuery = z.infer<typeof teamStandingsQuerySchema>;
+export type ExpectedStandingsQuery = z.infer<
+  typeof expectedStandingsQuerySchema
+>;
+export type ExpectedStanding = z.infer<typeof expectedStandingSchema>;

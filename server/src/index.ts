@@ -13,6 +13,7 @@ import teamsRoutes from "./modules/teams/teams.routes";
 import squadRoutes from "./modules/squads/squads.routes";
 import { requireAdminKey } from "./middleware/requireAdminKey";
 import { env } from "./config/env";
+import { errorHandler, notFound } from "./middleware/errorHandler";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -33,6 +34,9 @@ app.use("/h2h", h2hRoutes);
 app.use("/teamstats", teamStatsRoutes);
 app.use("/teams", teamsRoutes);
 app.use("/squad", squadRoutes);
+
+app.use(notFound);
+app.use(errorHandler);
 
 const PORT = env.PORT;
 app.listen(PORT, () => {

@@ -13,31 +13,6 @@ export interface teams {
   teamName: string;
 }
 
-export interface Standings {
-  league: string;
-  name: string;
-  season: string;
-  position: number;
-  played: number;
-  won: number;
-  draw: number;
-  lost: number;
-  goalsAgainst: number;
-  goalsFor: number;
-  goalDifference: number;
-  points: number;
-  form: string | null;
-  recentGf: number | null;
-  recentGa: number | null;
-  type: string;
-}
-
-export type ExpectedStanding = {
-  team: string;
-  expectedPosition: number | null;
-  seasons: number;
-};
-
 export interface upcomingMatches {
   id: number;
   matchDate: string;
