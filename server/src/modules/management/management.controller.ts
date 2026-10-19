@@ -1,263 +1,171 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
+import type { ApiError } from "@epl/shared";
+import { curSeason } from "../../config/map";
+import type { RequestSchemas, Validated } from "../../middleware/validation";
 import {
-  updateStandingsService,
   updateFutureMatchesService,
-  updateOddsService,
   updateLeagueSquadsService,
+  updateOddsService,
+  updateStandingsService,
   updateTopPlayersService,
 } from "./management.service";
 import {
-  competition_codes,
-  espn_leagues,
-  Leagues,
-  odds_sports,
-} from "../../config/arrays";
-import { curSeason } from "../../config/map";
+  backfillEspnMatchDataService,
+  importEspnMatchesService,
+} from "./management.espnService";
 import { updatePlayerImagesService } from "./management.imageService";
-import { importEspnMatchesService } from "./management.espnService";
+import {
+  daysAgo,
+  leaguesFor,
+  runFullUpdate,
+  runStep,
+  STEP,
+  type LeagueConfig,
+  type StepName,
+} from "./management.pipeline";
+import {
+  jobStatus,
+  startJob,
+  type JobStarted,
+  type JobStatus,
+} from "./management.jobs";
+import type {
+  backfillSchemas,
+  imagesSchemas,
+  importMatchesSchemas,
+  leagueJobSchemas,
+} from "./management.schemas";
+export { runFullUpdate } from "./management.pipeline";
 
-const DAILY_WINDOW_DAYS = 10;
-const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+type JobResponse<S extends RequestSchemas> = Response<
+  JobStarted | ApiError,
+  Validated<S>
+>;
 
-// Your parallel arrays, zipped once so each league's settings stay together
-const LEAGUE_CONFIG = Leagues.map((name, i) => ({
-  name,
-  espnLeague: espn_leagues[i],
-  competitionCode: competition_codes[i],
-  oddsSport: odds_sports[i],
-}));
-
-let updateRunning = false;
-
-const STEP = {
-  import: "Match import (ESPN)",
-  standings: "Standings",
-  upcoming: "Upcoming matches + H2H",
-  odds: "Odds",
-  squads: "Squads + top players + images",
-} as const;
-type StepName = (typeof STEP)[keyof typeof STEP];
-
-type StepResult = {
-  step: StepName;
-  league: string;
-  status: "ok" | "failed" | "skipped";
-  seconds: number;
-  error?: string;
-};
-
-const runStep = async (
-  results: StepResult[],
+const startLeagueJob = (
+  res: Response<JobStarted | ApiError>,
   step: StepName,
-  league: string,
-  fn: () => Promise<unknown>,
-  dependsOn: StepName[] = [],
-) => {
-  // Skip if anything this step builds on failed (or was skipped) for the same league
-  const blocker = results.find(
-    (r) =>
-      r.league === league && dependsOn.includes(r.step) && r.status !== "ok",
+  leagues: LeagueConfig[],
+  fn: (l: LeagueConfig) => Promise<unknown>,
+) =>
+  startJob(
+    res,
+    step,
+    leagues.map((l) => l.name),
+    async (results) => {
+      for (const l of leagues)
+        await runStep(results, step, l.name, () => fn(l));
+    },
   );
-  if (blocker) {
-    console.warn(
-      `[${step}] ${league} skipped (${blocker.step} ${blocker.status})`,
-    );
-    results.push({
-      step,
-      league,
-      status: "skipped",
-      seconds: 0,
-      error: `${blocker.step} ${blocker.status}`,
-    });
-    return;
-  }
 
-  const start = Date.now();
-  console.log(`[${step}] ${league}…`);
-  try {
-    await fn();
-    results.push({
-      step,
-      league,
-      status: "ok",
-      seconds: (Date.now() - start) / 1000,
-    });
-  } catch (err: any) {
-    console.error(`[${step}] ${league} failed:`, err.message);
-    results.push({
-      step,
-      league,
-      status: "failed",
-      seconds: (Date.now() - start) / 1000,
-      error: err.message,
-    });
-  }
+/** GET /management/status: the job running now (if any) and the last one that finished. */
+export const getStatus = (_req: Request, res: Response<JobStatus>): void => {
+  res.json(jobStatus());
 };
 
-export const runFullUpdate = async () => {
-  const results: StepResult[] = [];
-  const started = Date.now();
+// The full pipeline
 
-  // Update match stats/data using ESPN
-  for (const l of LEAGUE_CONFIG)
-    await runStep(results, STEP.import, l.name, () =>
-      importEspnMatchesService(l.name, l.espnLeague, daysAgo(3)),
-    );
-
-  // Update Standings using match stats obtained from CSV
-  for (const l of LEAGUE_CONFIG)
-    await runStep(
-      results,
-      STEP.standings,
-      l.name,
-      () => updateStandingsService(l.name, curSeason),
-      [STEP.import],
-    );
-
-  // Update Upcoming Matches
-  for (const l of LEAGUE_CONFIG)
-    await runStep(results, STEP.upcoming, l.name, () =>
-      updateFutureMatchesService(l.competitionCode, l.name),
-    );
-
-  // Update Odds
-  for (const l of LEAGUE_CONFIG)
-    await runStep(
-      results,
-      STEP.odds,
-      l.name,
-      () => updateOddsService(l.oddsSport),
-      [STEP.upcoming],
-    );
-
-  // Update League Squads through ESPN
-  for (const l of LEAGUE_CONFIG)
-    await runStep(results, STEP.squads, l.name, () =>
-      updateLeagueSquadsService(l.name, l.espnLeague),
-    );
-
-  const count = (s: StepResult["status"]) =>
-    results.filter((r) => r.status === s).length;
-  console.log(
-    `Full update finished in ${((Date.now() - started) / 60000).toFixed(1)} min: ` +
-      `${count("ok")} ok, ${count("failed")} failed, ${count("skipped")} skipped`,
-  );
-  const problems = results.filter((r) => r.status !== "ok");
-  if (problems.length) console.table(problems);
-  return results;
-};
-
-export const updateAll = async (
+export const updateAll = (
   _req: Request,
-  res: Response,
-): Promise<void> => {
-  // prevent 2 calls
-  if (updateRunning) {
-    res.status(409).json({ message: "A full update is already running" });
-    return;
-  }
-
-  updateRunning = true;
-  res.status(202).json({
-    message:
-      "Full update started. Progress and a summary are logged on the server.",
-  });
-
-  try {
-    await runFullUpdate();
-  } catch (err: any) {
-    console.error("Full update crashed:", err);
-  } finally {
-    updateRunning = false;
-  }
+  res: JobResponse<typeof leagueJobSchemas>,
+): void => {
+  const leagues = leaguesFor(res.locals.validated.query.league);
+  startJob(
+    res,
+    "Full update",
+    leagues.map((l) => l.name),
+    (results) => runFullUpdate(leagues, results),
+  );
 };
 
-// Singular updates for when fails occur or new season testing needed to update maps
-// updates standings and recent form for teams - total , home , and away
-export const updateStandings = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  try {
-    for (let i = 0; i < 5; i++)
-      await updateStandingsService(Leagues[i], curSeason);
-    res.status(200).send("Standings updated successfully");
-  } catch (err: any) {
-    res.status(500).send(err.message);
-  }
+// Single steps, for re-running one after a failure
+
+export const importMatches = (
+  _req: Request,
+  res: JobResponse<typeof importMatchesSchemas>,
+): void => {
+  const { league, days } = res.locals.validated.query;
+  startLeagueJob(res, STEP.import, leaguesFor(league), (l) =>
+    importEspnMatchesService(l.name, l.espnLeague, daysAgo(days)),
+  );
 };
 
-// updates future matches and h2h records
-export const updateFutureMatches = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  try {
-    for (let i = 0; i < 5; i++)
-      await updateFutureMatchesService(competition_codes[i], Leagues[i]);
-    res.status(200).send("Matches updates successfully");
-  } catch (err: any) {
-    res.status(500).send(err.message);
-  }
+export const backfillMatches = (
+  _req: Request,
+  res: JobResponse<typeof backfillSchemas>,
+): void => {
+  const { league, seasonsAgo, refresh } = res.locals.validated.query;
+  startLeagueJob(res, STEP.backfill, leaguesFor(league), (l) =>
+    backfillEspnMatchDataService(l.name, l.espnLeague, seasonsAgo, refresh),
+  );
 };
 
-export const updateTopPlayers = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  try {
-    for (let i = 0; i < 5; i++) await updateTopPlayersService(Leagues[i]);
-    res.status(200).send("Top Players updated successfully");
-  } catch (err: any) {
-    res.status(500).send(err.message);
-  }
+export const updateStandings = (
+  _req: Request,
+  res: JobResponse<typeof leagueJobSchemas>,
+): void => {
+  startLeagueJob(
+    res,
+    STEP.standings,
+    leaguesFor(res.locals.validated.query.league),
+    (l) => updateStandingsService(l.name, curSeason),
+  );
 };
 
-export const updateOdds = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  try {
-    for (let i = 0; i < 5; i++) await updateOddsService(odds_sports[i]);
-    res.status(200).send("Odds updated successfuly");
-  } catch (err: any) {
-    res.status(500).send(err.message);
-  }
+export const updateFutureMatches = (
+  _req: Request,
+  res: JobResponse<typeof leagueJobSchemas>,
+): void => {
+  startLeagueJob(
+    res,
+    STEP.upcoming,
+    leaguesFor(res.locals.validated.query.league),
+    (l) => updateFutureMatchesService(l.competitionCode, l.name),
+  );
 };
 
-export const updateImageUrls = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  try {
-    const images = await updatePlayerImagesService("Bundesliga");
-    res.status(200).json({
-      message: `Updated images`,
-      images,
-    });
-  } catch (err: any) {
-    res.status(500).send(err.message);
-  }
+export const updateOdds = (
+  _req: Request,
+  res: JobResponse<typeof leagueJobSchemas>,
+): void => {
+  startLeagueJob(
+    res,
+    STEP.odds,
+    leaguesFor(res.locals.validated.query.league),
+    (l) => updateOddsService(l.oddsSport),
+  );
 };
 
-export const updateSquad = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  const league = String(req.query.league ?? req.body?.league ?? "").trim();
-  const espnLeague = espn_leagues[4];
-  try {
-    const { teams, images } = await updateLeagueSquadsService(
-      league,
-      espnLeague,
-    );
-    res.status(200).json({
-      message: `Updated ${teams.length} ${league} squads`,
-      teams,
-      images,
-    });
-  } catch (err: any) {
-    console.error("updateSquad:", err);
-    res.status(500).json({ message: err.message });
-  }
+export const updateSquads = (
+  _req: Request,
+  res: JobResponse<typeof leagueJobSchemas>,
+): void => {
+  startLeagueJob(
+    res,
+    STEP.squads,
+    leaguesFor(res.locals.validated.query.league),
+    (l) => updateLeagueSquadsService(l.name, l.espnLeague),
+  );
+};
+
+export const updateTopPlayers = (
+  _req: Request,
+  res: JobResponse<typeof leagueJobSchemas>,
+): void => {
+  startLeagueJob(
+    res,
+    STEP.topPlayers,
+    leaguesFor(res.locals.validated.query.league),
+    (l) => updateTopPlayersService(l.name),
+  );
+};
+
+export const updateImages = (
+  _req: Request,
+  res: JobResponse<typeof imagesSchemas>,
+): void => {
+  const { league, limit } = res.locals.validated.query;
+  startLeagueJob(res, STEP.images, leaguesFor(league), (l) =>
+    updatePlayerImagesService(l.name, limit),
+  );
 };

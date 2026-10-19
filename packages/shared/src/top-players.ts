@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { leagueParamSchema } from "./leagues";
 
 // Leaderboard names, as used in the URL.
 export const topPlayerCategorySchema = z.enum([
@@ -34,13 +35,7 @@ export const topPlayerSchema = z.object({
 });
 
 export const topPlayersQuerySchema = z.object({
-  league: z.enum([
-    "Bundesliga",
-    "La Liga",
-    "Ligue 1",
-    "Premier League",
-    "Serie A",
-  ]),
+  league: leagueParamSchema,
   season: z.string().regex(/^\d{4}$/, "season must be a year like 2026"),
   category: topPlayerCategorySchema.default("goals"),
 });

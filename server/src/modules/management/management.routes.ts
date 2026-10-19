@@ -1,22 +1,35 @@
 import express from "express";
+import { validate } from "../../middleware/validation";
 import {
-  updateStandings,
-  updateFutureMatches,
+  backfillMatches,
+  getStatus,
+  importMatches,
   updateAll,
+  updateFutureMatches,
+  updateImages,
   updateOdds,
-  updateImageUrls,
-  updateSquad,
+  updateSquads,
+  updateStandings,
   updateTopPlayers,
 } from "./management.controller";
+import {
+  backfillSchemas,
+  imagesSchemas,
+  importMatchesSchemas,
+  leagueJobSchemas,
+} from "./management.schemas";
 
 const router = express.Router();
 
-router.post("/standings", updateStandings);
-router.post("/future-matches", updateFutureMatches);
-router.post("/update-all", updateAll);
-router.get("/top-players", updateTopPlayers);
-router.post("/odds", updateOdds);
-router.post("/images", updateImageUrls);
-router.post("/squad", updateSquad);
+router.get("/status", getStatus);
+router.post("/update-all", validate(leagueJobSchemas), updateAll);
+router.post("/import-matches", validate(importMatchesSchemas), importMatches);
+router.post("/backfill", validate(backfillSchemas), backfillMatches);
+router.post("/standings", validate(leagueJobSchemas), updateStandings);
+router.post("/future-matches", validate(leagueJobSchemas), updateFutureMatches);
+router.post("/odds", validate(leagueJobSchemas), updateOdds);
+router.post("/squad", validate(leagueJobSchemas), updateSquads);
+router.post("/top-players", validate(leagueJobSchemas), updateTopPlayers);
+router.post("/images", validate(imagesSchemas), updateImages);
 
 export default router;

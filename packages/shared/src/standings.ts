@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { leagueParamSchema } from "./leagues";
 
 export const standingSchema = z.object({
   id: z.number().int(),
@@ -21,13 +22,7 @@ export const standingSchema = z.object({
 });
 
 export const standingsQuerySchema = z.object({
-  league: z.enum([
-    "Bundesliga",
-    "La Liga",
-    "Ligue 1",
-    "Premier League",
-    "Serie A",
-  ]),
+  league: leagueParamSchema,
   season: z.string().regex(/^\d{4}$/, "season must be a year like 2026"),
 });
 
