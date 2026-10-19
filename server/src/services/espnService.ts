@@ -10,7 +10,7 @@ import {
   TeamLineup,
   teams,
 } from "../../drizzle/schema";
-import { curSeason, espnTeam } from "../utils/map";
+import { curSeason, espnTeam } from "../config/map";
 
 // Shared ESPN plumbing (also used by the squad sync)
 export const espn = axios.create({

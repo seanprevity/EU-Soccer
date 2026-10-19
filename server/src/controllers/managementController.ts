@@ -12,7 +12,7 @@ import {
   Leagues,
   odds_sports,
 } from "../config/arrays";
-import { curSeason } from "../utils/map";
+import { curSeason } from "../config/map";
 import { updatePlayerImagesService } from "../services/imageService";
 import { importEspnMatchesService } from "../services/espnService";
 

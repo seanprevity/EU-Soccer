@@ -7,7 +7,7 @@ import {
 } from "../../drizzle/schema";
 import { db } from "../lib/db";
 import { eq, or, and, lt, gt, desc, count, gte, inArray } from "drizzle-orm";
-import { curSeason } from "../utils/map";
+import { curSeason } from "../config/map";
 import {
   computeFormScore,
   computeTeamStats,
@@ -15,7 +15,7 @@ import {
   get_team_data,
   getHeadToHeadBias,
   poissonRandom,
-} from "../utils/simulation";
+} from "../config/simulation";
 
 export const PAGE_SIZE = 5;
 export type MatchRow = typeof matchStats.$inferSelect;

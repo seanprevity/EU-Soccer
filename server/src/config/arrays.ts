@@ -1,4 +1,4 @@
-import { urlSeason } from "../utils/map";
+import { urlSeason } from "./map";
 
 // Prem, Bundesliga, Ligue 1, Serie A, La Liga.
 export const competition_codes = ["PL", "BL1", "FL1", "SA", "PD"];

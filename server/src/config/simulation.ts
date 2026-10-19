@@ -32,7 +32,7 @@ export const mean = (arr: number[]): number =>
 
 export const get_team_data = async (
   homeTeam: string,
-  awayTeam: string
+  awayTeam: string,
 ): Promise<MatchRow[]> => {
   const seasonStart = new Date(Date.UTC(parseInt(curSeason), 7, 1, 0, 0, 0));
   return await db
@@ -45,9 +45,9 @@ export const get_team_data = async (
           eq(matchStats.homeTeam, homeTeam),
           eq(matchStats.awayTeam, homeTeam),
           eq(matchStats.homeTeam, awayTeam),
-          eq(matchStats.awayTeam, awayTeam)
-        )
-      )
+          eq(matchStats.awayTeam, awayTeam),
+        ),
+      ),
     );
 };
 
@@ -108,7 +108,7 @@ export const computeTeamStats = (matches: MatchRow[]): TeamStats => {
 export const get_standings = async (
   homeTeam: string,
   awayTeam: string,
-  season: string
+  season: string,
 ) => {
   return await db
     .select()
@@ -116,8 +116,8 @@ export const get_standings = async (
     .where(
       and(
         eq(standings.season, curSeason),
-        or(eq(standings.name, homeTeam), eq(standings.name, awayTeam))
-      )
+        or(eq(standings.name, homeTeam), eq(standings.name, awayTeam)),
+      ),
     );
 };
 
@@ -134,7 +134,7 @@ export const computeFormScore = (form: string | null | undefined): number => {
 // Compute mild historical head-to-head bias
 export const getHeadToHeadBias = async (
   homeTeam: string,
-  awayTeam: string
+  awayTeam: string,
 ): Promise<number> => {
   const [team1, team2] = [homeTeam, awayTeam].sort();
 

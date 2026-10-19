@@ -1,7 +1,7 @@
 import { standings } from "../../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { db } from "../lib/db";
-import { curSeason } from "../utils/map";
+import { curSeason } from "../config/map";
 import {
   getLast5MatchStatsService,
   getTeamMatchStatsService,
@@ -12,7 +12,7 @@ import { matchStats } from "../../drizzle/schema";
 const calculateStats = (
   team: string,
   matches: (typeof matchStats.$inferSelect)[],
-  standing?: typeof standings.$inferSelect
+  standing?: typeof standings.$inferSelect,
 ) => {
   let shots = 0;
   let shotsOnTarget = 0;
@@ -23,10 +23,10 @@ const calculateStats = (
 
   for (const match of matches) {
     const isHome = match.homeTeam === team;
-    corners += isHome ? match.hc ?? 0 : match.ac ?? 0;
-    yellows += isHome ? match.hy ?? 0 : match.ay ?? 0;
-    reds += isHome ? match.hr ?? 0 : match.ar ?? 0;
-    xg += isHome ? match.hxg ?? 0 : match.axg ?? 0;
+    corners += isHome ? (match.hc ?? 0) : (match.ac ?? 0);
+    yellows += isHome ? (match.hy ?? 0) : (match.ay ?? 0);
+    reds += isHome ? (match.hr ?? 0) : (match.ar ?? 0);
+    xg += isHome ? (match.hxg ?? 0) : (match.axg ?? 0);
 
     if (isHome) {
       shots += match.hs ?? 0;
@@ -60,7 +60,7 @@ const calculateStats = (
 
 const calculateLast5Stats = (
   team: string,
-  matches: (typeof matchStats.$inferSelect)[]
+  matches: (typeof matchStats.$inferSelect)[],
 ) => {
   let wins = 0;
   let draws = 0;
@@ -77,20 +77,20 @@ const calculateLast5Stats = (
   for (const match of matches) {
     const isHome = match.homeTeam === team;
 
-    gf += isHome ? match.fthg ?? 0 : match.ftag ?? 0;
-    ga += isHome ? match.ftag ?? 0 : match.fthg ?? 0;
-    yellows += isHome ? match.hy ?? 0 : match.ay ?? 0;
-    reds += isHome ? match.hr ?? 0 : match.ar ?? 0;
-    corners += isHome ? match.hc ?? 0 : match.ac ?? 0;
-    xg += isHome ? match.hxg ?? 0 : match.axg ?? 0;
+    gf += isHome ? (match.fthg ?? 0) : (match.ftag ?? 0);
+    ga += isHome ? (match.ftag ?? 0) : (match.fthg ?? 0);
+    yellows += isHome ? (match.hy ?? 0) : (match.ay ?? 0);
+    reds += isHome ? (match.hr ?? 0) : (match.ar ?? 0);
+    corners += isHome ? (match.hc ?? 0) : (match.ac ?? 0);
+    xg += isHome ? (match.hxg ?? 0) : (match.axg ?? 0);
 
     if (match.ftr === "H" && isHome) wins++;
     else if (match.ftr === "A" && !isHome) wins++;
     else if (match.ftr === "D") draws++;
     else losses++;
 
-    shots += isHome ? match.hs ?? 0 : match.as ?? 0;
-    shotsOnTarget += isHome ? match.hst ?? 0 : match.ast ?? 0;
+    shots += isHome ? (match.hs ?? 0) : (match.as ?? 0);
+    shotsOnTarget += isHome ? (match.hst ?? 0) : (match.ast ?? 0);
   }
 
   return {
@@ -123,7 +123,7 @@ const calculateLast5Stats = (
 
 export const getSeasonTeamStatsService = async (
   team1: string,
-  team2: string
+  team2: string,
 ) => {
   // Get standings info for both teams (where type === "TOTAL")
   const [team1Standing] = await db
@@ -133,8 +133,8 @@ export const getSeasonTeamStatsService = async (
       and(
         eq(standings.season, curSeason),
         eq(standings.name, team1),
-        eq(standings.type, "TOTAL")
-      )
+        eq(standings.type, "TOTAL"),
+      ),
     );
 
   const [team2Standing] = await db
@@ -144,8 +144,8 @@ export const getSeasonTeamStatsService = async (
       and(
         eq(standings.season, curSeason),
         eq(standings.name, team2),
-        eq(standings.type, "TOTAL")
-      )
+        eq(standings.type, "TOTAL"),
+      ),
     );
 
   // Get all matches for this season for both teams
@@ -160,7 +160,7 @@ export const getSeasonTeamStatsService = async (
 
 export const getLast5TeamStatsService = async (
   team1: string,
-  team2: string
+  team2: string,
 ) => {
   const last5Team1 = await getLast5MatchStatsService(team1);
   const last5Team2 = await getLast5MatchStatsService(team2);

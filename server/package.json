@@ -8,7 +8,7 @@
     "dev": "nodemon --exec ts-node src/index.ts",
     "start": "node dist/src/index.js",
     "typecheck": "tsc --noEmit",
-    "update-all": "ts-node --transpile-only src/scripts/updateAll.ts",
+    "update-all": "ts-node --transpile-only src/config/updateAll.ts",
     "build": "tsc"
   },
   "keywords": [],

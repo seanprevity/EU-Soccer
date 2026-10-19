@@ -36,7 +36,7 @@ import {
   ODDS_MAP,
   curSeason,
   espnTeam,
-} from "../utils/map";
+} from "../config/map";
 import { StandingsStats, bookmakers } from "../config/arrays";
 import { updatePlayerImagesService } from "./imageService";
 import { ESPN_DELAY_MS, sleep } from "./espnService";
