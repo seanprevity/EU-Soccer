@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import { env } from "../config/env";
 
 export const requireAdminKey = (
   req: Request,
@@ -6,7 +7,7 @@ export const requireAdminKey = (
   next: NextFunction,
 ) => {
   const key = req.header("x-admin-key");
-  if (!process.env.ADMIN_KEY || key !== process.env.ADMIN_KEY) {
+  if (!env.ADMIN_KEY || key !== env.ADMIN_KEY) {
     res.status(404).end();
     return;
   }

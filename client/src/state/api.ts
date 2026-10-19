@@ -11,11 +11,12 @@ import {
   leagues,
   SquadPlayer,
   simulation,
-  matchPreview,
   ExpectedStanding,
   TopPlayerCategory,
   HomeAwayStats,
+  matchPreview,
 } from "@/types/drizzleTypes";
+import { h2hMatchesResponseSchema, type H2HMatchesResponse } from "@epl/shared";
 import { withToast } from "@/lib/utils";
 
 export const api = createApi({
@@ -258,20 +259,15 @@ export const api = createApi({
     }),
 
     get5H2HMatches: build.query<
-      { matches: matchPreview[] },
+      H2HMatchesResponse,
       { team1: string; team2: string; page: number }
     >({
-      query: ({ team1, team2, page = 0 }) => {
-        return {
-          url: "/h2h/matches",
-          method: "GET",
-          params: {
-            team1: team1,
-            team2: team2,
-            page,
-          },
-        };
-      },
+      query: ({ team1, team2, page = 0 }) => ({
+        url: "/h2h/matches",
+        method: "GET",
+        params: { team1, team2, page },
+      }),
+      transformResponse: (raw: unknown) => h2hMatchesResponseSchema.parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get H2H Matches.",

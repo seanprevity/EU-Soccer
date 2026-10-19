@@ -1,4 +1,3 @@
-import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -13,17 +12,13 @@ import teamStatsRoutes from "./modules/teamstats/teamstats.routes";
 import teamsRoutes from "./modules/teams/teams.routes";
 import squadRoutes from "./modules/squads/squads.routes";
 import { requireAdminKey } from "./middleware/requireAdminKey";
-
-const allowedOrigins =
-  process.env.FRONTEND_URL?.split(",") // split different urls by comma
-    .map((o) => o.trim())
-    .filter(Boolean) ?? [];
+import { env } from "./config/env";
 
 const app = express();
 app.set("trust proxy", 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
-app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : false }));
-app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+app.use(cors({ origin: env.FRONTEND_URL }));
+app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -39,7 +34,7 @@ app.use("/teamstats", teamStatsRoutes);
 app.use("/teams", teamsRoutes);
 app.use("/squad", squadRoutes);
 
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = env.PORT;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

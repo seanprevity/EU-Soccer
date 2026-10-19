@@ -8,8 +8,6 @@ import {
   odds,
   squad,
   topPlayers,
-  TopPlayerCategory,
-  TOP_PLAYER_CATEGORIES,
 } from "../../../drizzle/schema";
 import {
   and,
@@ -27,7 +25,6 @@ import { db } from "../../lib/db";
 import csv from "csv-parser";
 import { Readable } from "stream";
 import axios from "axios";
-import dotenv from "dotenv";
 import {
   normalize_name,
   toInt,
@@ -40,11 +37,11 @@ import {
 import { StandingsStats, bookmakers } from "../../config/arrays";
 import { updatePlayerImagesService } from "./management.imageService";
 import { ESPN_DELAY_MS, sleep } from "./management.espnService";
+import { env } from "../../config/env";
+import { TOP_PLAYER_CATEGORIES, TopPlayerCategory } from "@epl/shared";
 
-dotenv.config();
-
-const football_api_key = process.env.FOOTBALL_DATA_API_KEY;
-const odds_api_key = process.env.ODDS_API_KEY;
+const football_api_key = env.FOOTBALL_DATA_API_KEY;
+const odds_api_key = env.ODDS_API_KEY;
 const football_url = "https://api.football-data.org/v4";
 const headers = { "X-Auth-Token": football_api_key };
 const espn = axios.create({

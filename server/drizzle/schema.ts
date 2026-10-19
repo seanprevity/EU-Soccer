@@ -17,80 +17,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-
-export type MatchEvent = {
-  minute: number | null;
-  extraMinute: number | null;
-  side: "home" | "away" | null;
-  player: string | null;
-  playerOut?: string | null;
-  assist: string | null;
-  kind:
-    | "goal"
-    | "penalty"
-    | "own_goal"
-    | "yellow"
-    | "red"
-    | "second_yellow"
-    | "sub";
-};
-
-export type LineupPlayer = {
-  espnId: string;
-  name: string;
-  shortName: string | null;
-  jersey: string | null;
-  position: string | null;
-  positionName: string | null;
-  formationPlace: number | null;
-  starter: boolean;
-  subbedIn: boolean;
-  subbedOut: boolean;
-  headshot: string | null;
-};
-
-export type MatchPreview = {
-  id: number;
-  espnId: string | null;
-  homeTeam: string;
-  awayTeam: string;
-  league: string;
-  matchDate: string | null;
-  ftr: string | null;
-  fthg: number | null;
-  ftag: number | null;
-  hr: number | null;
-  ar: number | null;
-};
-
-export type HomeAwayStats = {
-  id: number;
-  homeTeam: string;
-  awayTeam: string;
-  hst: number | null;
-  ast: number | null;
-  hxg: number | null;
-  axg: number | null;
-  hposs: number | null;
-  aposs: number | null;
-};
-
-export type TeamLineup = { formation: string | null; players: LineupPlayer[] };
-export type MatchLineups = { home: TeamLineup; away: TeamLineup };
-
-// Leaderboard name -> squad column it's ranked by
-export const TOP_PLAYER_CATEGORIES = {
-  goals: "goals",
-  assists: "assists",
-  saves: "saves",
-  yellow_cards: "yellowCards",
-  red_cards: "redCards",
-} as const;
-
-export type TopPlayerCategory = keyof typeof TOP_PLAYER_CATEGORIES;
-
-export const isTopPlayerCategory = (c: string): c is TopPlayerCategory =>
-  Object.hasOwn(TOP_PLAYER_CATEGORIES, c);
+import type { MatchEvent, MatchLineups, MatchResult } from "@epl/shared";
 
 export const odds = pgTable(
   "odds",
@@ -264,7 +191,7 @@ export const matchStats = pgTable(
     homeTeam: text("HomeTeam").notNull(),
     awayTeam: text("AwayTeam").notNull(),
     matchDate: text("MatchDate"),
-    ftr: text("FTR"),
+    ftr: text("FTR").$type<MatchResult>(),
     hs: integer("HS"),
     as: integer("AS"),
     hst: integer("HST"),
@@ -283,14 +210,14 @@ export const matchStats = pgTable(
     hxg: doublePrecision("HxG"),
     axg: doublePrecision("AxG"),
     espnId: text("EspnId"),
-    events: jsonb("Events"),
+    events: jsonb("Events").$type<MatchEvent[]>(),
     hposs: doublePrecision("HPoss"),
     aposs: doublePrecision("APoss"),
     hbs: integer("HBS"),
     abs: integer("ABS"),
     hsv: integer("HSV"),
     asv: integer("ASV"),
-    lineups: jsonb("Lineups"),
+    lineups: jsonb("Lineups").$type<MatchLineups>(),
   },
   (table) => [
     foreignKey({

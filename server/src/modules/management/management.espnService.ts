@@ -1,16 +1,15 @@
 import axios from "axios";
 import { and, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { db } from "../../lib/db";
+import { matchStats, players, teams } from "../../../drizzle/schema";
+import { curSeason, espnTeam } from "../../config/map";
 import {
   LineupPlayer,
   MatchEvent,
   MatchLineups,
-  matchStats,
-  players,
+  MatchResult,
   TeamLineup,
-  teams,
-} from "../../../drizzle/schema";
-import { curSeason, espnTeam } from "../../config/map";
+} from "@epl/shared";
 
 // Shared ESPN plumbing (also used by the squad sync)
 export const espn = axios.create({
@@ -472,7 +471,7 @@ export const importEspnMatchesService = async (
             )
           : m.events;
 
-      const values = {
+      const values: typeof matchStats.$inferInsert = {
         espnId: m.id,
         league,
         homeTeam: m.home,
@@ -482,10 +481,10 @@ export const importEspnMatchesService = async (
         ftag: m.awayScore,
         ftr:
           m.homeScore > m.awayScore
-            ? "H"
+            ? ("H" as MatchResult)
             : m.homeScore < m.awayScore
-              ? "A"
-              : "D",
+              ? ("A" as MatchResult)
+              : ("D" as MatchResult),
         ...statColumns(homeStats, awayStats),
         hposs: homeStats?.get("possessionPct") ?? m.homePoss,
         aposs: awayStats?.get("possessionPct") ?? m.awayPoss,

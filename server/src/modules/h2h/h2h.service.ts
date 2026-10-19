@@ -1,28 +1,39 @@
-import { head2Head, MatchPreview, matchStats } from "../../../drizzle/schema";
-import { eq, and, or, desc, count } from "drizzle-orm";
+import { head2Head, matchStats } from "../../../drizzle/schema";
+import { eq, and, or, desc, inArray } from "drizzle-orm";
 import { db } from "../../lib/db";
 import { upcomingMatches } from "../../../drizzle/schema";
 import { PAGE_SIZE } from "../matches/matches.service";
+import { H2H, MatchPreview } from "@epl/shared";
 
-export const getH2HService = async (teamA: string, teamB: string) => {
+const pairOf = (teamA: string, teamB: string): [string, string] => {
   const [team1, team2] = [teamA, teamB].sort();
-  return await db
+  return [team1!, team2!];
+};
+
+export const getH2HService = async (
+  teamA: string,
+  teamB: string,
+): Promise<H2H | null> => {
+  const [team1, team2] = pairOf(teamA, teamB);
+  const [row] = await db
     .select()
     .from(head2Head)
-    .where(and(eq(head2Head.team1, team1), eq(head2Head.team2, team2)));
+    .where(and(eq(head2Head.team1, team1), eq(head2Head.team2, team2)))
+    .limit(1);
+  return row ?? null;
 };
 
 export const get5H2HMatchesService = async (
   teamA: string,
   teamB: string,
   page = 0,
-): Promise<{ matches: MatchPreview[] }> => {
-  const [team1, team2] = [teamA, teamB].sort();
+): Promise<MatchPreview[]> => {
+  const [team1, team2] = pairOf(teamA, teamB);
   const where = or(
     and(eq(matchStats.homeTeam, team1), eq(matchStats.awayTeam, team2)),
     and(eq(matchStats.homeTeam, team2), eq(matchStats.awayTeam, team1)),
   );
-  const matches = await db
+  return await db
     .select({
       id: matchStats.id,
       espnId: matchStats.espnId,
@@ -41,20 +52,42 @@ export const get5H2HMatchesService = async (
     .orderBy(desc(matchStats.matchDate))
     .limit(PAGE_SIZE)
     .offset(page * PAGE_SIZE);
-  return { matches };
 };
 
-export const getUpcomingH2HService = async (matchId: number) => {
-  const [match] = await db
-    .select()
+export const getUpcomingH2HService = async (
+  matchIds: number[],
+): Promise<H2H[]> => {
+  const matches = await db
+    .select({
+      id: upcomingMatches.id,
+      homeTeam: upcomingMatches.homeTeam,
+      awayTeam: upcomingMatches.awayTeam,
+    })
     .from(upcomingMatches)
-    .where(eq(upcomingMatches.id, matchId));
-  if (!match) return null;
-  const [team1, team2] = [match.homeTeam, match.awayTeam].sort();
-  const [h2hRecord] = await db
+    .where(inArray(upcomingMatches.id, matchIds));
+  if (matches.length === 0) return [];
+
+  const pairs = matches.map((m) => pairOf(m.homeTeam, m.awayTeam));
+  const records = await db
     .select()
     .from(head2Head)
-    .where(and(eq(head2Head.team1, team1), eq(head2Head.team2, team2)));
+    .where(
+      or(
+        ...pairs.map(([team1, team2]) =>
+          and(eq(head2Head.team1, team1), eq(head2Head.team2, team2)),
+        ),
+      ),
+    );
 
-  return h2hRecord || null;
+  // Put the results back in the order the ids were asked for
+  const recordByPair = new Map(
+    records.map((r) => [`${r.team1}|${r.team2}`, r]),
+  );
+  const pairByMatchId = new Map(
+    matches.map((m) => [m.id, pairOf(m.homeTeam, m.awayTeam).join("|")]),
+  );
+  return matchIds.flatMap((id) => {
+    const record = recordByPair.get(pairByMatchId.get(id) ?? "");
+    return record ? [record] : [];
+  });
 };

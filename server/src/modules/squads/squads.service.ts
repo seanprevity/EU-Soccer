@@ -2,10 +2,10 @@ import { and, eq, asc, desc, sql, getTableColumns } from "drizzle-orm";
 import {
   players,
   squad,
-  TopPlayerCategory,
   topPlayers,
 } from "../../../drizzle/schema";
 import { db } from "../../lib/db";
+import { TopPlayerCategory } from "@epl/shared";
 
 export const getSquadService = (team: string) =>
   db

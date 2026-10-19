@@ -1,6 +1,4 @@
 import {
-  HomeAwayStats,
-  MatchPreview,
   matchStats,
   odds,
   upcomingMatches,
@@ -16,6 +14,7 @@ import {
   getHeadToHeadBias,
   poissonRandom,
 } from "../../config/simulation";
+import { HomeAwayStats, MatchPreview } from "@epl/shared";
 
 export const PAGE_SIZE = 5;
 export type MatchRow = typeof matchStats.$inferSelect;

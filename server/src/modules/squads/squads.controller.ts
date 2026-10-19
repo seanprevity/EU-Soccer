@@ -1,9 +1,6 @@
 import { Request, Response } from "express";
 import { getSquadService, getTopPlayersService } from "./squads.service";
-import {
-  isTopPlayerCategory,
-  TOP_PLAYER_CATEGORIES,
-} from "../../../drizzle/schema";
+import { isTopPlayerCategory, TOP_PLAYER_CATEGORIES } from "@epl/shared";
 
 export const getSquad = async (req: Request, res: Response): Promise<void> => {
   try {

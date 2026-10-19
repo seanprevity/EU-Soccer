@@ -4,67 +4,41 @@ import {
   get5H2HMatchesService,
   getUpcomingH2HService,
 } from "./h2h.service";
+import { ApiError, H2H, H2HMatchesResponse } from "@epl/shared";
+import { Validated } from "../../middleware/validation";
+import {
+  getH2HMatchesSchemas,
+  getH2HSchemas,
+  getUpcomingH2HSchemas,
+} from "./h2h.schemas";
 
-export const getH2H = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const team1 = req.query.team1 as string;
-    const team2 = req.query.team2 as string;
-    const normalizedTeam1 = team1.split("_").join(" ");
-    const normalizedTeam2 = team2.split("_").join(" ");
-    const data = await getH2HService(normalizedTeam1, normalizedTeam2);
-    if (!data.length) {
-      res.status(404).json({ error: "H2H not found" });
-      return;
-    }
-    res.json(data[0]);
-  } catch (err: any) {
-    console.error("Failed to get H2H ", err);
-    res.status(500).json({
-      message: `Error fetching H2H: ${err.message}`,
-    });
+export const getH2H = async (
+  _req: Request,
+  res: Response<H2H | ApiError, Validated<typeof getH2HSchemas>>,
+): Promise<void> => {
+  const { team1, team2 } = res.locals.validated.query;
+  const h2h = await getH2HService(team1, team2);
+
+  if (!h2h) {
+    res.status(404).json({ error: "No head-to-head record for these teams" });
+    return;
   }
+
+  res.json(h2h);
 };
 
-export const getH2HMatches = async (req: Request, res: Response) => {
-  try {
-    const team1 = req.query.team1 as string;
-    const team2 = req.query.team2 as string;
-    const page = Math.max(0, Number(req.query.page ?? 0));
-    const data = await get5H2HMatchesService(team1, team2, page);
-    res.json(data);
-  } catch (err: any) {
-    console.error("Failed to get H2H Matches ", err);
-    res
-      .status(500)
-      .json({ message: `Error fetching H2H Matches: ${err.message}` });
-  }
+export const getH2HMatches = async (
+  _req: Request,
+  res: Response<H2HMatchesResponse, Validated<typeof getH2HMatchesSchemas>>,
+): Promise<void> => {
+  const { team1, team2, page } = res.locals.validated.query;
+  res.json({ matches: await get5H2HMatchesService(team1, team2, page) });
 };
 
 export const getUpcomingH2H = async (
-  req: Request,
-  res: Response,
+  _req: Request,
+  res: Response<H2H[], Validated<typeof getUpcomingH2HSchemas>>,
 ): Promise<void> => {
-  try {
-    const idList = req.query.ids as string;
-    if (!idList) {
-      res.status(400).json({ message: "Missing 'ids' query parameter" });
-      return;
-    }
-    const ids = idList
-      .split(",")
-      .map((id) => Number(id.trim()))
-      .filter(Boolean);
-    if (ids.length === 0) {
-      res.status(400).json({ message: "No valid IDs provided" });
-      return;
-    }
-    const data = await Promise.all(ids.map((id) => getUpcomingH2HService(id)));
-    const flattened = data.flat().filter(Boolean);
-    res.json(flattened);
-  } catch (err: any) {
-    console.error("Failed to fetch upcoming H2H ", err);
-    res.status(500).json({
-      message: `Error fetching upcoming H2H: ${err.message}`,
-    });
-  }
+  const { ids } = res.locals.validated.query;
+  res.json(await getUpcomingH2HService(ids));
 };
