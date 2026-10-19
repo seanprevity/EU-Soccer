@@ -15,21 +15,21 @@ import {
   cn,
 } from "@/lib/utils";
 import { useEffect, useMemo, useRef } from "react";
-import { head2Head, upcomingMatches } from "@/types/drizzleTypes";
 import { useMatchesByDate } from "@/hooks/useMatchesByDate";
 import { PastMatchesList } from "./pastMatches";
 import { useAppSelector } from "@/state/redux";
 import { useDispatch } from "react-redux";
 import { setMatchDate } from "@/state";
 import { edgeFor, matchColors } from "@/lib/array";
+import { H2H, UpcomingMatch } from "@epl/shared";
 
 function UpcomingMatchCard({
   match: m,
   h2h,
   h2hLoading,
 }: {
-  match: upcomingMatches;
-  h2h: head2Head | undefined;
+  match: UpcomingMatch;
+  h2h: H2H | undefined;
   h2hLoading: boolean;
 }) {
   const winsFor = (team: string) =>
@@ -198,7 +198,7 @@ export default function Matches() {
   }, [selectedDate]);
 
   const h2hMap = useMemo(() => {
-    const map = new Map<string, head2Head>();
+    const map = new Map<string, H2H>();
     for (const h of h2hData ?? []) {
       if (h.team1 && h.team2) map.set(normalizeTeams(h.team1, h.team2), h);
     }

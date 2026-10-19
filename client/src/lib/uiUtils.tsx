@@ -1,14 +1,15 @@
-import {
-  LineupPlayer,
-  MatchEvent,
-  MatchLineups,
-  TeamLineup,
-} from "@/types/drizzleTypes";
 import React from "react";
 import { calculatePercentage, cn, formationLayout, getLogoFile } from "./utils";
 import Image from "next/image";
 import Link from "next/link";
-import { Standing, TeamStats } from "@epl/shared";
+import {
+  LineupPlayer,
+  MatchEvent,
+  MatchLineups,
+  Standing,
+  TeamLineup,
+  TeamStats,
+} from "@epl/shared";
 
 export const renderForm = (formString: string | null) => {
   if (!formString) return null;

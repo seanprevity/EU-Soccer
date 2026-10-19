@@ -3,13 +3,13 @@
 import { RedCardBadge } from "@/lib/uiUtils";
 import { getLogoFile, getResultColors, getMatchResult } from "@/lib/utils";
 import { useGetLast5MatchesQuery } from "@/state/api";
-import { matchPreview } from "@/types/drizzleTypes";
 import Image from "next/image";
 import Link from "next/link";
 import Pager from "@/components/Pager";
 import { useDispatch } from "react-redux";
 import { useAppSelector } from "@/state/redux";
 import { setAwayRFPage, setHomeRFPage } from "@/state";
+import { MatchPreview } from "@epl/shared";
 
 const PAGE_SIZE = 5;
 
@@ -20,11 +20,10 @@ function useRecentMatches(team: string, page: number) {
     team,
     page,
   });
-  const total = data?.total ?? 0;
   return {
     matches: data?.matches ?? [],
+    total: data?.total ?? 0,
     isLoading: isLoading || isFetching,
-    total,
   };
 }
 
@@ -74,10 +73,10 @@ function Score({ value, won }: { value: number | null; won: boolean }) {
   );
 }
 
-function MatchRow({ m, team }: { m: matchPreview; team: string }) {
+function MatchRow({ m, team }: { m: MatchPreview; team: string }) {
   const colors = getResultColors(getMatchResult(m, team));
-  const homeWon = m.fthg! > m.ftag!;
-  const awayWon = m.ftag! > m.fthg!;
+  const homeWon = (m.fthg ?? 0) > (m.ftag ?? 0);
+  const awayWon = (m.ftag ?? 0) > (m.fthg ?? 0);
 
   return (
     <li className="bg-white dark:bg-gray-800 rounded-md shadow-sm overflow-hidden">

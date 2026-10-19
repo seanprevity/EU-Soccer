@@ -1,193 +1,117 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
+import type {
+  ApiError,
+  HomeAwayMatches,
+  MatchPreview,
+  MatchStats,
+  Odds,
+  PaginatedMatches,
+  SimulationResult,
+  UpcomingMatch,
+} from "@epl/shared";
+import type { Validated } from "../../middleware/validation";
+import type {
+  getMatchStatsSchemas,
+  getMatchupSchemas,
+  getOddsSchemas,
+  getTeamMatchesSchemas,
+  getUpcomingMatchByIdSchemas,
+} from "./matches.schemas";
 import {
-  getLast5MatchesService,
+  getHomeAwayMatchesService,
   getMatchStatsService,
   getOddsService,
+  getPastMatchesService,
+  getSimulationService,
+  getTeamMatchesService,
   getUpcomingMatchByIdService,
   getUpcomingMatchesService,
-  getRecentMatchesService,
-  getSimulationService,
-  getPastMatchesService,
-  getHomeAwayMatchesService,
 } from "./matches.service";
 
 export const getMatchStats = async (
-  req: Request,
-  res: Response,
+  _req: Request,
+  res: Response<MatchStats[], Validated<typeof getMatchStatsSchemas>>,
 ): Promise<void> => {
-  try {
-    const ids = req.query.ids as string;
-    if (!ids) {
-      res.status(400).json({ message: "Missing 'ids' query parameter" });
-      return;
-    }
-    const idList = ids
-      .split(",")
-      .map((id) => Number(id.trim()))
-      .filter(Boolean);
-    if (idList.length === 0) {
-      res.status(400).json({ message: "No valid IDs provided" });
-      return;
-    }
-    const stats = await Promise.all(
-      idList.map((id) => getMatchStatsService(id)),
-    );
-    res.json(stats.flat());
-  } catch (err: any) {
-    console.error("Erorr fetching match stats ", err);
-    res.status(500).json({
-      message: `Error fetching match stats: ${err.message}`,
-    });
-  }
+  const { ids } = res.locals.validated.query;
+  res.json(await getMatchStatsService(ids));
 };
 
 export const getUpcomingMatches = async (
-  req: Request,
-  res: Response,
+  _req: Request,
+  res: Response<UpcomingMatch[]>,
 ): Promise<void> => {
-  try {
-    const data = await getUpcomingMatchesService();
-    res.json(data);
-  } catch (err: any) {
-    console.error("Erorr fetching upcoming matches ", err);
-    res.status(500).json({
-      message: `Error fetching upcoming matches: ${err.message}`,
-    });
-  }
+  res.json(await getUpcomingMatchesService());
 };
 
 export const getPastMatches = async (
-  req: Request,
-  res: Response,
+  _req: Request,
+  res: Response<MatchPreview[]>,
 ): Promise<void> => {
-  try {
-    const data = await getPastMatchesService();
-    res.json(data);
-  } catch (err: any) {
-    console.error("Erorr fetching past matches ", err);
-    res.status(500).json({
-      message: `Error fetching past matches: ${err.message}`,
-    });
-  }
+  res.json(await getPastMatchesService());
 };
 
-export const getOdds = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    if (!id) {
-      res.status(400).json({ message: "Missing 'id' parameter" });
-      return;
-    }
-    const data = await getOddsService(Number(id));
-    res.json(data);
-  } catch (err: any) {
-    console.error("Failed to fetch odds. ", err);
-    res.status(500).json({
-      message: `Error fetching odds: ${err.message}`,
-    });
-  }
+export const getOdds = async (
+  _req: Request,
+  res: Response<Odds[], Validated<typeof getOddsSchemas>>,
+): Promise<void> => {
+  const { id } = res.locals.validated.params;
+  res.json(await getOddsService(id));
 };
 
 export const getUpcomingMatchById = async (
-  req: Request,
-  res: Response,
+  _req: Request,
+  res: Response<
+    UpcomingMatch | ApiError,
+    Validated<typeof getUpcomingMatchByIdSchemas>
+  >,
 ): Promise<void> => {
-  try {
-    const { id } = req.params;
-    if (!id) {
-      res.status(400).json({ message: "Missing 'id' parameter" });
-      return;
-    }
-    const data = await getUpcomingMatchByIdService(Number(id));
-    if (!data.length) {
-      res.status(404).json({ error: "Match not found" });
-      return;
-    }
-    res.json(data[0]);
-  } catch (err: any) {
-    console.error("Failed to fetch upcoming match by id: ", err);
-    res.status(500).json({
-      message: `Error fetching upcoming match by id: ${err.message}`,
-    });
+  const { id } = res.locals.validated.params;
+  const match = await getUpcomingMatchByIdService(id);
+  if (!match) {
+    res.status(404).json({ error: "Match not found" });
+    return;
   }
+  res.json(match);
 };
 
 export const getLast5Matches = async (
-  req: Request,
-  res: Response,
+  _req: Request,
+  res: Response<PaginatedMatches, Validated<typeof getTeamMatchesSchemas>>,
 ): Promise<void> => {
-  try {
-    const team = req.query.team as string;
-    const page = Math.max(0, Number(req.query.page ?? 0));
-    const data = await getLast5MatchesService(team, page);
-    res.json(data);
-  } catch (err: any) {
-    console.error("Failed to get last 5 matches: ", err);
-    res.status(500).json({
-      message: `Error fetching last 5 matches: ${err.message}`,
-    });
-  }
+  const { team, page } = res.locals.validated.query;
+  res.json(await getTeamMatchesService(team, page));
 };
 
 export const getRecentMatches = async (
-  req: Request,
-  res: Response,
+  _req: Request,
+  res: Response<PaginatedMatches, Validated<typeof getTeamMatchesSchemas>>,
 ): Promise<void> => {
-  try {
-    const team = req.query.team as string;
-    const page = Math.max(0, Number(req.query.page ?? 0));
-    const data = await getRecentMatchesService(team, page);
-    res.json(data);
-  } catch (err: any) {
-    console.error("Error fetching recent matches: ", err);
-    res.status(500).json({
-      message: `Error Fetching recent matches: ${err.message}`,
-    });
-  }
+  const { team, page } = res.locals.validated.query;
+  res.json(await getTeamMatchesService(team, page));
 };
 
 export const getSimulation = async (
-  req: Request,
-  res: Response,
+  _req: Request,
+  res: Response<
+    SimulationResult | ApiError,
+    Validated<typeof getMatchupSchemas>
+  >,
 ): Promise<void> => {
-  try {
-    const homeTeam = req.query.homeTeam as string;
-    const awayTeam = req.query.awayTeam as string;
-    if (!homeTeam || !awayTeam) {
-      res.status(500).json({
-        message: `Missing Home or Away Team`,
-      });
-    }
-    const normalizedHomeTeam = homeTeam.split("_").join(" ");
-    const normalizedAwayTeam = awayTeam.split("_").join(" ");
-    console.log(homeTeam);
-    console.log(awayTeam);
-    const data = await getSimulationService(
-      normalizedHomeTeam,
-      normalizedAwayTeam,
-    );
-    res.json(data);
-  } catch (err: any) {
-    console.error("Error fetching simulation: ", err);
-    res.status(500).json({
-      message: `Error Fetching simulation: ${err.message}`,
-    });
+  const { homeTeam, awayTeam } = res.locals.validated.query;
+  const result = await getSimulationService(homeTeam, awayTeam);
+  if (!result) {
+    res
+      .status(404)
+      .json({ error: "Not enough data this season to simulate this match" });
+    return;
   }
+  res.json(result);
 };
 
 export const getHomeAwayMatches = async (
-  req: Request,
-  res: Response,
+  _req: Request,
+  res: Response<HomeAwayMatches, Validated<typeof getMatchupSchemas>>,
 ): Promise<void> => {
-  try {
-    const homeTeam = req.query.homeTeam as string;
-    const awayTeam = req.query.awayTeam as string;
-    const data = await getHomeAwayMatchesService(homeTeam, awayTeam);
-    res.json(data);
-  } catch (err: any) {
-    console.error("Error fetching home and away matches: ", err);
-    res.status(500).json({
-      message: `Error fetching home and away matches: ${err.message}`,
-    });
-  }
+  const { homeTeam, awayTeam } = res.locals.validated.query;
+  res.json(await getHomeAwayMatchesService(homeTeam, awayTeam));
 };

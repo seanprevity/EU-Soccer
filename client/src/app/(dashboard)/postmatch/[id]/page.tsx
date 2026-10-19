@@ -7,13 +7,13 @@ import { useState } from "react";
 import { useGetMatchStatsQuery } from "@/state/api";
 import { cn, getLogoFile } from "@/lib/utils";
 import { EventIcon, formatMinute } from "@/lib/uiUtils";
-import { MatchEvent, matchStats } from "@/types/drizzleTypes";
 import Stats from "../stats";
 import Timeline from "../timeline";
 import Lineups from "../lineups";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import MatchTable from "../matchTable";
+import { MatchEvent, MatchStats } from "@epl/shared";
 
 type Tab = "timeline" | "table" | "stats" | "lineups";
 
@@ -98,7 +98,7 @@ function EventRow({
   );
 }
 
-function Header({ match }: { match: matchStats }) {
+function Header({ match }: { match: MatchStats }) {
   const events = match.events ?? [];
   const redsFor = (side: Side) => {
     const fromEvents = events.filter(

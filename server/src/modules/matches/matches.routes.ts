@@ -1,26 +1,38 @@
 import express from "express";
+import { validate } from "../../middleware/validation";
 import {
+  getHomeAwayMatches,
+  getLast5Matches,
   getMatchStats,
   getOdds,
-  getUpcomingMatches,
-  getUpcomingMatchById,
-  getLast5Matches,
+  getPastMatches,
   getRecentMatches,
   getSimulation,
-  getPastMatches,
-  getHomeAwayMatches,
+  getUpcomingMatchById,
+  getUpcomingMatches,
 } from "./matches.controller";
+import {
+  getMatchStatsSchemas,
+  getMatchupSchemas,
+  getOddsSchemas,
+  getTeamMatchesSchemas,
+  getUpcomingMatchByIdSchemas,
+} from "./matches.schemas";
 
 const router = express.Router();
 
-router.get("/stats", getMatchStats);
+router.get("/stats", validate(getMatchStatsSchemas), getMatchStats);
 router.get("/upcoming", getUpcomingMatches);
 router.get("/past", getPastMatches);
-router.get("/upcoming/:id", getUpcomingMatchById);
-router.get("/odds/:id", getOdds);
-router.get("/last5", getLast5Matches);
-router.get("/recent", getRecentMatches);
-router.get("/simulation", getSimulation);
-router.get("/home-away", getHomeAwayMatches);
+router.get(
+  "/upcoming/:id",
+  validate(getUpcomingMatchByIdSchemas),
+  getUpcomingMatchById,
+);
+router.get("/odds/:id", validate(getOddsSchemas), getOdds);
+router.get("/last5", validate(getTeamMatchesSchemas), getLast5Matches);
+router.get("/recent", validate(getTeamMatchesSchemas), getRecentMatches);
+router.get("/simulation", validate(getMatchupSchemas), getSimulation);
+router.get("/home-away", validate(getMatchupSchemas), getHomeAwayMatches);
 
 export default router;

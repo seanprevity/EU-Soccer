@@ -1,13 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import {
-  matchStats,
-  upcomingMatches,
-  odds,
-  simulation,
-  HomeAwayStats,
-  matchPreview,
-} from "@/types/drizzleTypes";
-import {
   h2hMatchesResponseSchema,
   type H2HMatchesResponse,
   type ExpectedStanding,
@@ -26,6 +18,20 @@ import {
   SquadPlayerWithImage,
   squadPlayerWithImageSchema,
   topPlayerEntrySchema,
+  matchStatsSchema,
+  MatchStats,
+  UpcomingMatch,
+  upcomingMatchSchema,
+  matchPreviewSchema,
+  MatchPreview,
+  Odds,
+  oddsSchema,
+  PaginatedMatches,
+  paginatedMatchesSchema,
+  SimulationResult,
+  simulationResultSchema,
+  HomeAwayMatches,
+  homeAwayMatchesSchema,
 } from "@epl/shared";
 import { withToast } from "@/lib/utils";
 import { z } from "zod";
@@ -167,11 +173,13 @@ export const api = createApi({
     }),
 
     // gets upcoming matches in db for next 10 days
-    getUpcomingMatches: build.query<upcomingMatches[], void>({
+    getUpcomingMatches: build.query<UpcomingMatch[], void>({
       query: () => ({
         url: `/matches/upcoming`,
         method: "GET",
       }),
+      transformResponse: (raw: unknown) =>
+        z.array(upcomingMatchSchema).parse(raw),
       providesTags: ["upcomingMatches"],
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
@@ -180,11 +188,13 @@ export const api = createApi({
       },
     }),
 
-    getPastMatches: build.query<matchPreview[], void>({
+    getPastMatches: build.query<MatchPreview[], void>({
       query: () => ({
         url: `/matches/past`,
         method: "GET",
       }),
+      transformResponse: (raw: unknown) =>
+        z.array(matchPreviewSchema).parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to fetch past matches.",
@@ -193,14 +203,15 @@ export const api = createApi({
     }),
 
     // gets stats for 1 or more matches (used right now for post match page with one id, needs all stats)
-    getMatchStats: build.query<matchStats[], { ids: number[] | number }>({
-      query: ({ ids }) => {
-        const idParam = Array.isArray(ids) ? ids.join(",") : ids.toString();
-        return {
-          url: `/matches/stats?ids=${idParam}`,
-          method: "GET",
-        };
-      },
+    getMatchStats: build.query<MatchStats[], { ids: number[] | number }>({
+      query: ({ ids }) => ({
+        url: `/matches/stats`,
+        method: "GET",
+        params: {
+          ids: Array.isArray(ids) ? ids.join(",") : ids.toString(),
+        },
+      }),
+      transformResponse: (raw: unknown) => z.array(matchStatsSchema).parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get match stats.",
@@ -210,19 +221,18 @@ export const api = createApi({
 
     // gets last 5 matches in league (not h2h)
     getLast5Matches: build.query<
-      { matches: matchPreview[]; total: number },
+      PaginatedMatches,
       { team: string; page?: number }
     >({
-      query: ({ team, page = 0 }) => {
-        return {
-          url: `/matches/last5`,
-          method: "GET",
-          params: {
-            team: team,
-            page: page,
-          },
-        };
-      },
+      query: ({ team, page = 0 }) => ({
+        url: `/matches/last5`,
+        method: "GET",
+        params: {
+          team: team,
+          page: page,
+        },
+      }),
+      transformResponse: (raw: unknown) => paginatedMatchesSchema.parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to fetch last 5 matches.",
@@ -231,11 +241,12 @@ export const api = createApi({
     }),
 
     // gets odds for a specific match
-    getOdds: build.query<odds[], { id: string }>({
+    getOdds: build.query<Odds[], { id: string }>({
       query: ({ id }) => ({
         url: `/matches/odds/${id}`,
         method: "GET",
       }),
+      transformResponse: (raw: unknown) => z.array(oddsSchema).parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get odds.",
@@ -297,11 +308,12 @@ export const api = createApi({
     }),
 
     // get's an upcomingMatch by Id
-    getUpcomingMatchById: build.query<upcomingMatches, { id: string }>({
+    getUpcomingMatchById: build.query<UpcomingMatch, { id: string }>({
       query: ({ id }) => ({
         url: `/matches/upcoming/${id}`,
         method: "GET",
       }),
+      transformResponse: (raw: unknown) => upcomingMatchSchema.parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get upcoming match by id.",
@@ -340,19 +352,18 @@ export const api = createApi({
 
     // gets recent matches for team history page
     getRecentMatches: build.query<
-      { matches: matchPreview[]; total: number },
+      PaginatedMatches,
       { team: string; page: number }
     >({
-      query: ({ team, page = 0 }) => {
-        return {
-          url: `/matches/recent`,
-          method: "GET",
-          params: {
-            team: team,
-            page: page,
-          },
-        };
-      },
+      query: ({ team, page = 0 }) => ({
+        url: `/matches/recent`,
+        method: "GET",
+        params: {
+          team: team,
+          page: page,
+        },
+      }),
+      transformResponse: (raw: unknown) => paginatedMatchesSchema.parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get recent matches using an end date.",
@@ -396,17 +407,15 @@ export const api = createApi({
     }),
 
     getSimulation: build.query<
-      simulation,
+      SimulationResult,
       { homeTeam: string; awayTeam: string }
     >({
-      query: ({ homeTeam, awayTeam }) => {
-        const normalizedHomeTeam = homeTeam.split(" ").join("_");
-        const normalizedAwayTeam = awayTeam.split(" ").join("_");
-        return {
-          url: `/matches/simulation?homeTeam=${normalizedHomeTeam}&awayTeam=${normalizedAwayTeam}`,
-          method: "GET",
-        };
-      },
+      query: ({ homeTeam, awayTeam }) => ({
+        url: `/matches/simulation`,
+        method: "GET",
+        params: { homeTeam, awayTeam },
+      }),
+      transformResponse: (raw: unknown) => simulationResultSchema.parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get simulation.",
@@ -415,24 +424,18 @@ export const api = createApi({
     }),
 
     getHomeAwayMatchStats: build.query<
-      {
-        homeHome: HomeAwayStats[];
-        homeAway: HomeAwayStats[];
-        awayHome: HomeAwayStats[];
-        awayAway: HomeAwayStats[];
-      },
+      HomeAwayMatches,
       { homeTeam: string; awayTeam: string }
     >({
-      query: ({ homeTeam, awayTeam }) => {
-        return {
-          url: "matches/home-away",
-          method: "GET",
-          params: {
-            homeTeam,
-            awayTeam,
-          },
-        };
-      },
+      query: ({ homeTeam, awayTeam }) => ({
+        url: "matches/home-away",
+        method: "GET",
+        params: {
+          homeTeam,
+          awayTeam,
+        },
+      }),
+      transformResponse: (raw: unknown) => homeAwayMatchesSchema.parse(raw),
     }),
   }),
 });

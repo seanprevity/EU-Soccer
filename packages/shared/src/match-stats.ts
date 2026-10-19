@@ -1,6 +1,6 @@
 import { z } from "zod";
+import { idListSchema, pageSchema } from "./common";
 
-// Events (jsonb "Events")
 export const matchEventKindSchema = z.enum([
   "goal",
   "penalty",
@@ -98,7 +98,7 @@ export const matchPreviewSchema = matchStatsSchema.pick({
   ar: true,
 });
 
-// The stats compared side by side for a match. 
+// The stats compared side by side for a match.
 export const homeAwayStatsSchema = matchStatsSchema.pick({
   id: true,
   homeTeam: true,
@@ -111,6 +111,57 @@ export const homeAwayStatsSchema = matchStatsSchema.pick({
   aposs: true,
 });
 
+// A page of a team's matches, newest first, with the total for paging.
+export const paginatedMatchesSchema = z.object({
+  matches: z.array(matchPreviewSchema),
+  total: z.number().int().min(0),
+});
+
+// Each team's home and away matches this season, for the side-by-side charts.
+export const homeAwayMatchesSchema = z.object({
+  homeHome: z.array(homeAwayStatsSchema), // home team, playing at home
+  homeAway: z.array(homeAwayStatsSchema), // home team, playing away
+  awayHome: z.array(homeAwayStatsSchema), // away team, playing at home
+  awayAway: z.array(homeAwayStatsSchema), // away team, playing away
+});
+
+// Monte Carlo prediction for one fixture. Field names are snake_case, as the API has always sent them.
+export const simulationResultSchema = z.object({
+  home_team: z.string(),
+  away_team: z.string(),
+  home_win_prob: z.number(), // 0-1
+  draw_prob: z.number(),
+  away_win_prob: z.number(),
+  avg_goals_home: z.number(),
+  avg_goals_away: z.number(),
+  lambda_home: z.number(), // expected goals used for the simulation
+  lambda_away: z.number(),
+  most_likely_score: z.string(), // "2-1"
+  most_likely_score_prob: z.number(),
+});
+
+// /matches/stats?ids=12,15
+export const matchStatsQuerySchema = z.object({ ids: idListSchema });
+
+// /matches/last5 and /matches/recent
+export const teamMatchesQuerySchema = z.object({
+  team: z.string().trim().min(1),
+  page: pageSchema,
+});
+
+const teamNameParam = z
+  .string()
+  .transform((s) => s.replace(/_/g, " ").trim())
+  .pipe(z.string().min(1));
+
+// /matches/simulation and /matches/home-away
+export const matchupQuerySchema = z
+  .object({ homeTeam: teamNameParam, awayTeam: teamNameParam })
+  .refine((q) => q.homeTeam !== q.awayTeam, {
+    error: "homeTeam and awayTeam must be different teams",
+    path: ["awayTeam"],
+  });
+
 export type MatchEventKind = z.infer<typeof matchEventKindSchema>;
 export type MatchEvent = z.infer<typeof matchEventSchema>;
 export type LineupPlayer = z.infer<typeof lineupPlayerSchema>;
@@ -120,3 +171,9 @@ export type MatchResult = z.infer<typeof matchResultSchema>;
 export type MatchStats = z.infer<typeof matchStatsSchema>;
 export type MatchPreview = z.infer<typeof matchPreviewSchema>;
 export type HomeAwayStats = z.infer<typeof homeAwayStatsSchema>;
+export type PaginatedMatches = z.infer<typeof paginatedMatchesSchema>;
+export type HomeAwayMatches = z.infer<typeof homeAwayMatchesSchema>;
+export type SimulationResult = z.infer<typeof simulationResultSchema>;
+export type MatchStatsQuery = z.infer<typeof matchStatsQuerySchema>;
+export type TeamMatchesQuery = z.infer<typeof teamMatchesQuerySchema>;
+export type MatchupQuery = z.infer<typeof matchupQuerySchema>;

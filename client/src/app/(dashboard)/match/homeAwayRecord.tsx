@@ -1,10 +1,9 @@
 "use client";
 
-import { HomeAwayStats } from "@/types/drizzleTypes";
 import { cn, getLogoFile } from "@/lib/utils";
 import Image from "next/image";
 import { useGetHomeAwayMatchStatsQuery } from "@/state/api";
-import { Standing } from "@epl/shared";
+import { HomeAwayStats, Standing } from "@epl/shared";
 
 type Split = "HOME" | "AWAY";
 

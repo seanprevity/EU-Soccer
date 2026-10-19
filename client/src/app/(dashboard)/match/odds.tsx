@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import { useGetOddsQuery, useGetSimulationQuery } from "@/state/api";
-import { upcomingMatches } from "@/types/drizzleTypes";
 import { cn, getLogoFile } from "@/lib/utils";
 import { edgeFor, matchColors } from "@/lib/array";
+import { UpcomingMatch } from "@epl/shared";
 
 type Outcome = "home" | "draw" | "away";
 type OddsKey = "oddsHome" | "oddsDraw" | "oddsAway";
@@ -53,7 +53,7 @@ const Odds = ({
   match,
   matchId,
 }: {
-  match: upcomingMatches;
+  match: UpcomingMatch;
   matchId: string;
 }) => {
   const { data: odds } = useGetOddsQuery({ id: matchId });

@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { matchPreview } from "@/types/drizzleTypes";
 import { cn, getLogoFile } from "@/lib/utils";
 import { EventIcon } from "@/lib/uiUtils";
+import { MatchPreview } from "@epl/shared";
 
 function TeamRow({
   team,
@@ -68,7 +68,7 @@ function TeamRow({
 }
 
 // sort matches by kickoff
-const byKickoff = (a: matchPreview, b: matchPreview) => {
+const byKickoff = (a: MatchPreview, b: MatchPreview) => {
   if (!a.matchDate || !b.matchDate)
     return a.matchDate ? -1 : b.matchDate ? 1 : 0;
   return (
@@ -77,7 +77,7 @@ const byKickoff = (a: matchPreview, b: matchPreview) => {
   );
 };
 
-export function PastMatchesList({ matches }: { matches: matchPreview[] }) {
+export function PastMatchesList({ matches }: { matches: MatchPreview[] }) {
   const ordered = [...matches].sort(byKickoff);
 
   return (

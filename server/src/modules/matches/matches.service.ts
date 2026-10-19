@@ -1,10 +1,15 @@
-import {
-  matchStats,
-  odds,
-  upcomingMatches,
-} from "../../../drizzle/schema";
+import { and, count, desc, eq, gt, gte, inArray, lt, or } from "drizzle-orm";
+import type {
+  HomeAwayMatches,
+  MatchPreview,
+  MatchStats,
+  Odds,
+  PaginatedMatches,
+  SimulationResult,
+  UpcomingMatch,
+} from "@epl/shared";
+import { matchStats, odds, upcomingMatches } from "../../../drizzle/schema";
 import { db } from "../../lib/db";
-import { eq, or, and, lt, gt, desc, count, gte, inArray } from "drizzle-orm";
 import { curSeason } from "../../config/map";
 import {
   computeFormScore,
@@ -14,292 +19,209 @@ import {
   getHeadToHeadBias,
   poissonRandom,
 } from "../../config/simulation";
-import { HomeAwayStats, MatchPreview } from "@epl/shared";
 
 export const PAGE_SIZE = 5;
-export type MatchRow = typeof matchStats.$inferSelect;
 
-type SimulationResult = {
-  home_team: string;
-  away_team: string;
-  home_win_prob: number;
-  draw_prob: number;
-  away_win_prob: number;
-  avg_goals_home: number;
-  avg_goals_away: number;
-  lambda_home: number;
-  lambda_away: number;
-  most_likely_score: string;
-  most_likely_score_prob: number;
+const previewColumns = {
+  id: matchStats.id,
+  espnId: matchStats.espnId,
+  homeTeam: matchStats.homeTeam,
+  awayTeam: matchStats.awayTeam,
+  league: matchStats.league,
+  matchDate: matchStats.matchDate,
+  ftr: matchStats.ftr,
+  fthg: matchStats.fthg,
+  ftag: matchStats.ftag,
+  hr: matchStats.hr,
+  ar: matchStats.ar,
 };
 
-export const getMatchStatsService = async (id: number) => {
-  return await db.select().from(matchStats).where(eq(matchStats.id, id));
-};
+const involves = (team: string) =>
+  or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team));
 
-export const getUpcomingMatchesService = async () => {
-  const futureMatches = await db.select().from(upcomingMatches);
-  return futureMatches;
-};
-
-export const getPastMatchesService = async (): Promise<MatchPreview[]> => {
-  const today = new Date();
-  today.setDate(today.getDate() - 7);
-  today.setHours(0, 0, 0, 0);
-  return await db
-    .select({
-      id: matchStats.id,
-      espnId: matchStats.espnId,
-      homeTeam: matchStats.homeTeam,
-      awayTeam: matchStats.awayTeam,
-      league: matchStats.league,
-      matchDate: matchStats.matchDate,
-      ftr: matchStats.ftr,
-      fthg: matchStats.fthg,
-      ftag: matchStats.ftag,
-      hr: matchStats.hr,
-      ar: matchStats.ar,
-    })
+export const getMatchStatsService = async (
+  ids: number[],
+): Promise<MatchStats[]> => {
+  const rows = await db
+    .select()
     .from(matchStats)
-    .where(gt(matchStats.matchDate, today.toISOString()));
+    .where(inArray(matchStats.id, ids));
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return ids.flatMap((id) => {
+    const row = byId.get(id);
+    return row ? [row] : [];
+  });
 };
 
-export const getOddsService = async (id: number) => {
-  return await db.select().from(odds).where(eq(odds.match, id));
+export const getUpcomingMatchesService = async (): Promise<UpcomingMatch[]> => {
+  return await db.select().from(upcomingMatches);
 };
 
-export const getTeamMatchStatsService = async (team: string) => {
-  const startDate = new Date(Date.UTC(Number(curSeason), 7, 1));
-  const endDate = new Date(Date.UTC(Number(curSeason) + 1, 6, 1));
-  return await db
+export const getPastMatchesService = (): Promise<MatchPreview[]> => {
+  const since = new Date();
+  since.setDate(since.getDate() - 7);
+  since.setHours(0, 0, 0, 0);
+  return db
+    .select(previewColumns)
+    .from(matchStats)
+    .where(gt(matchStats.matchDate, since.toISOString()));
+};
+
+export const getOddsService = async (matchId: number): Promise<Odds[]> => {
+  return await db.select().from(odds).where(eq(odds.match, matchId));
+};
+
+export const getUpcomingMatchByIdService = async (
+  id: number,
+): Promise<UpcomingMatch | null> => {
+  const [row] = await db
+    .select()
+    .from(upcomingMatches)
+    .where(eq(upcomingMatches.id, id))
+    .limit(1);
+  return row ?? null;
+};
+
+export const getTeamMatchesService = async (
+  team: string,
+  page = 0,
+): Promise<PaginatedMatches> => {
+  const [matches, [totalRow]] = await Promise.all([
+    db
+      .select(previewColumns)
+      .from(matchStats)
+      .where(involves(team))
+      .orderBy(desc(matchStats.matchDate))
+      .limit(PAGE_SIZE)
+      .offset(page * PAGE_SIZE),
+    db.select({ total: count() }).from(matchStats).where(involves(team)),
+  ]);
+  return { matches, total: totalRow?.total ?? 0 };
+};
+
+export const getTeamMatchStatsService = (
+  team: string,
+): Promise<MatchStats[]> => {
+  const start = new Date(Date.UTC(Number(curSeason), 7, 1));
+  const end = new Date(Date.UTC(Number(curSeason) + 1, 6, 1));
+  return db
     .select()
     .from(matchStats)
     .where(
       and(
-        lt(matchStats.matchDate, endDate.toISOString()),
-        gt(matchStats.matchDate, startDate.toISOString()),
-        or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)),
+        gt(matchStats.matchDate, start.toISOString()),
+        lt(matchStats.matchDate, end.toISOString()),
+        involves(team),
       ),
     );
-};
-
-export const getUpcomingMatchByIdService = async (id: number) => {
-  return await db
-    .select()
-    .from(upcomingMatches)
-    .where(eq(upcomingMatches.id, id));
-};
-
-export const getLast5MatchesService = async (
-  team: string,
-  page = 0,
-): Promise<{ matches: MatchPreview[]; total: number }> => {
-  const where = or(
-    eq(matchStats.homeTeam, team),
-    eq(matchStats.awayTeam, team),
-  );
-
-  const matches = await db
-    .select({
-      id: matchStats.id,
-      espnId: matchStats.espnId,
-      homeTeam: matchStats.homeTeam,
-      awayTeam: matchStats.awayTeam,
-      league: matchStats.league,
-      matchDate: matchStats.matchDate,
-      ftr: matchStats.ftr,
-      fthg: matchStats.fthg,
-      ftag: matchStats.ftag,
-      hr: matchStats.hr,
-      ar: matchStats.ar,
-    })
-    .from(matchStats)
-    .where(where)
-    .orderBy(desc(matchStats.matchDate))
-    .limit(PAGE_SIZE)
-    .offset(page * PAGE_SIZE);
-
-  const [{ total }] = await db
-    .select({ total: count() })
-    .from(matchStats)
-    .where(where);
-
-  return { matches, total };
-};
-
-export const getRecentMatchesService = async (
-  team: string,
-  page: number,
-): Promise<{ matches: MatchPreview[]; total: number }> => {
-  const where = or(
-    eq(matchStats.homeTeam, team),
-    eq(matchStats.awayTeam, team),
-  );
-
-  const matches = await db
-    .select({
-      id: matchStats.id,
-      espnId: matchStats.espnId,
-      homeTeam: matchStats.homeTeam,
-      awayTeam: matchStats.awayTeam,
-      league: matchStats.league,
-      matchDate: matchStats.matchDate,
-      ftr: matchStats.ftr,
-      fthg: matchStats.fthg,
-      ftag: matchStats.ftag,
-      hr: matchStats.hr,
-      ar: matchStats.ar,
-    })
-    .from(matchStats)
-    .where(where)
-    .orderBy(desc(matchStats.matchDate))
-    .limit(PAGE_SIZE)
-    .offset(page * PAGE_SIZE);
-
-  const [{ total }] = await db
-    .select({ total: count() })
-    .from(matchStats)
-    .where(where);
-
-  return { matches, total };
 };
 
 export const getLast5MatchStatsService = async (
   team: string,
   page = 0,
-): Promise<{ matches: MatchRow[]; total: number }> => {
-  const where = or(
-    eq(matchStats.homeTeam, team),
-    eq(matchStats.awayTeam, team),
-  );
-
-  const matches = await db
-    .select()
-    .from(matchStats)
-    .where(where)
-    .orderBy(desc(matchStats.matchDate))
-    .limit(PAGE_SIZE)
-    .offset(page * PAGE_SIZE);
-
-  const [{ total }] = await db
-    .select({ total: count() })
-    .from(matchStats)
-    .where(where);
-
-  return { matches, total };
+): Promise<{ matches: MatchStats[]; total: number }> => {
+  const [matches, [totalRow]] = await Promise.all([
+    db
+      .select()
+      .from(matchStats)
+      .where(involves(team))
+      .orderBy(desc(matchStats.matchDate))
+      .limit(PAGE_SIZE)
+      .offset(page * PAGE_SIZE),
+    db.select({ total: count() }).from(matchStats).where(involves(team)),
+  ]);
+  return { matches, total: totalRow?.total ?? 0 };
 };
 
-// Simulate a match using Monte Carlo
 export const getSimulationService = async (
   homeTeam: string,
   awayTeam: string,
   season: string = curSeason,
-  nSimulations: number = 10000,
-): Promise<SimulationResult> => {
-  // Fetch stats and standings
-  const matches = await get_team_data(homeTeam, awayTeam);
+  nSimulations = 10000,
+): Promise<SimulationResult | null> => {
+  const [matches, standingsRows, h2hBias] = await Promise.all([
+    get_team_data(homeTeam, awayTeam),
+    get_standings(homeTeam, awayTeam, season),
+    getHeadToHeadBias(homeTeam, awayTeam),
+  ]);
   const teamStats = computeTeamStats(matches);
-  const standingsRows = await get_standings(homeTeam, awayTeam, season);
 
-  // Map standings by team name
-  const standingsMap: Record<string, (typeof standingsRows)[0]> = {};
-  for (const row of standingsRows) standingsMap[row.name] = row;
+  // By team name; if get_standings returns several rows per team, the last one wins, as before
+  const standingByTeam = new Map(standingsRows.map((r) => [r.name, r]));
+  const home = standingByTeam.get(homeTeam);
+  const away = standingByTeam.get(awayTeam);
+  const homeStats = teamStats[homeTeam];
+  const awayStats = teamStats[awayTeam];
+  if (!home || !away || !homeStats || !awayStats) return null;
 
   const maxPoints = Math.max(...standingsRows.map((r) => r.points ?? 0), 1);
-  const homePoints = (standingsMap[homeTeam].points ?? 0) / maxPoints;
-  const awayPoints = (standingsMap[awayTeam].points ?? 0) / maxPoints;
-
-  // Home/away form from standings (use total/home/away as needed)
-  const homeHomeForm = standingsMap[homeTeam];
-  const awayAwayForm = standingsMap[awayTeam];
-
-  const homeFormScore = computeFormScore(standingsMap[homeTeam].form);
-  const awayFormScore = computeFormScore(standingsMap[awayTeam].form);
+  const homePoints = (home.points ?? 0) / maxPoints;
+  const awayPoints = (away.points ?? 0) / maxPoints;
+  const homeFormScore = computeFormScore(home.form);
+  const awayFormScore = computeFormScore(away.form);
 
   // Expected scoring rates
-  let lamHome =
-    (teamStats[homeTeam].avg_scored_home +
-      teamStats[awayTeam].avg_conceded_away) /
-    2;
-  let lamAway =
-    (teamStats[awayTeam].avg_scored_away +
-      teamStats[homeTeam].avg_conceded_home) /
-    2;
+  let lamHome = (homeStats.avg_scored_home + awayStats.avg_conceded_away) / 2;
+  let lamAway = (awayStats.avg_scored_away + homeStats.avg_conceded_home) / 2;
 
   // Adjust by points
   lamHome *= 1 + (homePoints - awayPoints) * 0.2;
   lamAway *= 1 + (awayPoints - homePoints) * 0.2;
 
-  // Adjust by home/away form
-  lamHome *=
-    1 +
-    ((homeHomeForm.points ?? 0) / ((homeHomeForm.played ?? 1) * 3) - 0.5) * 0.2;
-  lamAway *=
-    1 +
-    ((awayAwayForm.points ?? 0) / ((awayAwayForm.played ?? 1) * 3) - 0.5) * 0.2;
+  // Adjust by points per game
+  lamHome *= 1 + ((home.points ?? 0) / ((home.played || 1) * 3) - 0.5) * 0.2;
+  lamAway *= 1 + ((away.points ?? 0) / ((away.played || 1) * 3) - 0.5) * 0.2;
 
   // Adjust by recent form
   lamHome *= 1 + (homeFormScore - awayFormScore) * 0.2;
   lamAway *= 1 + (awayFormScore - homeFormScore) * 0.2;
 
   // Head-to-head bias
-  const h2hBias = await getHeadToHeadBias(homeTeam, awayTeam);
   lamHome *= 1 + h2hBias;
   lamAway *= 1 - h2hBias;
 
-  // Run Monte Carlo simulations
-  const goalsHome: number[] = [];
-  const goalsAway: number[] = [];
-  for (let i = 0; i < nSimulations; i++) {
-    goalsHome.push(poissonRandom(lamHome));
-    goalsAway.push(poissonRandom(lamAway));
-  }
-
-  // Compute probabilities and averages
-  const homeWinProb =
-    goalsHome.filter((g, i) => g > goalsAway[i]).length / nSimulations;
-  const drawProb =
-    goalsHome.filter((g, i) => g === goalsAway[i]).length / nSimulations;
-  const awayWinProb =
-    goalsHome.filter((g, i) => g < goalsAway[i]).length / nSimulations;
-  const avgGoalsHome = goalsHome.reduce((a, b) => a + b, 0) / nSimulations;
-  const avgGoalsAway = goalsAway.reduce((a, b) => a + b, 0) / nSimulations;
-
+  // Run the simulations, counting results and scores as we go
+  let homeWins = 0;
+  let draws = 0;
+  let totalHome = 0;
+  let totalAway = 0;
   const scoreCounts = new Map<string, number>();
   for (let i = 0; i < nSimulations; i++) {
-    const key = `${goalsHome[i]}-${goalsAway[i]}`;
+    const h = poissonRandom(lamHome);
+    const a = poissonRandom(lamAway);
+    if (h > a) homeWins++;
+    else if (h === a) draws++;
+    totalHome += h;
+    totalAway += a;
+    const key = `${h}-${a}`;
     scoreCounts.set(key, (scoreCounts.get(key) ?? 0) + 1);
   }
-  const [mostLikelyScore, mostLikelyScoreCount] = [
-    ...scoreCounts.entries(),
-  ].reduce((a, b) => (b[1] > a[1] ? b : a));
 
-  const mostLikelyScoreProb = mostLikelyScoreCount / nSimulations;
+  let mostLikelyScore = "0-0";
+  let mostLikelyCount = 0;
+  for (const [score, n] of scoreCounts) {
+    if (n > mostLikelyCount) [mostLikelyScore, mostLikelyCount] = [score, n];
+  }
 
   return {
     home_team: homeTeam,
     away_team: awayTeam,
-    home_win_prob: homeWinProb,
-    draw_prob: drawProb,
-    away_win_prob: awayWinProb,
-    avg_goals_home: avgGoalsHome,
-    avg_goals_away: avgGoalsAway,
+    home_win_prob: homeWins / nSimulations,
+    draw_prob: draws / nSimulations,
+    away_win_prob: (nSimulations - homeWins - draws) / nSimulations,
+    avg_goals_home: totalHome / nSimulations,
+    avg_goals_away: totalAway / nSimulations,
     lambda_home: lamHome,
     lambda_away: lamAway,
     most_likely_score: mostLikelyScore,
-    most_likely_score_prob: mostLikelyScoreProb,
+    most_likely_score_prob: mostLikelyCount / nSimulations,
   };
 };
 
 export const getHomeAwayMatchesService = async (
   homeTeam: string,
   awayTeam: string,
-): Promise<{
-  homeHome: HomeAwayStats[];
-  homeAway: HomeAwayStats[];
-  awayHome: HomeAwayStats[];
-  awayAway: HomeAwayStats[];
-}> => {
+): Promise<HomeAwayMatches> => {
   const teams = [homeTeam, awayTeam];
   const rows = await db
     .select({

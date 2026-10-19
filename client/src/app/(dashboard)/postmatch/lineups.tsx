@@ -2,15 +2,10 @@
 
 import Image from "next/image";
 import { ReactNode, useEffect, useRef, useState } from "react";
-import {
-  LineupPlayer,
-  matchStats,
-  MatchEvent,
-  TeamLineup,
-} from "@/types/drizzleTypes";
 import { cn, formationLayout, getLogoFile } from "@/lib/utils";
 import { ArrowBadge, EventIcon, formatMinute, SubStack } from "@/lib/uiUtils";
 import { matchColors } from "@/lib/array";
+import { LineupPlayer, MatchEvent, MatchStats, TeamLineup } from "@epl/shared";
 
 type Side = "home" | "away";
 type CardKind = "yellow" | "red" | "second_yellow";
@@ -200,7 +195,7 @@ function Pitch({
   match,
   marks,
 }: {
-  match: matchStats;
+  match: MatchStats;
   marks: Map<string, PlayerMarks>;
 }) {
   const lineups = match.lineups!;
@@ -382,7 +377,7 @@ function BenchColumn({
   );
 }
 
-export default function Lineups({ match }: { match: matchStats }) {
+export default function Lineups({ match }: { match: MatchStats }) {
   if (!match.lineups)
     return (
       <p className="text-center text-sm text-gray-500 dark:text-gray-400">

@@ -4,11 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
 import { useGetStandingsQuery } from "@/state/api";
-import { matchStats } from "@/types/drizzleTypes";
 import { cn, generateSeasons, getLogoFile, HEADER_CONFIG } from "@/lib/utils";
 import { renderForm } from "@/lib/uiUtils";
 import { matchColors } from "@/lib/array";
-import { Standing } from "@epl/shared";
+import { MatchStats, Standing } from "@epl/shared";
 
 const TABLE_HEADERS = HEADER_CONFIG.filter((h) => h.key !== "expectedPosition");
 
@@ -57,7 +56,7 @@ function Cell({ team, column }: { team: Standing; column: string }) {
   }
 }
 
-export default function MatchTable({ match }: { match: matchStats }) {
+export default function MatchTable({ match }: { match: MatchStats }) {
   const season = match.matchDate ? seasonFor(match.matchDate) : null;
   const { data, isLoading, isError } = useGetStandingsQuery(
     { league: match.league, season: season ?? "" },

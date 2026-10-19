@@ -1,8 +1,8 @@
-import { matchStats } from "@/types/drizzleTypes";
 import { statsKeys } from "@/lib/utils";
 import { StatBar } from "@/lib/uiUtils";
 import Image from "next/image";
 import { getLogoFile } from "@/lib/utils";
+import { MatchStats } from "@epl/shared";
 
 function TeamLogo({ team }: { team: string }) {
   return (
@@ -18,11 +18,11 @@ function TeamLogo({ team }: { team: string }) {
 }
 
 const readStat = (
-  m: matchStats,
+  m: MatchStats,
   side: "h" | "a",
   key: string,
 ): number | null => {
-  const v = m[`${side}${key.slice(1)}` as keyof matchStats];
+  const v = m[`${side}${key.slice(1)}` as keyof MatchStats];
   return typeof v === "number" ? v : null;
 };
 
@@ -46,7 +46,7 @@ type Row = {
   away: number | null;
 };
 
-export default function Stats({ match }: { match: matchStats }) {
+export default function Stats({ match }: { match: MatchStats }) {
   const rows: Row[] = statsKeys
     .map(({ key, label }) => ({
       key,

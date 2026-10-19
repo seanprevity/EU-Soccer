@@ -2,12 +2,12 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { toast } from "sonner";
 import {
-  head2Head,
+  H2H,
   LineupPlayer,
-  matchPreview,
-  matchStats,
+  MatchPreview,
+  MatchStats,
   TeamLineup,
-} from "@/types/drizzleTypes";
+} from "@epl/shared";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -95,16 +95,16 @@ export const emptyH2H = {
 };
 
 export function getChartData(
-  data: head2Head | null,
-  last5Matches: matchStats[] | null,
+  data: H2H | null,
+  last5Matches: MatchStats[] | null,
   homeTeam: string,
   awayTeam: string,
 ) {
   if (!last5Matches || !data) return [];
 
   const sumStat = (
-    statHome: keyof matchStats,
-    statAway: keyof matchStats,
+    statHome: keyof MatchStats,
+    statAway: keyof MatchStats,
     team: string,
   ) =>
     last5Matches.reduce((sum, m) => {
@@ -180,7 +180,7 @@ export function calculatePercentage(value: number, oppositeValue: number) {
 }
 
 export const getMatchResult = (
-  match: matchStats | matchPreview,
+  match: MatchStats | MatchPreview,
   teamName: string,
 ) => {
   const isHomeTeam = match.homeTeam === teamName;

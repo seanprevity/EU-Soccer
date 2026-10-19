@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useState } from "react";
 import { cn, getLogoFile } from "@/lib/utils";
 import { edgeFor, matchColors } from "@/lib/array";
-import { head2Head, matchPreview } from "@/types/drizzleTypes";
 import { useGet5H2HMatchesQuery } from "@/state/api";
 import { RedCardBadge } from "@/lib/uiUtils";
 import Link from "next/link";
@@ -12,6 +11,7 @@ import { useAppSelector } from "@/state/redux";
 import { useDispatch } from "react-redux";
 import { setH2HPage } from "@/state";
 import Pager from "@/components/Pager";
+import { H2H, MatchPreview } from "@epl/shared";
 
 type Segment = "home" | "draw" | "away";
 const PAGE_SIZE = 5;
@@ -37,7 +37,7 @@ function toPercentages(values: number[], total: number): number[] {
   return floored;
 }
 
-function useH2HMatches(h2h: head2Head | null, page: number) {
+function useH2HMatches(h2h: H2H | null, page: number) {
   const { data, isLoading, isFetching } = useGet5H2HMatchesQuery(
     {
       team1: h2h?.team1 ?? "",
@@ -98,7 +98,7 @@ function PlaceholderCard() {
   );
 }
 
-function MatchCard({ m }: { m: matchPreview }) {
+function MatchCard({ m }: { m: MatchPreview }) {
   const homeWon = m.fthg! > m.ftag!;
   const awayWon = m.ftag! > m.fthg!;
 
@@ -150,7 +150,7 @@ const Head2Head = ({
   h2h,
   homeTeam,
 }: {
-  h2h: head2Head | null;
+  h2h: H2H | null;
   homeTeam: string;
 }) => {
   const [hovered, setHovered] = useState<Segment | null>(null);

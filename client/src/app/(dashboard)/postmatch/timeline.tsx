@@ -1,7 +1,7 @@
-import { matchStats } from "@/types/drizzleTypes";
 import { MatchTimeline } from "@/lib/uiUtils";
 import { edgeFor, matchColors } from "@/lib/array";
 import { cn } from "@/lib/utils";
+import { MatchStats } from "@epl/shared";
 
 type KeyStat = {
   label: string;
@@ -100,7 +100,7 @@ function KeyStatistics({
   match,
   onShowStats,
 }: {
-  match: matchStats;
+  match: MatchStats;
   onShowStats: () => void;
 }) {
   const homeName = match.homeTeam;
@@ -165,7 +165,7 @@ export default function Timeline({
   match,
   onShowStats,
 }: {
-  match: matchStats;
+  match: MatchStats;
   onShowStats: () => void;
 }) {
   return (
