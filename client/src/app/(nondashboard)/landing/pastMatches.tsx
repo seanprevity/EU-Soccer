@@ -90,7 +90,7 @@ export function PastMatchesList({ matches }: { matches: matchPreview[] }) {
           <li key={m.id}>
             <Link
               href={`/postmatch/${m.id}`}
-              className="flex items-center gap-3 rounded-md border-l-4 border-gray-300 bg-[#f8f8f8] p-3 no-underline transition-transform duration-200 ease-in-out hover:-translate-y-[2px] hover:shadow-lg dark:border-gray-500 dark:bg-gray-700"
+              className="flex items-center gap-3 rounded-md border-l-4 border-gray-300 bg-[#f8f8f8] p-3 no-underline transition-transform duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg dark:border-gray-500 dark:bg-gray-700"
             >
               <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600 dark:bg-gray-700 dark:text-white">
                 FT

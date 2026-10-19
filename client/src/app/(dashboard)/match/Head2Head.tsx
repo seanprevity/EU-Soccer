@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { cn, getLogoFile } from "@/lib/utils";
-import { edgeFor, luminance, matchColors } from "@/lib/array";
+import { edgeFor, matchColors } from "@/lib/array";
 import { head2Head, matchPreview } from "@/types/drizzleTypes";
 import { useGet5H2HMatchesQuery } from "@/state/api";
 import { RedCardBadge } from "@/lib/uiUtils";

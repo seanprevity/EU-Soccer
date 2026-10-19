@@ -3,16 +3,6 @@ export interface players {
   imageUrl: string | null;
 }
 
-export interface leagues {
-  name: string;
-  country: string;
-}
-
-export interface teams {
-  id: number;
-  teamName: string;
-}
-
 export interface upcomingMatches {
   id: number;
   matchDate: string;

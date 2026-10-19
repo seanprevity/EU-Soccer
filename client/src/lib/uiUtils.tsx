@@ -2,7 +2,6 @@ import {
   LineupPlayer,
   MatchEvent,
   MatchLineups,
-  Standings,
   TeamLineup,
   teamStats,
 } from "@/types/drizzleTypes";
@@ -10,6 +9,7 @@ import React from "react";
 import { calculatePercentage, cn, formationLayout, getLogoFile } from "./utils";
 import Image from "next/image";
 import Link from "next/link";
+import { Standing } from "@epl/shared";
 
 export const renderForm = (formString: string | null) => {
   if (!formString) return null;
@@ -33,7 +33,7 @@ export const renderForm = (formString: string | null) => {
     return (
       <span
         key={index}
-        className={`inline-flex items-center justify-center w-[18px] h-[18px] rounded-full text-white font-bold ${colorClass}`}
+        className={`inline-flex items-center justify-center w-18px h-18px rounded-full text-white font-bold ${colorClass}`}
       >
         <span className={textClass}>{symbol}</span>
       </span>
@@ -76,7 +76,7 @@ export const StatBar = ({
       </div>
       <div className="flex items-center justify-between w-full">
         <div className="flex justify-start w-1/2 pr-0.5 sm:pr-1">
-          <div className="relative w-full h-[6px] sm:h-[8px] bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden flex justify-end">
+          <div className="relative w-full h-6px sm:h-8px bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden flex justify-end">
             <div
               className={`${homeColor} h-full rounded-full transition-all duration-300`}
               style={{
@@ -86,7 +86,7 @@ export const StatBar = ({
           </div>
         </div>
         <div className="flex justify-start w-1/2 pl-0.5 sm:pl-1">
-          <div className="relative w-full h-[6px] sm:h-[8px] bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+          <div className="relative w-full h-6px sm:h-8px bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
             <div
               className={`${awayColor} h-full rounded-r-full transition-all duration-300`}
               style={{
@@ -107,7 +107,7 @@ export function RenderCard({
   className,
 }: {
   teamLabel: string;
-  record: Standings;
+  record: Standing;
   mode: string;
   className?: string;
 }) {
@@ -116,7 +116,7 @@ export function RenderCard({
   return (
     <div
       className={cn(
-        "flex-1 p-6 bg-gradient-to-br rounded-xl shadow-lg border border-white/20",
+        "flex-1 p-6 bg-linear-to-br rounded-xl shadow-lg border border-white/20",
         modeColor,
         className,
       )}
@@ -210,7 +210,7 @@ function TeamStatsRow({
       </div>
       <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${isPositive ? "from-sky-500 to-sky-600" : "from-gray-500 to-gray-500"}`}
+          className={`h-full rounded-full transition-all duration-500 bg-linear-to-r ${isPositive ? "from-sky-500 to-sky-600" : "from-gray-500 to-gray-500"}`}
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -277,7 +277,7 @@ export function TeamStatsCard({
   const goalsMinusXg = teamStandings.gf - teamStandings.xg;
   return (
     <div
-      className={`flex flex-col gap-2 min-w-[250px] max-w-[350px] flex-1 p-6 rounded-xl shadow-md bg-gray-100 dark:bg-gray-800/40`}
+      className={`flex flex-col gap-2 min-w-250px max-w-350px flex-1 p-6 rounded-xl shadow-md bg-gray-100 dark:bg-gray-800/40`}
     >
       <div className="flex justify-center items-center">
         <Image
@@ -285,7 +285,7 @@ export function TeamStatsCard({
           alt={`${teamStandings.name} logo`}
           width={60}
           height={60}
-          className="w-[60px] h-[60px] object-contain"
+          className="w-60px h-60px object-contain"
         />
       </div>
       <h3 className="text-2xl font-bold text-center dark:text-gray-200">
@@ -313,7 +313,7 @@ export function TeamStatsCard({
 
       {teamStandings.form && (
         <div className="flex flex-col items-center mb-2">
-          <span className="px-1 py-2 justify-center gap-[2px] flex">
+          <span className="px-1 py-2 justify-center gap-2px flex">
             {renderForm(teamStandings.form)}
           </span>
         </div>
@@ -479,7 +479,7 @@ export const getBorderLabel = (borderColor: string): string => {
 export function RedCardBadge({ count }: { count: number | null | undefined }) {
   if (typeof count !== "number" || count <= 0) return null;
   return (
-    <div className="absolute -right-1 -top-1 flex h-[10px] w-[10px] items-center justify-center">
+    <div className="absolute -right-1 -top-1 flex h-10px w-10px items-center justify-center">
       <Image
         src="/Red.svg"
         alt="Red card"
@@ -501,7 +501,7 @@ export function FormationPitch({ lineup }: { lineup: TeamLineup }) {
   if (!placed) return null; // show MatchLineupList instead
 
   return (
-    <div className="relative aspect-[3/4] w-full rounded bg-green-700">
+    <div className="relative aspect-3/4 w-full rounded bg-green-700">
       {placed.map(({ player, x, y }) => (
         <div
           key={player.espnId || player.name}
@@ -893,7 +893,7 @@ function SideCell({
       aria-hidden
       className={cn(
         "h-px w-6 shrink-0 from-gray-400 to-transparent dark:from-gray-600",
-        align === "right" ? "bg-gradient-to-r" : "bg-gradient-to-l",
+        align === "right" ? "bg-linear-to-r" : "bg-linear-to-l",
       )}
     />
   );

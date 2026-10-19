@@ -4,10 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
 import { useGetStandingsQuery } from "@/state/api";
-import { matchStats, Standings } from "@/types/drizzleTypes";
+import { matchStats } from "@/types/drizzleTypes";
 import { cn, generateSeasons, getLogoFile, HEADER_CONFIG } from "@/lib/utils";
 import { renderForm } from "@/lib/uiUtils";
 import { matchColors } from "@/lib/array";
+import { Standing } from "@epl/shared";
 
 const TABLE_HEADERS = HEADER_CONFIG.filter((h) => h.key !== "expectedPosition");
 
@@ -20,7 +21,7 @@ const seasonFor = (matchDate: string) => {
 
 const teamHref = (team: string) => `/team/${team.split(" ").join("_")}`;
 
-function Cell({ team, column }: { team: Standings; column: string }) {
+function Cell({ team, column }: { team: Standing; column: string }) {
   switch (column) {
     case "name":
       return (
@@ -40,7 +41,7 @@ function Cell({ team, column }: { team: Standings; column: string }) {
       );
     case "form":
       return (
-        <span className="flex justify-center gap-[2px]">
+        <span className="flex justify-center gap-2px">
           {renderForm(team.form)}
         </span>
       );
@@ -52,7 +53,7 @@ function Cell({ team, column }: { team: Standings; column: string }) {
         </>
       );
     default:
-      return <>{team[column as keyof Standings] ?? "–"}</>;
+      return <>{team[column as keyof Standing] ?? "–"}</>;
   }
 }
 

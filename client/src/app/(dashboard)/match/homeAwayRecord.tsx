@@ -1,9 +1,10 @@
 "use client";
 
-import { HomeAwayStats, Standings } from "@/types/drizzleTypes";
+import { HomeAwayStats } from "@/types/drizzleTypes";
 import { cn, getLogoFile } from "@/lib/utils";
 import Image from "next/image";
 import { useGetHomeAwayMatchStatsQuery } from "@/state/api";
+import { Standing } from "@epl/shared";
 
 type Split = "HOME" | "AWAY";
 
@@ -69,7 +70,7 @@ const fromTeamView = (m: HomeAwayStats, split: Split) => {
 };
 
 function toSplitStats(
-  r: Standings | undefined,
+  r: Standing | undefined,
   matches: HomeAwayStats[] | undefined,
   split: Split,
 ): SplitStats | null {
@@ -277,7 +278,7 @@ const HomeAwayRecord = ({
   homeTeam,
   awayTeam,
 }: {
-  stats: Standings[];
+  stats: Standing[];
   homeTeam: string;
   awayTeam: string;
 }) => {

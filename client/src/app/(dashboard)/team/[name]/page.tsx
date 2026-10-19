@@ -24,10 +24,10 @@ export default function Page({
   const tab = useAppSelector((state) => state.global.tab);
   // use teamId to return team name then get stats? or just use id?
   const { data: team, isLoading: teamLoading } = useGetTeamByNameQuery({
-    name,
+    name: name.split("_").join(" "),
   });
   const { data: league, isLoading: leagueLoading } = useGetLeagueByTeamQuery({
-    team: name,
+    name: name.split("_").join(" "),
   });
 
   if (teamLoading || leagueLoading) {
@@ -66,7 +66,7 @@ export default function Page({
             <React.Fragment key={t}>
               <button
                 onClick={() => dispatch(setTab(t as typeof tab))}
-                className={`px-3 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm md:text-base font-semibold transition-all duration-300 w-[125px] sm:w-[130px] md:w-[150px] text-center rounded-lg shadow-sm cursor-pointer ${
+                className={`px-3 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm md:text-base font-semibold transition-all duration-300 w-125px sm:w-130px md:w-150px text-center rounded-lg shadow-sm cursor-pointer ${
                   tab === t
                     ? "bg-[#38003c] text-white dark:bg-gray-600 dark:text-white scale-102 ring-1 ring-[#38003c]/20 dark:ring-gray-500/30"
                     : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"

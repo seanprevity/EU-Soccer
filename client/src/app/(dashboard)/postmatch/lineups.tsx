@@ -10,7 +10,7 @@ import {
 } from "@/types/drizzleTypes";
 import { cn, formationLayout, getLogoFile } from "@/lib/utils";
 import { ArrowBadge, EventIcon, formatMinute, SubStack } from "@/lib/uiUtils";
-import { edgeFor, matchColors } from "@/lib/array";
+import { matchColors } from "@/lib/array";
 
 type Side = "home" | "away";
 type CardKind = "yellow" | "red" | "second_yellow";
@@ -213,7 +213,7 @@ function Pitch({
   return (
     <div
       ref={ref}
-      className="relative mx-auto aspect-[679/1027] w-full max-w-md overflow-hidden rounded-lg bg-green-700 bg-cover bg-center"
+      className="relative mx-auto aspect-679/1027 w-full max-w-md overflow-hidden rounded-lg bg-green-700 bg-cover bg-center"
       style={{ backgroundImage: "url(/pitch.svg)" }}
     >
       <Image

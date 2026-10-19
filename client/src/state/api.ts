@@ -5,8 +5,6 @@ import {
   topPlayers,
   odds,
   teamStats,
-  teams,
-  leagues,
   SquadPlayer,
   simulation,
   TopPlayerCategory,
@@ -21,6 +19,10 @@ import {
   Standing,
   expectedStandingSchema,
   standingSchema,
+  Team,
+  teamSchema,
+  League,
+  leagueSchema,
 } from "@epl/shared";
 import { withToast } from "@/lib/utils";
 import { z } from "zod";
@@ -112,7 +114,7 @@ export const api = createApi({
       { teams: string[] }
     >({
       query: ({ teams }) => ({
-        url: "standings/expected",
+        url: "/standings/expected",
         method: "GET",
         params: { teams: teams.join(",") },
       }),
@@ -327,11 +329,13 @@ export const api = createApi({
     }),
 
     // returns team, basically just the name, used for future fetches
-    getTeamByName: build.query<teams, { name: string }>({
+    getTeamByName: build.query<Team, { name: string }>({
       query: ({ name }) => ({
-        url: `/teams?team=${name}`,
+        url: `/teams`,
         method: "GET",
+        params: { name },
       }),
+      transformResponse: (raw: unknown) => teamSchema.parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get team by name.",
@@ -339,14 +343,13 @@ export const api = createApi({
       },
     }),
 
-    getLeagueByTeam: build.query<leagues, { team: string }>({
-      query: ({ team }) => {
-        const normalizedTeam = team.split(" ").join("_");
-        return {
-          url: `/teams/league?team=${normalizedTeam}`,
-          method: "GET",
-        };
-      },
+    getLeagueByTeam: build.query<League, { name: string }>({
+      query: ({ name }) => ({
+        url: `/teams/league`,
+        method: "GET",
+        params: { name },
+      }),
+      transformResponse: (raw: unknown) => leagueSchema.parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to get league by team.",
