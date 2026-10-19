@@ -255,7 +255,7 @@ const Odds = ({
             </p>
           )}
           <div className="overflow-x-auto rounded-lg shadow-sm">
-            <table className="w-full min-w-420px border-collapse text-sm">
+            <table className="w-full min-w-[420px] border-collapse text-sm">
               <thead className="bg-[#38003c] text-white dark:bg-gray-900">
                 <tr>
                   <th className="px-3 py-2 text-left font-semibold">
@@ -289,7 +289,7 @@ const Odds = ({
                             <span
                               title={isBest ? "Best available odds" : undefined}
                               className={cn(
-                                "inline-block min-w-3.25rem rounded px-2 py-1 font-semibold tabular-nums",
+                                "inline-block min-w-[3.25rem] rounded px-2 py-1 font-semibold tabular-nums",
                                 isBest
                                   ? "bg-green-100 text-green-800 ring-1 ring-green-300 dark:bg-green-900/50 dark:text-green-200 dark:ring-green-700"
                                   : "text-gray-700 dark:text-gray-300",

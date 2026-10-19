@@ -66,7 +66,7 @@ function EventColumn({
       )}
     >
       {lines.map((l) => (
-        <li key={l.key} className="wrap-break-word">
+        <li key={l.key} className="break-words">
           {l.player}{" "}
           <span className="tabular-nums text-gray-500 dark:text-gray-400">
             {l.minutes.join(", ")}

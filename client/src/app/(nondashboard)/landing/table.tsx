@@ -170,7 +170,7 @@ export default function Table() {
           </div>
           <div className="ml-auto hidden shrink-0 items-center gap-2 sm:flex">
             <div
-              className="relative h-28px w-28px shrink-0 md:h-36px md:w-36px"
+              className="relative h-[28px] w-[28px] flex-shrink-0 md:h-[36px] md:w-[36px]"
               title={league}
             >
               <Image
@@ -203,7 +203,7 @@ export default function Table() {
                     key={key}
                     onClick={() => handleSort(key)}
                     className={`px-1 py-2 text-center font-semibold cursor-pointer select-none hover:bg-white/10 text-[0.65rem] sm:text-[0.75rem] md:text-[0.85rem]
-                      ${key === "position" ? "w-60px sm:w-80px" : ""}
+                      ${key === "position" ? "w-[60px] sm:w-[80px]" : ""}
                     `}
                   >
                     {label}
@@ -290,7 +290,7 @@ export default function Table() {
                           className="no-underline flex items-center hover:opacity-90 transition-opacity"
                         >
                           <div className="flex items-center gap-2">
-                            <div className="relative w-20px h-20px sm:w-24px sm:h-24px shrink-0 md:w-28px md:h-28px">
+                            <div className="relative w-[20px] h-[20px] sm:w-[24px] sm:h-[24px] flex-shrink-0 md:w-[28px] md:h-[28px]">
                               <Image
                                 src={`/${logo}`}
                                 alt={`${team.name} logo`}
@@ -328,7 +328,7 @@ export default function Table() {
                       <td className="px-1 py-2 text-center text-black dark:text-gray-200">
                         {team.points}
                       </td>
-                      <td className="px-1 py-2 justify-center gap-2px flex">
+                      <td className="px-1 py-2 justify-center gap-[2px] flex">
                         {renderForm(team.form)}
                       </td>
                     </tr>
@@ -353,7 +353,7 @@ export default function Table() {
               transition: { duration: 0.15 },
             }}
             transition={{ duration: 1, ease: [0.45, 0, 0.55, 1] }}
-            className={`w-full lg:w-280px shrink-0 overflow-hidden`}
+            className={`w-full lg:w-280px flex-shrink-0 overflow-hidden`}
           >
             <div className="mb-3 flex items-center justify-between gap-2 border-b border-gray-200 pb-1 dark:border-gray-400">
               <h3 className="truncate text-lg font-semibold text-[#38003c] dark:text-gray-200">
@@ -394,7 +394,7 @@ export default function Table() {
                       <span className="text-sm font-bold text-gray-800 dark:text-gray-200 w-5 text-center">
                         {p.rank}
                       </span>
-                      <div className="relative w-38px h-38px shrink-0 rounded-full overflow-hidden">
+                      <div className="relative w-[38px] h-[38px] flex-shrink-0 rounded-full overflow-hidden">
                         <Image
                           src={p.imageUrl || "/placeholder-player.svg"}
                           alt={`${p.player} picture`}
@@ -407,7 +407,7 @@ export default function Table() {
                           {p.player}
                         </span>
                         <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-300">
-                          <div className="relative w-16px h-16px shrink-0">
+                          <div className="relative w-[16px] h-[16px] flex-shrink-0">
                             <Image
                               src={`/${getLogoFile(p.team)}`}
                               alt={`${p.team} logo`}

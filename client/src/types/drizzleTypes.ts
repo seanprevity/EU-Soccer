@@ -140,25 +140,6 @@ export interface odds {
   match: upcomingMatches | null;
 }
 
-export interface teamStats {
-  name: string;
-  won: number;
-  draw: number;
-  lost: number;
-  xg: number;
-  gf: number;
-  ga: number;
-  gd: number;
-  shots: number;
-  shotsOnTarget: number;
-  form: string;
-  played: number;
-  corners: number;
-  yellows: number;
-  reds: number;
-  goalEvents: JSON;
-}
-
 export interface SquadPlayer {
   id: number;
   player: string;

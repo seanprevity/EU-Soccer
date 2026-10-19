@@ -23,7 +23,7 @@ const Header = ({
 
   if (!league || isStandingsLoading) {
     return (
-      <div className="flex justify-center items-center h-130px bg-gray-100 dark:bg-gray-900 rounded-md">
+      <div className="flex justify-center items-center h-[130px] bg-gray-100 dark:bg-gray-900 rounded-md">
         <p className="text-gray-600 dark:text-gray-300 animate-pulse">
           Loading Team Data...
         </p>
@@ -35,7 +35,7 @@ const Header = ({
     <header className="flex flex-col sm:flex-row justify-center sm:justify-between items-center gap-6 sm:gap-8 bg-white dark:bg-gray-900 px-6 sm:px-10 py-6 shadow-sm">
       {/* Team logo + info */}
       <div className="flex items-center gap-3 sm:gap-5">
-        <div className="relative w-55px h-55px sm:w-70px sm:h-70px md:w-80px md:h-80px lg:w-90px lg:h-90px drop-shadow-md">
+        <div className="relative w-[55px] h-[55px] sm:w-[70px] sm:h-[70px] md:w-[80px] md:h-[80px] lg:w-[90px] lg:h-[90px] drop-shadow-md">
           <Image
             src={`/${getLogoFile(team)}`}
             alt={`${team} logo`}
@@ -91,7 +91,7 @@ const Header = ({
 
               <td className="py-1 px-2 text-left">
                 <div className="flex items-center gap-2">
-                  <div className="relative w-18px h-18px sm:w-20px sm:h-20px shrink-0">
+                  <div className="relative w-[18px] h-[18px] sm:w-[20px] sm:h-[20px] flex-shrink-0">
                     <Image
                       src={`/${getLogoFile(standing?.name ?? "")}`}
                       alt={`${standing?.name} logo`}
@@ -99,7 +99,7 @@ const Header = ({
                       className="object-contain"
                     />
                   </div>
-                  <span className="truncate text-xs md:text-sm max-w-170px sm:max-w-65px md:max-w-170px">
+                  <span className="truncate text-xs md:text-sm max-w-[170px] sm:max-w-[65px] md:max-w-[170px]">
                     {standing?.name}
                   </span>
                 </div>
@@ -115,7 +115,7 @@ const Header = ({
       </button>
 
       {/* Country Logo */}
-      <div className="relative w-65px h-65px sm:w-80px sm:h-80px drop-shadow-md">
+      <div className="relative w-[65px] h-[65px] sm:w-[80px] sm:h-[80px] drop-shadow-md">
         <Image
           src={`${getCountryFile(league?.country ?? "")}`}
           alt={`${league?.country || "League"} logo`}

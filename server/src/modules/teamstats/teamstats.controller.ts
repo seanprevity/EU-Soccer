@@ -3,49 +3,22 @@ import {
   getLast5TeamStatsService,
   getSeasonTeamStatsService,
 } from "./teamstats.service";
+import { Validated } from "../../middleware/validation";
+import { getTeamStatsSchemas } from "./teamstats.schemas";
+import { TeamStatsPair } from "@epl/shared";
 
 export const getSeasonTeamStats = async (
-  req: Request,
-  res: Response,
+  _req: Request,
+  res: Response<TeamStatsPair, Validated<typeof getTeamStatsSchemas>>,
 ): Promise<void> => {
-  try {
-    const team1 = req.query.team1 as string;
-    const team2 = req.query.team2 as string;
-    const normalizedTeam1 = team1.split("_").join(" ");
-    const normalizedTeam2 = team2.split("_").join(" ");
-
-    const data = await getSeasonTeamStatsService(
-      normalizedTeam1,
-      normalizedTeam2,
-    );
-    res.json(data);
-  } catch (err: any) {
-    console.error("Error fetching last 5 standings: ", err);
-    res.status(500).json({
-      message: `Error fetching a team's last 5 standings: ${err.message}`,
-    });
-  }
+  const { team1, team2 } = res.locals.validated.query;
+  res.json(await getSeasonTeamStatsService(team1, team2));
 };
 
 export const getLast5TeamStats = async (
-  req: Request,
-  res: Response,
+  _req: Request,
+  res: Response<TeamStatsPair, Validated<typeof getTeamStatsSchemas>>,
 ): Promise<void> => {
-  try {
-    const team1 = req.query.team1 as string;
-    const team2 = req.query.team2 as string;
-    const normalizedTeam1 = team1.split("_").join(" ");
-    const normalizedTeam2 = team2.split("_").join(" ");
-
-    const data = await getLast5TeamStatsService(
-      normalizedTeam1,
-      normalizedTeam2,
-    );
-    res.json(data);
-  } catch (err: any) {
-    console.error("Error fetching last 5 standings: ", err);
-    res.status(500).json({
-      message: `Error fetching a team's last 5 standings: ${err.message}`,
-    });
-  }
+  const { team1, team2 } = res.locals.validated.query;
+  res.json(await getLast5TeamStatsService(team1, team2));
 };

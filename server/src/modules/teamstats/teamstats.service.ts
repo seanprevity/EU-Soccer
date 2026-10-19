@@ -1,17 +1,18 @@
 import { standings, matchStats } from "../../../drizzle/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../../lib/db";
 import { curSeason } from "../../config/map";
 import {
   getLast5MatchStatsService,
   getTeamMatchStatsService,
 } from "../matches/matches.service";
+import { MatchStats, Standing, TeamStatsPair } from "@epl/shared";
 
 // Helper to calculate aggregate stats
 const calculateStats = (
   team: string,
-  matches: (typeof matchStats.$inferSelect)[],
-  standing?: typeof standings.$inferSelect,
+  matches: MatchStats[],
+  standing?: Standing,
 ) => {
   let shots = 0;
   let shotsOnTarget = 0;
@@ -123,46 +124,44 @@ const calculateLast5Stats = (
 export const getSeasonTeamStatsService = async (
   team1: string,
   team2: string,
-) => {
-  // Get standings info for both teams (where type === "TOTAL")
-  const [team1Standing] = await db
-    .select()
-    .from(standings)
-    .where(
-      and(
-        eq(standings.season, curSeason),
-        eq(standings.name, team1),
-        eq(standings.type, "TOTAL"),
+): Promise<TeamStatsPair> => {
+  const [teamStandings, team1Matches, team2Matches] = await Promise.all([
+    db
+      .select()
+      .from(standings)
+      .where(
+        and(
+          eq(standings.season, curSeason),
+          eq(standings.type, "TOTAL"),
+          inArray(standings.name, [team1, team2]),
+        ),
       ),
-    );
-
-  const [team2Standing] = await db
-    .select()
-    .from(standings)
-    .where(
-      and(
-        eq(standings.season, curSeason),
-        eq(standings.name, team2),
-        eq(standings.type, "TOTAL"),
-      ),
-    );
-
-  // Get all matches for this season for both teams
-  const team1Matches = await getTeamMatchStatsService(team1);
-  const team2Matches = await getTeamMatchStatsService(team2);
+    getTeamMatchStatsService(team1),
+    getTeamMatchStatsService(team2),
+  ]);
 
   return [
-    calculateStats(team1, team1Matches, team1Standing),
-    calculateStats(team2, team2Matches, team2Standing),
+    calculateStats(
+      team1,
+      team1Matches,
+      teamStandings.find((s) => s.name === team1),
+    ),
+    calculateStats(
+      team2,
+      team2Matches,
+      teamStandings.find((s) => s.name === team2),
+    ),
   ];
 };
 
 export const getLast5TeamStatsService = async (
   team1: string,
   team2: string,
-) => {
-  const last5Team1 = await getLast5MatchStatsService(team1);
-  const last5Team2 = await getLast5MatchStatsService(team2);
+): Promise<TeamStatsPair> => {
+  const [last5Team1, last5Team2] = await Promise.all([
+    getLast5MatchStatsService(team1),
+    getLast5MatchStatsService(team2),
+  ]);
 
   return [
     calculateLast5Stats(team1, last5Team1.matches),

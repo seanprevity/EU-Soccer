@@ -63,7 +63,7 @@ function UpcomingMatchCard({
 
   return (
     <Link href={`/match/${m.id}`} className="no-underline">
-      <div className="p-4 rounded-md bg-[#f8f8f8] dark:bg-gray-700 border-l-4 border-[#38003c] dark:border-gray-700 transition-transform duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg">
+      <div className="p-4 rounded-md bg-[#f8f8f8] dark:bg-gray-700 border-l-4 border-[#38003c] dark:border-gray-700 transition-transform duration-200 ease-in-out hover:-translate-y-[2px] hover:shadow-lg">
         <div className="flex items-center justify-between mb-2">
           {teamBlock(m.homeTeam)}
           <span className="text-gray-600 dark:text-gray-400 font-normal text-sm mx-2">
@@ -283,7 +283,7 @@ export default function Matches() {
 
       <div
         className="flex flex-col gap-4 overflow-y-auto pr-2 
-        [&::-webkit-scrollbar]:w-0.5 
+        [&::-webkit-scrollbar]:w-[2px] 
         [&::-webkit-scrollbar-track]:bg-[#f1f1f1] [&::-webkit-scrollbar-track]:rounded-[10px] dark:[&::-webkit-scrollbar-track]:bg-gray-800
         [&::-webkit-scrollbar-thumb]:bg-[#38003c] [&::-webkit-scrollbar-thumb]:rounded-[10px] dark:[&::-webkit-scrollbar-thumb]:bg-gray-400
         md:max-h-[97.23vh]"
@@ -304,7 +304,7 @@ export default function Matches() {
             return (
               <div key={league}>
                 <h2 className="flex items-center justify-center gap-2 text-2xl font-bold text-[#38003c] dark:text-gray-300 mb-3 border-b border-gray-200 dark:border-gray-400 pb-1">
-                  <div className="relative h-40px w-40px shrink-0">
+                  <div className="relative h-[40px] w-[40px] flex-shrink-0">
                     <Image
                       src={getLeagueFile(league)}
                       alt={`${league} logo`}

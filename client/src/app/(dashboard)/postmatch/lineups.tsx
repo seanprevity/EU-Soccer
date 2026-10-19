@@ -213,7 +213,7 @@ function Pitch({
   return (
     <div
       ref={ref}
-      className="relative mx-auto aspect-679/1027 w-full max-w-md overflow-hidden rounded-lg bg-green-700 bg-cover bg-center"
+      className="relative mx-auto aspect-[679/1027] w-full max-w-md overflow-hidden rounded-lg bg-green-700 bg-cover bg-center"
       style={{ backgroundImage: "url(/pitch.svg)" }}
     >
       <Image

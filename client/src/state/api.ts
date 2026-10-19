@@ -4,7 +4,6 @@ import {
   upcomingMatches,
   topPlayers,
   odds,
-  teamStats,
   SquadPlayer,
   simulation,
   TopPlayerCategory,
@@ -23,6 +22,8 @@ import {
   teamSchema,
   League,
   leagueSchema,
+  TeamStatsPair,
+  teamStatsPairSchema,
 } from "@epl/shared";
 import { withToast } from "@/lib/utils";
 import { z } from "zod";
@@ -147,17 +148,15 @@ export const api = createApi({
 
     // returns teamStats on the season for two teams
     getSeasonTeamStats: build.query<
-      teamStats[],
+      TeamStatsPair,
       { team1: string; team2: string }
     >({
-      query: ({ team1, team2 }) => {
-        const team1Params = team1.split(" ").join("_");
-        const team2Params = team2.split(" ").join("_");
-        return {
-          url: `/teamstats/season?team1=${team1Params}&team2=${team2Params}`,
-          method: "GET",
-        };
-      },
+      query: ({ team1, team2 }) => ({
+        url: `/teamstats/season`,
+        method: "GET",
+        params: { team1, team2 },
+      }),
+      transformResponse: (raw: unknown) => teamStatsPairSchema.parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to fetch season team stats.",
@@ -167,17 +166,15 @@ export const api = createApi({
 
     // returns stats for two teams based on last 5 matches
     getLast5TeamStats: build.query<
-      teamStats[],
+      TeamStatsPair,
       { team1: string; team2: string }
     >({
-      query: ({ team1, team2 }) => {
-        const team1Params = team1.split(" ").join("_");
-        const team2Params = team2.split(" ").join("_");
-        return {
-          url: `/teamstats/last5?team1=${team1Params}&team2=${team2Params}`,
-          method: "GET",
-        };
-      },
+      query: ({ team1, team2 }) => ({
+        url: `/teamstats/last5`,
+        method: "GET",
+        params: { team1, team2 },
+      }),
+      transformResponse: (raw: unknown) => teamStatsPairSchema.parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to fetch last 5 team stats.",

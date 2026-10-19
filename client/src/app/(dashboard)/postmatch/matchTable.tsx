@@ -41,7 +41,7 @@ function Cell({ team, column }: { team: Standing; column: string }) {
       );
     case "form":
       return (
-        <span className="flex justify-center gap-2px">
+        <span className="flex justify-center gap-[2px]">
           {renderForm(team.form)}
         </span>
       );

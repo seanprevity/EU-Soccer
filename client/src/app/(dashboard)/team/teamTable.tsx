@@ -145,7 +145,7 @@ const TeamTable = ({
                   key={key}
                   onClick={() => handleSort(key)}
                   className={`px-1 py-2 text-center font-semibold cursor-pointer select-none hover:bg-white/10 text-[0.65rem] sm:text-[0.75rem] md:text-[0.85rem]
-                      ${key === "position" ? "w-60px sm:w-80px" : ""}
+                      ${key === "position" ? "w-[60px] sm:w-[80px]" : ""}
                     `}
                 >
                   {label}
@@ -249,7 +249,7 @@ const TeamTable = ({
                       className="no-underline flex items-center hover:opacity-90 transition-opacity"
                     >
                       <div className="flex items-center gap-2">
-                        <div className="relative w-20px h-20px sm:w-24px sm:h-24px shrink-0 md:w-28px md:h-28px">
+                        <div className="relative w-[20px] h-[20px] sm:w-[24px] sm:h-[24px] flex-shrink-0 md:w-[28px] md:h-[28px]">
                           <Image
                             src={`/${logo}`}
                             alt={`${team.name} logo`}
@@ -287,7 +287,7 @@ const TeamTable = ({
                   <td className="px-1 py-2 text-center text-black dark:text-gray-200">
                     {team.points}
                   </td>
-                  <td className="px-1 py-2 justify-center gap-2px flex">
+                  <td className="px-1 py-2 justify-center gap-[2px] flex">
                     {renderForm(team.form)}
                   </td>
                 </tr>
