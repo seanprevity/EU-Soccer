@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { matchPreviewSchema } from "./match-stats";
+import { idListSchema } from "./common";
 
 export const h2hSchema = z.object({
   team1: z.string(),
@@ -38,15 +39,7 @@ export const h2hMatchesResponseSchema = z.object({
 });
 
 export const upcomingH2HQuerySchema = z.object({
-  ids: z
-    .string()
-    .transform((s) =>
-      s
-        .split(",")
-        .map((id) => id.trim())
-        .filter((id) => id !== ""),
-    )
-    .pipe(z.array(z.coerce.number<string>().int().positive()).min(1).max(300)),
+  ids: idListSchema,
 });
 
 export type H2HQuery = z.infer<typeof h2hQuerySchema>;
