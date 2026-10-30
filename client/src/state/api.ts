@@ -32,6 +32,8 @@ import {
   simulationResultSchema,
   HomeAwayMatches,
   homeAwayMatchesSchema,
+  LiveMatch,
+  liveMatchSchema,
 } from "@epl/shared";
 import { withToast } from "@/lib/utils";
 import { z } from "zod";
@@ -437,6 +439,14 @@ export const api = createApi({
       }),
       transformResponse: (raw: unknown) => homeAwayMatchesSchema.parse(raw),
     }),
+
+    getLiveMatches: build.query<LiveMatch[], void>({
+      query: () => ({
+        url: "matches/live",
+        method: "GET",
+      }),
+      transformResponse: (raw: unknown) => z.array(liveMatchSchema).parse(raw),
+    }),
   }),
 });
 
@@ -464,6 +474,7 @@ export const {
   useGetSimulationQuery,
   useGetTeamsExpectedStandingsQuery,
   useGetHomeAwayMatchStatsQuery,
+  useGetLiveMatchesQuery,
 } = api;
 
 export const { endpoints } = api;

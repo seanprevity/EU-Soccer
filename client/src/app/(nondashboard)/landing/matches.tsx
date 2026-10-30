@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import {
+  useGetLiveMatchesQuery,
   useGetPastMatchesQuery,
   useGetUpcomingHead2HeadQuery,
   useGetUpcomingMatchesQuery,
@@ -21,7 +22,53 @@ import { useAppSelector } from "@/state/redux";
 import { useDispatch } from "react-redux";
 import { setMatchDate } from "@/state";
 import { edgeFor, matchColors } from "@/lib/array";
-import { H2H, UpcomingMatch } from "@epl/shared";
+import { H2H, LiveMatch, UpcomingMatch } from "@epl/shared";
+
+function TeamBlock({ team }: { team: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1 w-2/5 font-semibold text-sm text-gray-800 dark:text-gray-300 text-center">
+      <div className="relative w-6 h-6 mb-1">
+        <Image
+          src={`/${getLogoFile(team)}`}
+          alt={`${team} logo`}
+          fill
+          className="object-contain"
+        />
+      </div>
+      <span>{team}</span>
+    </div>
+  );
+}
+
+function LiveMatchCard({ match }: { match: LiveMatch }) {
+  const isHalfTime = match.status === "STATUS_HALFTIME";
+
+  let statusText = `Live · ${match.clock ?? ""}`;
+  if (isHalfTime) statusText = "Half time";
+
+  return (
+    <div className="p-4 rounded-md bg-[#f8f8f8] dark:bg-gray-700 border-l-4 border-red-600">
+      <div className="mb-2 flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
+        {/* Pulsing dot: one dot that pings outward behind a solid one */}
+        <span className="relative flex h-2 w-2">
+          {!isHalfTime && (
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+          )}
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
+        </span>
+        {statusText}
+      </div>
+
+      <div className="flex items-center justify-between">
+        <TeamBlock team={match.homeTeam} />
+        <span className="mx-2 text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+          {match.homeScore} – {match.awayScore}
+        </span>
+        <TeamBlock team={match.awayTeam} />
+      </div>
+    </div>
+  );
+}
 
 function UpcomingMatchCard({
   match: m,
@@ -165,10 +212,20 @@ function UpcomingMatchCard({
 }
 
 export default function Matches() {
-  const { data: upcomingMatches, isLoading: isUpcomingLoading } =
-    useGetUpcomingMatchesQuery();
-  const { data: pastMatches, isLoading: isPastLoading } =
-    useGetPastMatchesQuery();
+  const {
+    data: upcomingMatches,
+    isLoading: isUpcomingLoading,
+    refetch: refetchUpcoming,
+  } = useGetUpcomingMatchesQuery();
+  const {
+    data: pastMatches,
+    isLoading: isPastLoading,
+    refetch: refetchPast,
+  } = useGetPastMatchesQuery();
+  const { data: liveMatches } = useGetLiveMatchesQuery(undefined, {
+    pollingInterval: 30_000,
+  });
+
   const { data: h2hData, isFetching: isH2HFetching } =
     useGetUpcomingHead2HeadQuery(
       { ids: upcomingMatches?.map((m) => m.id) },
@@ -217,6 +274,40 @@ export default function Matches() {
 
   const todayKey = new Date().toDateString();
   const selectedKey = new Date(selectedDate).toDateString();
+  // Live matches for the selected day, grouped by league
+  const live = useMemo(() => {
+    const byLeague: Record<string, LiveMatch[]> = {};
+    const fixtures = new Set<string>(); // "Home|Away", used to hide them from upcoming
+    let count = 0;
+
+    for (const match of liveMatches ?? []) {
+      if (new Date(match.kickoff).toDateString() !== selectedKey) continue;
+
+      if (!byLeague[match.league]) byLeague[match.league] = [];
+      byLeague[match.league].push(match);
+      fixtures.add(`${match.homeTeam}|${match.awayTeam}`);
+      count++;
+    }
+
+    return { byLeague, fixtures, count };
+  }, [liveMatches, selectedKey]);
+
+  // When a match goes live or finishes, the other two lists are out of date
+  const liveIds = (liveMatches ?? [])
+    .map((match) => match.espnId)
+    .sort()
+    .join(",");
+  const previousLiveIds = useRef<string | null>(null);
+
+  useEffect(() => {
+    const changed =
+      previousLiveIds.current !== null && previousLiveIds.current !== liveIds;
+    if (changed) {
+      refetchPast();
+      refetchUpcoming();
+    }
+    previousLiveIds.current = liveIds;
+  }, [liveIds, refetchPast, refetchUpcoming]);
   const dayStart = (d: Date | string) => {
     const x = new Date(d);
     x.setHours(0, 0, 0, 0);
@@ -242,7 +333,7 @@ export default function Matches() {
       {/* --- Date Selector --- */}
       <div
         ref={dateBarRef}
-        className="relative flex gap-2 overflow-x-auto mb-4 pb-2 scrollbar-thin scrollbar-thumb-[#38003c]"
+        className="relative flex gap-2 overflow-x-auto mb-4 pb-2 scrollbar-thin"
       >
         {dateRange.map((date) => {
           const dateStr = date.toISOString();
@@ -292,15 +383,20 @@ export default function Matches() {
           <p className="text-center text-gray-500 dark:text-gray-200 py-6">
             Loading Matches…
           </p>
-        ) : past.count + upcoming.count === 0 ? (
+        ) : past.count + upcoming.count + live.count === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-200 py-6">
             {emptyMessage}
           </p>
         ) : (
           LEAGUES.map((league) => {
             const finished = past.byLeague[league];
-            const scheduled = upcoming.byLeague[league];
-            if (!finished.length && !scheduled.length) return null;
+            const inPlay = live.byLeague[league] ?? [];
+            const scheduled = upcoming.byLeague[league].filter(
+              (match) =>
+                !live.fixtures.has(`${match.homeTeam}|${match.awayTeam}`),
+            );
+            if (!finished.length && !inPlay.length && !scheduled.length)
+              return null;
             return (
               <div key={league}>
                 <h2 className="flex items-center justify-center gap-2 text-2xl font-bold text-[#38003c] dark:text-gray-300 mb-3 border-b border-gray-200 dark:border-gray-400 pb-1">
@@ -318,6 +414,9 @@ export default function Matches() {
                   {finished.length > 0 && (
                     <PastMatchesList matches={finished} />
                   )}
+                  {inPlay.map((match) => (
+                    <LiveMatchCard key={match.espnId} match={match} />
+                  ))}
                   {scheduled.map((m) => (
                     <UpcomingMatchCard
                       key={m.id}
