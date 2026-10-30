@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import type {
   ApiError,
   HomeAwayMatches,
+  LiveMatch,
   MatchPreview,
   MatchStats,
   Odds,
@@ -19,6 +20,7 @@ import type {
 } from "./matches.schemas";
 import {
   getHomeAwayMatchesService,
+  getLiveMatchesService,
   getMatchStatsService,
   getOddsService,
   getPastMatchesService,
@@ -114,4 +116,11 @@ export const getHomeAwayMatches = async (
 ): Promise<void> => {
   const { homeTeam, awayTeam } = res.locals.validated.query;
   res.json(await getHomeAwayMatchesService(homeTeam, awayTeam));
+};
+
+export const getLiveMatches = async (
+  _req: Request,
+  res: Response<LiveMatch[]>,
+): Promise<void> => {
+  res.json(await getLiveMatchesService());
 };

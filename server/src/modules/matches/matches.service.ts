@@ -1,6 +1,18 @@
-import { and, count, desc, eq, gt, gte, inArray, lt, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  lt,
+  or,
+} from "drizzle-orm";
 import type {
   HomeAwayMatches,
+  LiveMatch,
   MatchPreview,
   MatchStats,
   Odds,
@@ -59,7 +71,12 @@ export const getMatchStatsService = async (
 };
 
 export const getUpcomingMatchesService = async (): Promise<UpcomingMatch[]> => {
-  return await db.select().from(upcomingMatches);
+  const now = new Date().toISOString();
+  return await db
+    .select()
+    .from(upcomingMatches)
+    .where(gt(upcomingMatches.matchDate, now))
+    .orderBy(asc(upcomingMatches.matchDate));
 };
 
 export const getPastMatchesService = (): Promise<MatchPreview[]> => {
@@ -278,4 +295,8 @@ export async function deleteStaleLiveMatches(): Promise<number> {
     .where(lt(liveMatches.kickoff, sixHoursAgo))
     .returning({ espnId: liveMatches.espnId });
   return deleted.length;
+}
+
+export async function getLiveMatchesService(): Promise<LiveMatch[]> {
+  return await db.select().from(liveMatches).orderBy(asc(liveMatches.kickoff));
 }
