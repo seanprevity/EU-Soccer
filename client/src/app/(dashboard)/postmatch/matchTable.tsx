@@ -4,10 +4,18 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
 import { useGetStandingsQuery } from "@/state/api";
-import { cn, generateSeasons, getLogoFile, HEADER_CONFIG } from "@/lib/utils";
+import {
+  cn,
+  genCurrentSeason,
+  generateSeasons,
+  getLogoFile,
+  HEADER_CONFIG,
+} from "@/lib/utils";
 import { renderForm } from "@/lib/uiUtils";
 import { matchColors } from "@/lib/array";
 import { MatchStats, Standing } from "@epl/shared";
+import { LiveStanding, useLiveStandings } from "@/lib/liveStandings";
+import { LiveScore, Movement } from "@/components/liveBadges";
 
 const TABLE_HEADERS = HEADER_CONFIG.filter((h) => h.key !== "expectedPosition");
 
@@ -20,23 +28,34 @@ const seasonFor = (matchDate: string) => {
 
 const teamHref = (team: string) => `/team/${team.split(" ").join("_")}`;
 
-function Cell({ team, column }: { team: Standing; column: string }) {
+function Cell({ team, column }: { team: LiveStanding; column: string }) {
   switch (column) {
+    case "position":
+      return (
+        <span className="inline-flex items-center justify-center gap-1">
+          {team.position}
+          <Movement value={team.movement} />
+        </span>
+      );
+
     case "name":
       return (
-        <Link
-          href={teamHref(team.name)}
-          className="flex min-w-max items-center gap-2 no-underline transition-opacity hover:opacity-70"
-        >
-          <Image
-            src={`/${getLogoFile(team.name)}`}
-            alt=""
-            width={24}
-            height={24}
-            className="h-5 w-5 shrink-0 object-contain sm:h-6 sm:w-6"
-          />
-          <span className="whitespace-nowrap">{team.name}</span>
-        </Link>
+        <span className="flex min-w-max items-center gap-2">
+          <Link
+            href={teamHref(team.name)}
+            className="flex items-center gap-2 no-underline transition-opacity hover:opacity-70"
+          >
+            <Image
+              src={`/${getLogoFile(team.name)}`}
+              alt=""
+              width={24}
+              height={24}
+              className="h-5 w-5 shrink-0 object-contain sm:h-6 sm:w-6"
+            />
+            <span className="whitespace-nowrap">{team.name}</span>
+          </Link>
+          {team.live && <LiveScore live={team.live} />}
+        </span>
       );
     case "form":
       return (
@@ -58,18 +77,22 @@ function Cell({ team, column }: { team: Standing; column: string }) {
 
 export default function MatchTable({ match }: { match: MatchStats }) {
   const season = match.matchDate ? seasonFor(match.matchDate) : null;
-  const { data, isLoading, isError } = useGetStandingsQuery(
+  const { data, isLoading, isError, refetch } = useGetStandingsQuery(
     { league: match.league, season: season ?? "" },
     { skip: !season },
   );
 
-  const rows = useMemo(
+  const baseRows = useMemo(
     () =>
       (data ?? [])
         .filter((t) => t.type === "TOTAL")
         .sort((a, b) => a.position - b.position),
     [data],
   );
+  const isCurrentSeason = season !== null && season === genCurrentSeason();
+  const rows = useLiveStandings(baseRows, isCurrentSeason, refetch);
+  const isLive = rows.some((row) => row.live !== null);
+
   const colors = matchColors(match.homeTeam, match.awayTeam);
   const rowColor = new Map([
     [match.homeTeam, colors.home],
@@ -103,8 +126,13 @@ export default function MatchTable({ match }: { match: MatchStats }) {
       className="space-y-3 rounded-lg bg-white px-4 pb-4 dark:bg-gray-900"
     >
       <div className="flex justify-center">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-white">
           {match.league} {season}
+          {isLive && (
+            <span className="text-xs font-medium text-red-600 dark:text-red-400">
+              · Live, as it stands
+            </span>
+          )}
         </h3>
       </div>
 

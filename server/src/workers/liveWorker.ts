@@ -65,6 +65,14 @@ async function finishMatches(
   // import match stats from ESPN
   await importEspnMatchesService(league, espnLeague, dayStart, { to: dayEnd });
 
+  // update standings after matches added to match stats
+  try {
+    await updateStandingsService(league, curSeason);
+    console.log(`[live] updated standings for ${league}`);
+  } catch (error) {
+    console.error(`[live] failed updating standings for ${league}:`, error);
+  }
+
   // delete finished matches from live table
   for (const match of finished) {
     await deleteLiveMatch(match.id);
@@ -72,14 +80,6 @@ async function finishMatches(
     console.log(
       `[live] finished ${match.id} ${match.rawHome} ${match.homeScore}-${match.awayScore} ${match.rawAway}`,
     );
-  }
-
-  // update standings after matches added to match stats
-  try {
-    await updateStandingsService(league, curSeason);
-    console.log(`[live] updated standings for ${league}`);
-  } catch (error) {
-    console.error(`[live] failed updating standings for ${league}:`, error);
   }
 }
 

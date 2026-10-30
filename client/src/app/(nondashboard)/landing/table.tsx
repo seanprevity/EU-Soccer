@@ -10,6 +10,7 @@ import {
   getLeagueFile,
   HEADER_CONFIG,
   cn,
+  genCurrentSeason,
 } from "@/lib/utils";
 import { renderForm } from "@/lib/uiUtils";
 import { useAppSelector } from "@/state/redux";
@@ -18,6 +19,8 @@ import Link from "next/link";
 import { useDispatch } from "react-redux";
 import { setLeague, setSeason } from "@/state";
 import { Standing, TopPlayerCategory } from "@epl/shared";
+import { StandingType, useLiveStandings } from "@/lib/liveStandings";
+import { LiveScore, Movement } from "@/components/liveBadges";
 
 const TOP_PLAYER_CATEGORIES: {
   key: TopPlayerCategory;
@@ -41,16 +44,17 @@ export default function Table() {
   const priority = useAppSelector((state) => state.global.priority);
   const league = useAppSelector((state) => state.global.league);
   const season = useAppSelector((state) => state.global.season);
-  const [type, setType] = useState("TOTAL");
+  const [type, setType] = useState<StandingType>("TOTAL");
   const [sortConfig, setSortConfig] = useState({
     key: "position",
     direction: "asc",
   });
   const seasons = generateSeasons();
-  const { data: teams, isLoading: isStandingsLoading } = useGetStandingsQuery({
-    league,
-    season,
-  });
+  const {
+    data: teams,
+    isLoading: isStandingsLoading,
+    refetch: refetchStandings,
+  } = useGetStandingsQuery({ league, season });
   const [category, setCategory] = useState<TopPlayerCategory>("goals");
   const activeCategory = TOP_PLAYER_CATEGORIES.find((c) => c.key === category);
 
@@ -63,8 +67,19 @@ export default function Table() {
 
   const filteredTeams = useMemo(() => {
     if (!teams) return [];
-    return teams.filter((t) => t.type === type);
+    return teams
+      .filter((t) => t.type === type)
+      .sort((a, b) => a.position - b.position);
   }, [teams, type]);
+
+  const isCurrentSeason = season === genCurrentSeason();
+  const liveTeams = useLiveStandings(
+    filteredTeams,
+    isCurrentSeason,
+    refetchStandings,
+    type,
+  );
+  const isLive = liveTeams.some((team) => team.live !== null);
 
   const handleSort = (key: string) => {
     setSortConfig((prev) => {
@@ -79,8 +94,7 @@ export default function Table() {
   };
 
   const sortedTeams = useMemo(() => {
-    if (!filteredTeams) return [];
-    return [...filteredTeams].sort((a, b) => {
+    return [...liveTeams].sort((a, b) => {
       const key = sortConfig.key as keyof Standing;
       let aVal = a[key];
       let bVal = b[key];
@@ -100,7 +114,7 @@ export default function Table() {
       if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
       return 0;
     });
-  }, [filteredTeams, sortConfig]);
+  }, [liveTeams, sortConfig]);
 
   // Sort and ranks top players
   const rankedPlayers = useMemo(() => {
@@ -145,7 +159,7 @@ export default function Table() {
             </select>
 
             <div className="flex gap-2 w-full sm:w-auto">
-              {["TOTAL", "HOME", "AWAY"].map((t) => {
+              {(["TOTAL", "HOME", "AWAY"] as const).map((t) => {
                 const label = t.charAt(0) + t.substring(1).toLowerCase();
                 return (
                   <button
@@ -191,6 +205,16 @@ export default function Table() {
             </span>
           </div>
         </div>
+
+        {isLive && (
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
+            </span>
+            Live table, as it stands
+          </p>
+        )}
 
         {/* Table */}
         <div className="w-full overflow-x-auto rounded-lg">
@@ -281,7 +305,10 @@ export default function Table() {
                             className={`absolute left-0 top-1/2 -translate-y-1/2 w-3 h-[70%] ${borderColor} rounded-r-md -translate-x-1/2`}
                           />
                         )}
-                        <span className="relative z-10">{team.position}</span>
+                        <span className="relative z-10 inline-flex items-center gap-1">
+                          {team.position}
+                          <Movement value={team.movement} />
+                        </span>
                       </td>
                       <td className="px-2 py-1 text-left font-medium">
                         <Link
@@ -300,6 +327,7 @@ export default function Table() {
                             <span className="whitespace-nowrap text-black dark:text-gray-200">
                               {team.name}
                             </span>
+                            {team.live && <LiveScore live={team.live} />}
                           </div>
                         </Link>
                       </td>
