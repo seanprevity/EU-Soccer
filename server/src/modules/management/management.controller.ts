@@ -9,10 +9,7 @@ import {
   updateStandingsService,
   updateTopPlayersService,
 } from "./management.service";
-import {
-  backfillEspnMatchDataService,
-  importEspnMatchesService,
-} from "./management.espnService";
+import { importEspnMatchesService } from "./management.espnService";
 import { updatePlayerImagesService } from "./management.imageService";
 import {
   daysAgo,
@@ -35,6 +32,7 @@ import type {
   importMatchesSchemas,
   leagueJobSchemas,
 } from "./management.schemas";
+import { backfillEspnSeason } from "./management.backfillEspn";
 export { runFullUpdate } from "./management.pipeline";
 
 type JobResponse<S extends RequestSchemas> = Response<
@@ -96,7 +94,7 @@ export const backfillMatches = (
 ): void => {
   const { league, seasonsAgo, refresh } = res.locals.validated.query;
   startLeagueJob(res, STEP.backfill, leaguesFor(league), (l) =>
-    backfillEspnMatchDataService(l.name, l.espnLeague, seasonsAgo, refresh),
+    backfillEspnSeason(l.name, l.espnLeague, seasonsAgo, refresh),
   );
 };
 

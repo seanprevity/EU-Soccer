@@ -8,7 +8,12 @@ import type {
   SimulationResult,
   UpcomingMatch,
 } from "@epl/shared";
-import { matchStats, odds, upcomingMatches } from "../../../drizzle/schema";
+import {
+  liveMatches,
+  matchStats,
+  odds,
+  upcomingMatches,
+} from "../../../drizzle/schema";
 import { db } from "../../lib/db";
 import { curSeason } from "../../config/map";
 import {
@@ -253,3 +258,24 @@ export const getHomeAwayMatchesService = async (
     awayAway: rows.filter((r) => r.awayTeam === awayTeam),
   };
 };
+
+export const deleteLiveMatch = async (espnId: string): Promise<boolean> => {
+  const deleted = await db
+    .delete(liveMatches)
+    .where(eq(liveMatches.espnId, espnId));
+  return deleted.length > 0;
+};
+
+export const getLiveMatchIds = async (): Promise<Set<string>> => {
+  const rows = await db.select({ id: liveMatches.espnId }).from(liveMatches);
+  return new Set(rows.map((r) => r.id));
+};
+
+export async function deleteStaleLiveMatches(): Promise<number> {
+  const sixHoursAgo = new Date(Date.now() - 21_600_000).toISOString();
+  const deleted = await db
+    .delete(liveMatches)
+    .where(lt(liveMatches.kickoff, sixHoursAgo))
+    .returning({ espnId: liveMatches.espnId });
+  return deleted.length;
+}
