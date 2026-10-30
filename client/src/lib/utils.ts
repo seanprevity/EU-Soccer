@@ -212,6 +212,12 @@ export const getResultColors = (result: string) => {
         gradient:
           "bg-[linear-gradient(to_right,rgb(156_163_175/0.2)_0%,rgb(156_163_175/0.1)_20%,transparent_46%)]",
       };
+    case "live":
+      return {
+        rectangle: "bg-orange-500",
+        gradient:
+          "bg-[linear-gradient(to_right,rgb(249_115_22/0.2)_0%,rgb(249_115_22/0.1)_20%,transparent_46%)]",
+      };
     default:
       return {
         rectangle: "bg-gray-500",

@@ -690,10 +690,9 @@ export const formatMinute = (e: MatchEvent) =>
     ? ""
     : `${e.minute}${e.extraMinute ? `+${e.extraMinute}` : ""}'`;
 
-export const EVENT_ICON: Record<
-  MatchEvent["kind"],
-  { src: string; alt: string }
-> = {
+export type IconKind = MatchEvent["kind"] | "assist";
+
+export const EVENT_ICON: Record<IconKind, { src: string; alt: string }> = {
   goal: { src: "/goal.svg", alt: "Goal" },
   penalty: { src: "/penalty.svg", alt: "Penalty goal" },
   own_goal: { src: "/own-goal.svg", alt: "Own goal" },
@@ -701,13 +700,14 @@ export const EVENT_ICON: Record<
   red: { src: "/Red.svg", alt: "Red card" },
   second_yellow: { src: "/second-yellow.svg", alt: "Second yellow card" },
   sub: { src: "/substitution.svg", alt: "Substitution" },
+  assist: { src: "/assist.svg", alt: "Assist" },
 };
 
 export function EventIcon({
   kind,
   size = 16,
 }: {
-  kind: MatchEvent["kind"];
+  kind: IconKind;
   size?: number;
 }) {
   const { src, alt } = EVENT_ICON[kind];
@@ -916,8 +916,12 @@ function SideCell({
 
 export function MatchTimeline({
   events,
+  showHalfTime = true,
+  showFullTime = true,
 }: {
   events: MatchEvent[] | null | undefined;
+  showHalfTime?: boolean;
+  showFullTime?: boolean;
 }) {
   if (!events?.length)
     return (
@@ -1001,23 +1005,41 @@ export function MatchTimeline({
     });
 
   // Built in match order, then reversed so the latest events sit at the top
-  const items = [
-    <PeriodMarker key="ko" label="Kick-off" />,
-    ...eventRows(1),
-    <PeriodMarker key="ht" label="Half-time" score={scoreAfter(1)} />,
-    ...eventRows(2),
-    ...(hasExtraTime
-      ? [
-          <PeriodMarker
-            key="90"
-            label="End of 90 minutes"
-            score={scoreAfter(2)}
-          />,
-          ...eventRows(3),
-        ]
-      : []),
-    <PeriodMarker key="ft" label="Full-time" score={scoreAfter(3)} />,
-  ].reverse();
+  const items: React.ReactNode[] = [];
+
+  items.push(<PeriodMarker key="ko" label="Kick-off" />);
+  items.push(...eventRows(1));
+
+  // Once the match has reached half time
+  if (showHalfTime) {
+    items.push(
+      <PeriodMarker key="ht" label="Half-time" score={scoreAfter(1)} />,
+    );
+  }
+
+  items.push(...eventRows(2));
+
+  if (hasExtraTime) {
+    if (showFullTime) {
+      items.push(
+        <PeriodMarker
+          key="90"
+          label="End of 90 minutes"
+          score={scoreAfter(2)}
+        />,
+      );
+    }
+    items.push(...eventRows(3));
+  }
+
+  // Never on the live page
+  if (showFullTime) {
+    items.push(
+      <PeriodMarker key="ft" label="Full-time" score={scoreAfter(3)} />,
+    );
+  }
+
+  items.reverse();
 
   return <ol className="space-y-1">{items}</ol>;
 }

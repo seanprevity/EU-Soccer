@@ -14,6 +14,7 @@ import {
   LEAGUES,
   getLeagueFile,
   cn,
+  getResultColors,
 } from "@/lib/utils";
 import { useEffect, useMemo, useRef } from "react";
 import { useMatchesByDate } from "@/hooks/useMatchesByDate";
@@ -23,8 +24,10 @@ import { useDispatch } from "react-redux";
 import { setMatchDate } from "@/state";
 import { edgeFor, matchColors } from "@/lib/array";
 import { H2H, LiveMatch, UpcomingMatch } from "@epl/shared";
+import { LiveDot } from "@/components/liveBadges";
+import { RedCardBadge } from "@/lib/uiUtils";
 
-function TeamBlock({ team }: { team: string }) {
+function TeamBlock({ team, reds = 0 }: { team: string; reds?: number }) {
   return (
     <div className="flex flex-col items-center gap-1 w-2/5 font-semibold text-sm text-gray-800 dark:text-gray-300 text-center">
       <div className="relative w-6 h-6 mb-1">
@@ -34,38 +37,60 @@ function TeamBlock({ team }: { team: string }) {
           fill
           className="object-contain"
         />
+        <RedCardBadge count={reds} />
       </div>
       <span>{team}</span>
     </div>
   );
 }
 
+function redCardsFor(match: LiveMatch, side: "home" | "away"): number {
+  let fromEvents = 0;
+  for (const event of match.events ?? []) {
+    if (event.side !== side) continue;
+    if (event.kind === "red" || event.kind === "second_yellow") fromEvents++;
+  }
+
+  const stored = (side === "home" ? match.hr : match.ar) ?? 0;
+  return Math.max(fromEvents, stored);
+}
+
 function LiveMatchCard({ match }: { match: LiveMatch }) {
   const isHalfTime = match.status === "STATUS_HALFTIME";
+  const colors = getResultColors("live");
 
   let statusText = `Live · ${match.clock ?? ""}`;
   if (isHalfTime) statusText = "Half time";
 
   return (
-    <Link href={`/live/${match.espnId}`} className="no-underline">
-      <div className="p-4 rounded-md bg-[#f8f8f8] dark:bg-gray-700 border-l-4 border-red-600 transition-transform duration-200 ease-in-out hover:-translate-y-[2px] hover:shadow-lg">
-        <div className="mb-2 flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
-          {/* Pulsing dot: one dot that pings outward behind a solid one */}
-          <span className="relative flex h-2 w-2">
-            {!isHalfTime && (
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-            )}
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
-          </span>
+    <Link
+      href={`/live/${match.espnId}`}
+      className="block overflow-hidden rounded-md no-underline shadow-sm dark:bg-gray-700/15"
+    >
+      <div
+        className={cn(
+          "@container relative p-4 transition hover:bg-gray-100 dark:hover:bg-gray-700",
+          colors.gradient,
+        )}
+      >
+        <div
+          className={cn(
+            "absolute left-0 top-1/2 z-10 h-[55%] w-3 -translate-x-1/2 -translate-y-1/2 rounded-r-md",
+            colors.rectangle,
+          )}
+        />
+
+        <div className="mb-2 flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-400">
+          <LiveDot />
           {statusText}
         </div>
 
         <div className="flex items-center justify-between">
-          <TeamBlock team={match.homeTeam} />
-          <span className="mx-2 text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+          <TeamBlock team={match.homeTeam} reds={redCardsFor(match, "home")} />
+          <span className="mx-2 shrink-0 whitespace-nowrap text-lg font-bold tabular-nums text-gray-900 dark:text-white @xs:text-xl @sm:text-2xl">
             {match.homeScore} – {match.awayScore}
           </span>
-          <TeamBlock team={match.awayTeam} />
+          <TeamBlock team={match.awayTeam} reds={redCardsFor(match, "away")} />
         </div>
       </div>
     </Link>
@@ -112,7 +137,7 @@ function UpcomingMatchCard({
 
   return (
     <Link href={`/match/${m.id}`} className="no-underline">
-      <div className="p-4 rounded-md bg-[#f8f8f8] dark:bg-gray-700 border-l-4 border-[#38003c] dark:border-gray-700 transition-transform duration-200 ease-in-out hover:-translate-y-[2px] hover:shadow-lg">
+      <div className="p-4 rounded-md bg-[#f8f8f8] dark:bg-gray-700/40 transition-transform duration-200 ease-in-out hover:-translate-y-[2px] hover:shadow-lg">
         <div className="flex items-center justify-between mb-2">
           {teamBlock(m.homeTeam)}
           <span className="text-gray-600 dark:text-gray-400 font-normal text-sm mx-2">
@@ -129,7 +154,7 @@ function UpcomingMatchCard({
         </p>
 
         {/* Head to head */}
-        <div className="rounded bg-white p-3 dark:bg-gray-600">
+        <div className="rounded bg-white p-3 dark:bg-gray-700">
           {h2hLoading ? (
             <p className="text-center text-[0.7rem] text-gray-400 dark:text-gray-200">
               Loading H2H…
@@ -327,15 +352,15 @@ export default function Matches() {
   const isLoading = isUpcomingLoading || isPastLoading;
 
   return (
-    <section className="w-full max-w-full p-4 md:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-      <h1 className="text-xl font-bold text-center text-gray-800 dark:text-gray-200 mb-5 border-b-2 border-[#38003c] dark:border-gray-400 pb-2">
+    <section className="w-full max-w-full p-4 md:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md lg:flex lg:h-full lg:flex-col">
+      <h1 className="shrink-0 text-xl font-bold text-center text-gray-800 dark:text-gray-200 mb-5 border-b-2 border-[#38003c] dark:border-gray-400 pb-2">
         Matches
       </h1>
 
       {/* --- Date Selector --- */}
       <div
         ref={dateBarRef}
-        className="relative flex gap-2 overflow-x-auto mb-4 pb-2 scrollbar-thin"
+        className="relative mb-4 flex shrink-0 gap-2 overflow-x-auto pb-2 scrollbar-thin"
       >
         {dateRange.map((date) => {
           const dateStr = date.toISOString();
@@ -379,7 +404,7 @@ export default function Matches() {
         [&::-webkit-scrollbar]:w-[2px] 
         [&::-webkit-scrollbar-track]:bg-[#f1f1f1] [&::-webkit-scrollbar-track]:rounded-[10px] dark:[&::-webkit-scrollbar-track]:bg-gray-800
         [&::-webkit-scrollbar-thumb]:bg-[#38003c] [&::-webkit-scrollbar-thumb]:rounded-[10px] dark:[&::-webkit-scrollbar-thumb]:bg-gray-400
-        md:max-h-[97.23vh]"
+        max-h-[70vh] lg:max-h-none lg:min-h-0 lg:flex-1"
       >
         {isLoading ? (
           <p className="text-center text-gray-500 dark:text-gray-200 py-6">

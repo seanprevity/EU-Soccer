@@ -20,7 +20,7 @@ import { useDispatch } from "react-redux";
 import { setLeague, setSeason } from "@/state";
 import { Standing, TopPlayerCategory } from "@epl/shared";
 import { StandingType, useLiveStandings } from "@/lib/liveStandings";
-import { LiveScore, Movement } from "@/components/liveBadges";
+import { LiveDot, LiveScore, Movement } from "@/components/liveBadges";
 
 const TOP_PLAYER_CATEGORIES: {
   key: TopPlayerCategory;
@@ -38,6 +38,63 @@ const TOP_PLAYER_CATEGORIES: {
 const LEAGUE_HEADERS = HEADER_CONFIG.filter(
   (h) => h.key !== "expectedPosition",
 );
+
+// relegation or european football decided by spots on league table
+type Zone =
+  | "championsLeague"
+  | "championsLeagueQualifying"
+  | "europaLeague"
+  | "conferenceLeague"
+  | "relegationPlayOff"
+  | "relegation";
+
+// Colour and description of each zone
+const ZONES: Record<Zone, { color: string; label: string }> = {
+  championsLeague: {
+    color: "bg-[#38003c] dark:bg-blue-600",
+    label: "Champions League",
+  },
+  championsLeagueQualifying: {
+    color: "bg-[#301934] dark:bg-purple-800",
+    label: "Champions League qualifying",
+  },
+  europaLeague: { color: "bg-[#ff3333]", label: "Europa League" },
+  conferenceLeague: {
+    color: "bg-[#00A300]",
+    label: "Conference League qualifying",
+  },
+  relegationPlayOff: { color: "bg-[#ADADAD]", label: "Relegation play-off" },
+  relegation: { color: "bg-[#ff2882]", label: "Relegation" },
+};
+
+// Zones for european football or relegation
+function zoneFor(
+  index: number,
+  teamCount: number,
+  league: string,
+): Zone | null {
+  const thirdFromBottom = teamCount - 3;
+
+  if (index <= 3 && (league !== "Ligue 1" || index !== 3))
+    return "championsLeague";
+  if (index === 3 && league === "Ligue 1") return "championsLeagueQualifying";
+  if (index === 4) return "europaLeague";
+  if (index === 5 && league !== "Premier League") return "conferenceLeague";
+  if (index > thirdFromBottom) return "relegation";
+
+  if (index === thirdFromBottom) {
+    if (
+      league === "Premier League" ||
+      league === "Serie A" ||
+      league === "La Liga"
+    )
+      return "relegation";
+    if (league === "Ligue 1" || league === "Bundesliga")
+      return "relegationPlayOff";
+  }
+
+  return null;
+}
 
 export default function Table() {
   const dispatch = useDispatch();
@@ -116,6 +173,16 @@ export default function Table() {
     });
   }, [liveTeams, sortConfig]);
 
+  // The zones this league's table uses, in table order, for the key underneath
+  const zonesInTable = useMemo(() => {
+    const found: Zone[] = [];
+    for (let index = 0; index < sortedTeams.length; index++) {
+      const zone = zoneFor(index, sortedTeams.length, league);
+      if (zone && !found.includes(zone)) found.push(zone);
+    }
+    return found;
+  }, [sortedTeams.length, league]);
+
   // Sort and ranks top players
   const rankedPlayers = useMemo(() => {
     if (!topPlayers) return [];
@@ -171,7 +238,7 @@ export default function Table() {
                     ${
                       type === t
                         ? "bg-[#38003c] dark:bg-purple-900 text-white shadow-md"
-                        : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                        : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600/80"
                     }
                   `}
                   >
@@ -207,11 +274,8 @@ export default function Table() {
         </div>
 
         {isLive && (
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
-            </span>
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-orange-600 dark:text-orange-400">
+            <LiveDot />
             Live table, as it stands
           </p>
         )}
@@ -251,46 +315,13 @@ export default function Table() {
                 sortedTeams.map((team, idx) => {
                   const logo = getLogoFile(team.name);
 
-                  // Border color by rank + league
-                  let borderClass = "";
-                  let borderColor = "";
-                  // Champions League
-                  if (idx <= 3 && (league !== "Ligue 1" || idx !== 3)) {
-                    borderColor = "bg-[#38003c] dark:bg-blue-600";
-                  }
-                  // Champions League Qualification
-                  else if (idx === 3 && league === "Ligue 1") {
-                    borderColor = "bg-[#301934] dark:bg-purple-800";
-                  }
-                  // Europa League
-                  else if (idx === 4) {
-                    borderColor = "bg-[#ff3333]";
-                  }
-                  // Europa Conference League Qualification
-                  else if (idx === 5 && league !== "Premier League") {
-                    borderColor = "bg-[#00A300]";
-                  }
-                  // Relegation
-                  else if (idx > sortedTeams.length - 3) {
-                    borderColor = "bg-[#ff2882]";
-                  }
-                  // Relegation
-                  else if (
-                    idx === sortedTeams.length - 3 &&
-                    (league === "Premier League" ||
-                      league === "Serie A" ||
-                      league === "La Liga")
-                  ) {
-                    borderColor = "bg-[#ff2882]";
-                  }
-                  // Relegation Play-Off
-                  else if (
-                    idx === sortedTeams.length - 3 &&
-                    (league === "Ligue 1" || league === "Bundesliga")
-                  ) {
-                    borderColor = "bg-[#ADADAD]";
-                  }
-                  if (borderColor !== "") borderClass = "relative";
+                  const zone = zoneFor(
+                    team.position - 1,
+                    sortedTeams.length,
+                    league,
+                  );
+                  const borderColor = zone ? ZONES[zone].color : "";
+                  const borderClass = zone ? "relative" : "";
 
                   return (
                     <tr
@@ -365,6 +396,23 @@ export default function Table() {
             </tbody>
           </table>
         </div>
+
+        {zonesInTable.length > 0 && (
+          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-600 dark:text-gray-300">
+            {zonesInTable.map((zone) => (
+              <li key={zone} className="flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className={cn(
+                    "h-2 w-2 shrink-0 rounded-full",
+                    ZONES[zone].color,
+                  )}
+                />
+                {ZONES[zone].label}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* RHS: Top Scorers */}

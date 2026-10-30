@@ -104,21 +104,32 @@ export const getUpcomingMatchByIdService = async (
   return row ?? null;
 };
 
-export const getTeamMatchesService = async (
+// Matches involving the team, newest first, from `offset` onwards
+export const getRecentMatchesService = async (
   team: string,
-  page = 0,
+  offset: number,
+  limit: number,
 ): Promise<PaginatedMatches> => {
   const [matches, [totalRow]] = await Promise.all([
     db
       .select(previewColumns)
       .from(matchStats)
       .where(involves(team))
-      .orderBy(desc(matchStats.matchDate))
-      .limit(PAGE_SIZE)
-      .offset(page * PAGE_SIZE),
+      .orderBy(desc(matchStats.matchDate), desc(matchStats.id))
+      .limit(limit)
+      .offset(offset),
     db.select({ total: count() }).from(matchStats).where(involves(team)),
   ]);
+
   return { matches, total: totalRow?.total ?? 0 };
+};
+
+// Page-based version for the routes that still use pages
+export const getTeamMatchesService = async (
+  team: string,
+  page = 0,
+): Promise<PaginatedMatches> => {
+  return getRecentMatchesService(team, page * PAGE_SIZE, PAGE_SIZE);
 };
 
 export const getTeamMatchStatsService = (
@@ -298,7 +309,10 @@ export async function deleteStaleLiveMatches(): Promise<number> {
 }
 
 export async function getLiveMatchesService(): Promise<LiveMatch[]> {
-  return await db.select().from(liveMatches).orderBy(asc(liveMatches.kickoff));
+  return await db
+    .select()
+    .from(liveMatches)
+    .orderBy(asc(liveMatches.kickoff), asc(liveMatches.homeTeam));
 }
 
 export async function getLiveMatchService(

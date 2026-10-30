@@ -129,7 +129,7 @@ export default function MatchTable({ match }: { match: MatchStats }) {
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-white">
           {match.league} {season}
           {isLive && (
-            <span className="text-xs font-medium text-red-600 dark:text-red-400">
+            <span className="text-xs font-medium text-orange-600 dark:text-orange-400">
               · Live, as it stands
             </span>
           )}

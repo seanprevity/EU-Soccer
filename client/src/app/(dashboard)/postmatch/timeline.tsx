@@ -2,6 +2,7 @@ import { MatchTimeline } from "@/lib/uiUtils";
 import { edgeFor, matchColors } from "@/lib/array";
 import { cn } from "@/lib/utils";
 import { MatchStats } from "@epl/shared";
+import type { LiveInfo } from "./matchView";
 
 type KeyStat = {
   label: string;
@@ -164,17 +165,26 @@ function KeyStatistics({
 export default function Timeline({
   match,
   onShowStats,
+  live,
 }: {
   match: MatchStats;
   onShowStats: () => void;
+  live?: LiveInfo;
 }) {
+  const showHalfTime = live ? live.reachedHalfTime : true;
+  const showFullTime = !live;
+
   return (
     <div className="space-y-4">
       <section
         aria-label="Timeline"
         className="rounded-lg bg-white p-4 dark:bg-gray-900"
       >
-        <MatchTimeline events={match.events} />
+        <MatchTimeline
+          events={match.events}
+          showHalfTime={showHalfTime}
+          showFullTime={showFullTime}
+        />
       </section>
       <KeyStatistics match={match} onShowStats={onShowStats} />
     </div>

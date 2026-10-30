@@ -9,7 +9,12 @@ import { LineupPlayer, MatchEvent, MatchStats, TeamLineup } from "@epl/shared";
 
 type Side = "home" | "away";
 type CardKind = "yellow" | "red" | "second_yellow";
-type PlayerMarks = { goals: number; ownGoals: number; card: CardKind | null };
+type PlayerMarks = {
+  goals: number;
+  ownGoals: number;
+  assists: number;
+  card: CardKind | null;
+};
 
 const LABEL_FONT_PX = 10;
 const LABEL_PADDING_PX = 8; // px-1 on each side
@@ -59,13 +64,27 @@ const marksByPlayer = (events: MatchEvent[] | null) => {
   const marks = new Map<string, PlayerMarks>(); // key: "home|Player Name"
   const get = (e: MatchEvent) => {
     const key = `${e.side}|${e.player}`;
-    if (!marks.has(key)) marks.set(key, { goals: 0, ownGoals: 0, card: null });
+    if (!marks.has(key))
+      marks.set(key, { goals: 0, ownGoals: 0, assists: 0, card: null });
     return marks.get(key)!;
   };
 
   for (const e of events ?? []) {
     if (!e.player || !e.side) continue;
-    if (e.kind === "goal" || e.kind === "penalty") get(e).goals++;
+    if (e.kind === "goal" || e.kind === "penalty") {
+      get(e).goals++;
+      if (e.assist) {
+        const assistKey = `${e.side}|${e.assist}`;
+        if (!marks.has(assistKey))
+          marks.set(assistKey, {
+            goals: 0,
+            ownGoals: 0,
+            assists: 0,
+            card: null,
+          });
+        marks.get(assistKey)!.assists++;
+      }
+    }
     if (e.kind === "yellow" || e.kind === "red" || e.kind === "second_yellow") {
       const m = get(e);
       if (!m.card || CARD_SEVERITY[e.kind] > CARD_SEVERITY[m.card])
@@ -77,7 +96,8 @@ const marksByPlayer = (events: MatchEvent[] | null) => {
     if (e.kind !== "own_goal" || !e.player || !e.side) continue;
     const scorerSide = e.side === "home" ? "away" : "home";
     const key = `${scorerSide}|${e.player}`;
-    if (!marks.has(key)) marks.set(key, { goals: 0, ownGoals: 0, card: null });
+    if (!marks.has(key))
+      marks.set(key, { goals: 0, ownGoals: 0, assists: 0, card: null });
     marks.get(key)!.ownGoals++;
   }
 
@@ -93,29 +113,50 @@ function PlayerBadges({
   subbedIn?: boolean;
   subbedOff?: boolean;
 }) {
-  const scored = marks?.goals
-    ? { kind: "goal" as const, count: marks.goals }
-    : marks?.ownGoals
-      ? { kind: "own_goal" as const, count: marks.ownGoals }
-      : null;
+  let scored: { kind: "goal" | "own_goal"; count: number } | null = null;
+  if (marks?.goals) scored = { kind: "goal", count: marks.goals };
+  else if (marks?.ownGoals)
+    scored = { kind: "own_goal", count: marks.ownGoals };
+
+  const assists = marks?.assists ?? 0;
 
   return (
     <>
+      {/* Top-left: goals */}
       {scored && (
         <span className="absolute -left-1 -top-1">
           <EventIcon kind={scored.kind} size={14} />
           {scored.count > 1 && (
-            <span className="absolute -left-1.5 -top-1.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-red-600 px-0.5 text-[8px] font-bold leading-none text-white">
+            <span className="absolute -left-1.5 -top-1.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-black px-0.5 text-[8px] font-bold leading-none text-white">
               {scored.count}
             </span>
           )}
         </span>
       )}
+
+      {/* Top-right: card */}
       {marks?.card && (
         <span className="absolute -right-1 -top-1">
           <EventIcon kind={marks.card} size={13} />
         </span>
       )}
+
+      {/* Bottom-left: assists */}
+      {assists > 0 && (
+        <span
+          className="absolute -bottom-1 -left-1"
+          title={`${assists} assist${assists > 1 ? "s" : ""}`}
+        >
+          <EventIcon kind="assist" size={16} />
+          {assists > 1 && (
+            <span className="absolute -bottom-1.5 -left-1.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-black px-0.5 text-[8px] font-bold leading-none text-white">
+              {assists}
+            </span>
+          )}
+        </span>
+      )}
+
+      {/* Bottom-right: substitution */}
       {subbedOff ? (
         <ArrowBadge direction="down" corner="bottom-right" size={14} />
       ) : (

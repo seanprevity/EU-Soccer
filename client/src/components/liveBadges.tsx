@@ -1,6 +1,19 @@
 import { cn } from "@/lib/utils";
 import { LiveResult } from "@/lib/liveStandings";
 
+/** Static orange dot marking something that's being played right now. */
+export function LiveDot({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "inline-block h-2 w-2 shrink-0 rounded-full bg-orange-500 ring-2 ring-orange-500/30",
+        className,
+      )}
+    />
+  );
+}
+
 export function Movement({ value }: { value: number }) {
   if (value === 0) return null;
 
@@ -31,11 +44,12 @@ export function LiveScore({ live }: { live: LiveResult }) {
   return (
     <span
       className={cn(
-        "rounded px-1 text-[10px] font-semibold tabular-nums",
+        "inline-flex items-center gap-1 rounded px-1 text-[10px] font-semibold tabular-nums",
         RESULT_STYLE[live.result],
       )}
       title={`Live vs ${live.opponent}`}
     >
+      <LiveDot className="h-1.5 w-1.5 ring-1" />
       {live.score}
     </span>
   );

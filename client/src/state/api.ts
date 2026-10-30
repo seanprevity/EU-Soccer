@@ -39,6 +39,7 @@ import {
 } from "@epl/shared";
 import { withToast } from "@/lib/utils";
 import { z } from "zod";
+import { fillOffset } from "framer-motion";
 
 export const api = createApi({
   baseQuery: fetchBaseQuery({
@@ -357,20 +358,17 @@ export const api = createApi({
     // gets recent matches for team history page
     getRecentMatches: build.query<
       PaginatedMatches,
-      { team: string; page: number }
+      { team: string; offset: number; limit: number }
     >({
-      query: ({ team, page = 0 }) => ({
+      query: ({ team, offset, limit }) => ({
         url: `/matches/recent`,
         method: "GET",
-        params: {
-          team: team,
-          page: page,
-        },
+        params: { team, offset, limit },
       }),
       transformResponse: (raw: unknown) => paginatedMatchesSchema.parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
-          error: "Failed to get recent matches using an end date.",
+          error: "Failed to load recent matches.",
         });
       },
     }),
@@ -451,7 +449,7 @@ export const api = createApi({
     }),
 
     getLiveMatch: build.query<LiveMatchResponse, { espnId: string }>({
-      query: ({espnId}) => ({
+      query: ({ espnId }) => ({
         url: `matches/live/${espnId}`,
         method: "GET",
       }),

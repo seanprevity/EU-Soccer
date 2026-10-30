@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { cn, getLogoFile } from "@/lib/utils";
+import { cn, getLogoFile, getResultColors } from "@/lib/utils";
 import { EventIcon } from "@/lib/uiUtils";
 import { MatchPreview } from "@epl/shared";
 
@@ -80,6 +80,9 @@ const byKickoff = (a: MatchPreview, b: MatchPreview) => {
 export function PastMatchesList({ matches }: { matches: MatchPreview[] }) {
   const ordered = [...matches].sort(byKickoff);
 
+  // Neutral grey for every finished match: this list isn't from one team's side
+  const colors = getResultColors("draw");
+
   return (
     <ul className="space-y-3">
       {ordered.map((m) => {
@@ -90,9 +93,20 @@ export function PastMatchesList({ matches }: { matches: MatchPreview[] }) {
           <li key={m.id}>
             <Link
               href={`/postmatch/${m.id}`}
-              className="flex items-center gap-3 rounded-md border-l-4 border-gray-300 bg-[#f8f8f8] p-3 no-underline transition-transform duration-200 ease-in-out hover:-translate-y-[2px] hover:shadow-lg dark:border-gray-500 dark:bg-gray-700"
+              className={cn(
+                "relative flex items-center gap-3 overflow-hidden rounded-md bg-[#f8f8f8] p-3 no-underline transition-transform duration-200 ease-in-out hover:-translate-y-[2px] hover:shadow-lg dark:bg-gray-700/50",
+                colors.gradient,
+              )}
             >
-              <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600 dark:bg-gray-700 dark:text-white">
+              {/* The bar on the left edge, like the live and history cards */}
+              <div
+                className={cn(
+                  "absolute left-0 top-1/2 z-10 h-[55%] w-3 -translate-x-1/2 -translate-y-1/2 rounded-r-md",
+                  colors.rectangle,
+                )}
+              />
+
+              <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600 dark:text-white">
                 FT
               </span>
               <span

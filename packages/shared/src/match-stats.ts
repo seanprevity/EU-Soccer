@@ -143,10 +143,17 @@ export const simulationResultSchema = z.object({
 // /matches/stats?ids=12,15
 export const matchStatsQuerySchema = z.object({ ids: idListSchema });
 
-// /matches/last5 and /matches/recent
+// /matches/last5
 export const teamMatchesQuerySchema = z.object({
   team: z.string().trim().min(1),
   page: pageSchema,
+});
+
+// /matches/recent
+export const recentMatchesQuerySchema = z.object({
+  team: z.string(),
+  offset: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(20).default(5),
 });
 
 const teamNameParam = z
@@ -176,4 +183,5 @@ export type HomeAwayMatches = z.infer<typeof homeAwayMatchesSchema>;
 export type SimulationResult = z.infer<typeof simulationResultSchema>;
 export type MatchStatsQuery = z.infer<typeof matchStatsQuerySchema>;
 export type TeamMatchesQuery = z.infer<typeof teamMatchesQuerySchema>;
+export type RecentMatchesQuery = z.infer<typeof recentMatchesQuerySchema>;
 export type MatchupQuery = z.infer<typeof matchupQuerySchema>;

@@ -1,5 +1,7 @@
 "use client";
 
+import { LiveDot, LiveScore, Movement } from "@/components/liveBadges";
+import { useLiveStandings } from "@/lib/liveStandings";
 import { renderForm } from "@/lib/uiUtils";
 import { currentSeason, getLogoFile, HEADER_CONFIG } from "@/lib/utils";
 import {
@@ -49,8 +51,11 @@ const TeamTable = ({
   teamName: string;
   league: string;
 }) => {
-  const { data: teams, isLoading: isStandingsLoading } =
-    useGetRecentTableStandingsQuery({ team: teamName });
+  const {
+    data: teams,
+    isLoading: isStandingsLoading,
+    refetch: refetchStandings,
+  } = useGetRecentTableStandingsQuery({ team: teamName });
 
   const teamNames = useMemo(
     () => (teams ?? []).map((t) => t.name).sort(),
@@ -62,9 +67,25 @@ const TeamTable = ({
       { skip: teamNames.length === 0 },
     );
 
+  // In table order
+  const tableRows = useMemo(
+    () => [...(teams ?? [])].sort((a, b) => a.position - b.position),
+    [teams],
+  );
+
+  const isCurrentSeason = teams?.[0]?.season === currentSeason;
+  const liveTeams = useLiveStandings(
+    tableRows,
+    isCurrentSeason,
+    refetchStandings,
+  );
+  const isLive = liveTeams.some((team) => team.live !== null);
+
+  // Expected positions on top of the live table, so the arrows compare against
+  // where the team is right now
   const rows = useMemo(() => {
     const byTeam = new Map((xPositions ?? []).map((x) => [x.team, x]));
-    return (teams ?? []).map((t) => {
+    return liveTeams.map((t) => {
       const x = byTeam.get(t.name);
       const hasHistory = x?.expectedPosition != null;
       return {
@@ -76,7 +97,7 @@ const TeamTable = ({
         hasHistory,
       };
     });
-  }, [teams, xPositions]);
+  }, [liveTeams, xPositions]);
 
   const [sortConfig, setSortConfig] = useState({
     key: "position",
@@ -136,6 +157,12 @@ const TeamTable = ({
           ? `${teams[0].season}/${(Number(teams[0].season) + 1) % 2000}`
           : `${currentSeason}/${(Number(currentSeason) + 1) % 2000}`}
       </span>
+      {isLive && (
+        <p className="mb-2 flex items-center justify-center gap-1.5 text-xs font-medium text-orange-600 dark:text-orange-400">
+          <LiveDot />
+          Live table, as it stands
+        </p>
+      )}
       <div className="w-full overflow-x-auto rounded-lg">
         <table className="w-full border-collapse shadow-sm text-[0.65rem] sm:text-[0.75rem] md:text-[0.85rem] lg:text-[0.9rem]">
           <thead className="bg-[#38003c] dark:bg-gray-900 text-white sticky top-0 z-10">
@@ -219,7 +246,10 @@ const TeamTable = ({
                         className={`absolute left-0 top-1/2 -translate-y-1/2 w-3 h-[60%] ${borderColor} rounded-r-md -translate-x-1/2`}
                       />
                     )}
-                    <span className="relative z-10">{team.position}</span>
+                    <span className="relative z-10 inline-flex items-center gap-1">
+                      {team.position}
+                      <Movement value={team.movement} />
+                    </span>
                   </td>
                   <td
                     className="px-1 py-1 text-center tabular-nums text-black dark:text-gray-200"
@@ -260,6 +290,7 @@ const TeamTable = ({
                         <span className="whitespace-nowrap text-black dark:text-gray-200">
                           {team.name}
                         </span>
+                        {team.live && <LiveScore live={team.live} />}
                       </div>
                     </Link>
                   </td>

@@ -17,6 +17,7 @@ import type {
   getMatchStatsSchemas,
   getMatchupSchemas,
   getOddsSchemas,
+  getRecentMatchesSchemas,
   getTeamMatchesSchemas,
   getUpcomingMatchByIdSchemas,
 } from "./matches.schemas";
@@ -28,6 +29,7 @@ import {
   getMatchStatsService,
   getOddsService,
   getPastMatchesService,
+  getRecentMatchesService,
   getSimulationService,
   getTeamMatchesService,
   getUpcomingMatchByIdService,
@@ -90,10 +92,10 @@ export const getLast5Matches = async (
 
 export const getRecentMatches = async (
   _req: Request,
-  res: Response<PaginatedMatches, Validated<typeof getTeamMatchesSchemas>>,
+  res: Response<PaginatedMatches, Validated<typeof getRecentMatchesSchemas>>,
 ): Promise<void> => {
-  const { team, page } = res.locals.validated.query;
-  res.json(await getTeamMatchesService(team, page));
+  const { team, offset, limit } = res.locals.validated.query;
+  res.json(await getRecentMatchesService(team, offset, limit));
 };
 
 export const getSimulation = async (

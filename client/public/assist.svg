@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!-- Low-cut football cleat, tilted toe-down, with studs floating below the sole -->
+  <g transform="translate(24 0) scale(-1 1) translate(12 12) scale(1.15) rotate(18) translate(-12 -11.2)">
+    <!-- Upper -->
+    <path d="M2.6 9.4c0-1.6 1.3-2.8 2.9-2.8h4.2c1 0 1.7.6 2.3 1.5 2.6.5 6.4 1.6 8.5 3.1 1.5 1.1 1.2 3.4-.6 3.4H3.9c-.7 0-1.3-.6-1.3-1.3z"
+          fill="#ffffff" stroke="#111827" stroke-width="1.6" stroke-linejoin="round"/>
+    <!-- Heel counter -->
+    <path d="M2.8 10.2c1.5 0 2.6.8 3 2.2" stroke="#111827" stroke-width="1.2" stroke-linecap="round"/>
+    <!-- Laces -->
+    <path d="M12.3 9.6l1.2-1.1M14.4 10.2l1.2-1.1M16.4 10.9l1.1-1"
+          stroke="#111827" stroke-width="1.2" stroke-linecap="round"/>
+    <!-- Sole plate -->
+    <path d="M3.4 14.6h16.9" stroke="#111827" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- Studs: separate from the sole, slanted -->
+    <g fill="#111827">
+      <rect x="4.6" y="16" width="1.9" height="2.6" rx=".9" transform="rotate(12 5.55 17.3)"/>
+      <rect x="8.4" y="16" width="1.9" height="2.6" rx=".9" transform="rotate(12 9.35 17.3)"/>
+      <rect x="13.2" y="16" width="1.9" height="2.6" rx=".9" transform="rotate(12 14.15 17.3)"/>
+      <rect x="17.2" y="16" width="1.9" height="2.3" rx=".9" transform="rotate(12 18.15 17.15)"/>
+    </g>
+  </g>
+</svg>

@@ -18,6 +18,7 @@ import {
   getMatchStatsSchemas,
   getMatchupSchemas,
   getOddsSchemas,
+  getRecentMatchesSchemas,
   getTeamMatchesSchemas,
   getUpcomingMatchByIdSchemas,
 } from "./matches.schemas";
@@ -34,7 +35,7 @@ router.get(
 );
 router.get("/odds/:id", validate(getOddsSchemas), getOdds);
 router.get("/last5", validate(getTeamMatchesSchemas), getLast5Matches);
-router.get("/recent", validate(getTeamMatchesSchemas), getRecentMatches);
+router.get("/recent", validate(getRecentMatchesSchemas), getRecentMatches);
 router.get("/simulation", validate(getMatchupSchemas), getSimulation);
 router.get("/home-away", validate(getMatchupSchemas), getHomeAwayMatches);
 router.get("/live", getLiveMatches);

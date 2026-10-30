@@ -13,13 +13,18 @@ import MatchTable from "./matchTable";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { MatchEvent, MatchStats } from "@epl/shared";
+import { LiveDot } from "@/components/liveBadges";
 
 type Tab = "timeline" | "table" | "stats" | "lineups";
 type Side = "home" | "away";
 type EventLine = { key: string; player: string; minutes: string[] };
 
 // Present only while the match is being played
-export type LiveInfo = { label: string; isHalfTime: boolean };
+export type LiveInfo = {
+  label: string;
+  isHalfTime: boolean;
+  reachedHalfTime: boolean;
+};
 
 const teamHref = (team: string) => `/team/${team.split(" ").join("_")}`;
 
@@ -101,13 +106,8 @@ function EventRow({
 
 function LiveStatus({ live }: { live: LiveInfo }) {
   return (
-    <p className="mt-1 flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
-      <span className="relative flex h-2 w-2">
-        {!live.isHalfTime && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-        )}
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
-      </span>
+    <p className="mt-1 flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-400">
+      <LiveDot />
       {live.label}
     </p>
   );
@@ -293,7 +293,11 @@ export default function MatchView({
         <Tabs active={active} available={available} onChange={setTab} />
         <div role="tabpanel">
           {active === "timeline" && (
-            <Timeline match={match} onShowStats={() => setTab("stats")} />
+            <Timeline
+              match={match}
+              onShowStats={() => setTab("stats")}
+              live={live}
+            />
           )}
           {active === "stats" && <Stats match={match} />}
           {active === "table" && <MatchTable match={match} />}

@@ -21,9 +21,15 @@ function toMatchStats(live: LiveMatch): MatchStats {
 
 function toLiveInfo(live: LiveMatch): LiveInfo {
   const isHalfTime = live.status === "STATUS_HALFTIME";
+
+  // Everything except the first half (and before kickoff) is at or past half time
+  const reachedHalfTime =
+    live.status !== "STATUS_FIRST_HALF" && live.status !== "STATUS_SCHEDULED";
+
   let label = `Live · ${live.clock ?? ""}`;
   if (isHalfTime) label = "Half time";
-  return { label, isHalfTime };
+
+  return { label, isHalfTime, reachedHalfTime };
 }
 
 export default function LiveMatchPage() {
