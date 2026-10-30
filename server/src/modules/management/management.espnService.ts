@@ -252,10 +252,14 @@ const fillMissingHeadshots = async (lineups: MatchLineups) => {
 };
 
 // Fallback: gets assist from the text if it is there: "Assisted by Bukayo Saka with a cross." -> "Bukayo Saka"
-const assistFromText = (text: string | undefined) =>
-  /Assisted by (.+?)(?=\s+(?:with|following|after)\b|\.(?:\s|$)|$)/.exec(
-    text ?? "",
-  )?.[1] ?? null;
+const assistFromText = (text: string | undefined): string | null => {
+  if (!text) return null;
+
+  const match = text.match(
+    /Assisted by (.+?)(?=\s+(?:with|following|after)\b|\.(?:\s|$)|$)/,
+  );
+  return match ? match[1] : null;
+};
 
 // Get assists from summary key events if available
 const addAssists = (events: MatchEvent[], summary: any): MatchEvent[] => {
