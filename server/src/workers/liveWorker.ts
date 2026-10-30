@@ -16,6 +16,9 @@ import {
   getLiveMatchIds,
 } from "../modules/matches/matches.service";
 import client from "../lib/db";
+import { isRunning, sleepUntilStopped, stopOnSignals } from "./lifecycle";
+import { updateStandingsService } from "../modules/management/management.service";
+import { curSeason } from "../config/map";
 
 type TickResult = {
   liveGames: boolean;
@@ -29,22 +32,6 @@ type Seen = {
 };
 const seen = new Map<string, Seen>();
 
-let wakeUp: (() => void) | null = null;
-
-function sleepUntilStopped(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(finish, milliseconds);
-
-    function finish() {
-      clearTimeout(timer);
-      wakeUp = null;
-      resolve();
-    }
-
-    wakeUp = finish;
-  });
-}
-
 function chooseSleep(result: TickResult | null): number {
   if (result === null || result.liveGames) return 30_000;
 
@@ -54,11 +41,13 @@ function chooseSleep(result: TickResult | null): number {
   return Math.min(Math.max(untilKickoff, 30_000), 3_600_000);
 }
 
+// Handles live matches ending
 async function finishMatches(
   league: string,
   espnLeague: string,
   finished: EspnMatch[],
 ) {
+  // get start and end dates to import matches from
   const kickoffTimes = finished.map((match) =>
     new Date(match.date ?? Date.now()).getTime(),
   );
@@ -73,14 +62,24 @@ async function finishMatches(
   );
   const dayEnd = new Date(Math.max(...kickoffTimes) + 24 * 60 * 60 * 1000);
 
+  // import match stats from ESPN
   await importEspnMatchesService(league, espnLeague, dayStart, { to: dayEnd });
 
+  // delete finished matches from live table
   for (const match of finished) {
     await deleteLiveMatch(match.id);
     seen.delete(match.id);
     console.log(
       `[live] finished ${match.id} ${match.rawHome} ${match.homeScore}-${match.awayScore} ${match.rawAway}`,
     );
+  }
+
+  // update standings after matches added to match stats
+  try {
+    await updateStandingsService(league, curSeason);
+    console.log(`[live] updated standings for ${league}`);
+  } catch (error) {
+    console.error(`[live] failed updating standings for ${league}:`, error);
   }
 }
 
@@ -153,26 +152,19 @@ async function tick(): Promise<TickResult> {
 }
 
 async function main() {
-  let running = true;
-
-  function stop() {
-    running = false;
-    if (wakeUp) wakeUp();
-  }
-  process.on("SIGTERM", stop);
-  process.on("SIGINT", stop);
+  stopOnSignals();
 
   const stale = await deleteStaleLiveMatches();
   console.log(`[live] Removed ${stale} stale live matches`);
 
-  while (running) {
+  while (isRunning()) {
     let result: TickResult | null = null;
     try {
       result = await tick();
     } catch (error) {
       console.error("[live] tick failed:", error);
     }
-    if (!running) break;
+    if (!isRunning()) break;
 
     const sleepFor = chooseSleep(result);
     console.log(`[live] next check in ${Math.round(sleepFor / 60000)}m`);

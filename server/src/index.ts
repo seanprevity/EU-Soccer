@@ -5,13 +5,11 @@ import morgan from "morgan";
 import "../drizzle/relations";
 import "./lib/db";
 import standingsRoutes from "./modules/standings/standings.routes";
-import managementRoutes from "./modules/management/management.routes";
 import matchRoutes from "./modules/matches/matches.routes";
 import h2hRoutes from "./modules/h2h/h2h.routes";
 import teamStatsRoutes from "./modules/teamstats/teamstats.routes";
 import teamsRoutes from "./modules/teams/teams.routes";
 import squadRoutes from "./modules/squads/squads.routes";
-import { requireAdminKey } from "./middleware/requireAdminKey";
 import { env } from "./config/env";
 import { errorHandler, notFound } from "./middleware/errorHandler";
 
@@ -28,7 +26,6 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/standings", standingsRoutes);
-app.use("/management", requireAdminKey, managementRoutes);
 app.use("/matches", matchRoutes);
 app.use("/h2h", h2hRoutes);
 app.use("/teamstats", teamStatsRoutes);

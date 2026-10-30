@@ -1,8 +1,6 @@
 name: Daily data update
 
 on:
-  schedule:
-    - cron: "47 6 * * *" # 06:47 UTC daily
   workflow_dispatch:
 
 jobs:

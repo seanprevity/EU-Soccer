@@ -13,7 +13,7 @@ import {
 } from "./management.service";
 import { importEspnMatchesService } from "./management.espnService";
 
-// The parallel arrays in config/arrays, zipped once so each league's settings stay together
+// The parallel arrays in config/arrays
 export const LEAGUE_CONFIG = Leagues.map((name, i) => ({
   name,
   espnLeague: espn_leagues[i]!,
@@ -22,7 +22,7 @@ export const LEAGUE_CONFIG = Leagues.map((name, i) => ({
 }));
 export type LeagueConfig = (typeof LEAGUE_CONFIG)[number];
 
-/** One league's settings, or every league when none is given. */
+// One league's settings, or every league when none is given.
 export const leaguesFor = (league?: string): LeagueConfig[] =>
   league ? LEAGUE_CONFIG.filter((l) => l.name === league) : LEAGUE_CONFIG;
 
@@ -46,14 +46,9 @@ export type StepResult = {
   error?: string;
 };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-export const daysAgo = (n: number) => new Date(Date.now() - n * DAY_MS);
+export const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
 
-/**
- * Runs one step for one league and records how it went. A failure is recorded, not thrown,
- * so one league's problem doesn't stop the others. Skips the step when a step it depends on
- * failed (or was skipped) for the same league.
- */
+// Runs one step for one league and records how it went.
 export const runStep = async (
   results: StepResult[],
   step: StepName,
@@ -61,6 +56,7 @@ export const runStep = async (
   fn: () => Promise<unknown>,
   dependsOn: StepName[] = [],
 ): Promise<void> => {
+  // find any failed steps and stop if current step depends on that failed step
   const blocker = results.find(
     (r) =>
       r.league === league && dependsOn.includes(r.step) && r.status !== "ok",
@@ -81,6 +77,8 @@ export const runStep = async (
 
   const start = Date.now();
   console.log(`[${step}] ${league}…`);
+
+  // run step
   try {
     await fn();
     results.push({
@@ -102,7 +100,7 @@ export const runStep = async (
   }
 };
 
-/** Prints the end-of-run summary and a table of anything that didn't succeed. */
+// Prints the end-of-run summary and a table of anything that didn't succeed.
 export const logSummary = (
   name: string,
   results: StepResult[],
@@ -118,10 +116,40 @@ export const logSummary = (
   if (problems.length) console.table(problems);
 };
 
-/**
- * The daily pipeline, in dependency order. Used by POST /management/update-all
- * and by the daily GitHub Actions job (src/config/updateAll.ts).
- */
+// runs every few hours by update worker, handles standings, upcoming matches, post matches
+export const runQuickUpdate = async (
+  leagues: LeagueConfig[] = LEAGUE_CONFIG,
+  results: StepResult[] = [],
+): Promise<StepResult[]> => {
+  const started = Date.now();
+
+  // import match stats
+  for (const l of leagues)
+    await runStep(results, STEP.import, l.name, () =>
+      importEspnMatchesService(l.name, l.espnLeague, daysAgo(1)),
+    );
+
+  // update standings
+  for (const l of leagues)
+    await runStep(
+      results,
+      STEP.standings,
+      l.name,
+      () => updateStandingsService(l.name, curSeason),
+      [STEP.import],
+    );
+
+  // update upcoming matches (removes stale and grabs new)
+  for (const l of leagues)
+    await runStep(results, STEP.upcoming, l.name, () =>
+      updateFutureMatchesService(l.competitionCode, l.name),
+    );
+
+  logSummary("Quick update", results, started);
+  return results;
+};
+
+// The daily pipeline, used by the daily GHA job (src/config/updateAll.ts) and update worker.
 export const runFullUpdate = async (
   leagues: LeagueConfig[] = LEAGUE_CONFIG,
   results: StepResult[] = [],
