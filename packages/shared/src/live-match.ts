@@ -41,5 +41,15 @@ export const liveMatchSchema = z.object({
 // automatically generated, omit for insert type
 export const newLiveMatchSchema = liveMatchSchema.omit({ id: true });
 
+export const liveMatchQuerySchema = z.object({
+  espnId: z.string().regex(/^\d+$/, "espnId must be numeric"),
+});
+
+export const liveMatchResponseSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("live"), match: liveMatchSchema }),
+  z.object({ status: z.literal("finished"), matchId: z.number() }),
+]);
+
+export type LiveMatchResponse = z.infer<typeof liveMatchResponseSchema>;
 export type LiveMatch = z.infer<typeof liveMatchSchema>;
 export type NewLiveMatch = z.infer<typeof newLiveMatchSchema>;

@@ -47,26 +47,28 @@ function LiveMatchCard({ match }: { match: LiveMatch }) {
   if (isHalfTime) statusText = "Half time";
 
   return (
-    <div className="p-4 rounded-md bg-[#f8f8f8] dark:bg-gray-700 border-l-4 border-red-600">
-      <div className="mb-2 flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
-        {/* Pulsing dot: one dot that pings outward behind a solid one */}
-        <span className="relative flex h-2 w-2">
-          {!isHalfTime && (
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-          )}
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
-        </span>
-        {statusText}
-      </div>
+    <Link href={`/live/${match.espnId}`} className="no-underline">
+      <div className="p-4 rounded-md bg-[#f8f8f8] dark:bg-gray-700 border-l-4 border-red-600 transition-transform duration-200 ease-in-out hover:-translate-y-[2px] hover:shadow-lg">
+        <div className="mb-2 flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
+          {/* Pulsing dot: one dot that pings outward behind a solid one */}
+          <span className="relative flex h-2 w-2">
+            {!isHalfTime && (
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+            )}
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
+          </span>
+          {statusText}
+        </div>
 
-      <div className="flex items-center justify-between">
-        <TeamBlock team={match.homeTeam} />
-        <span className="mx-2 text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
-          {match.homeScore} – {match.awayScore}
-        </span>
-        <TeamBlock team={match.awayTeam} />
+        <div className="flex items-center justify-between">
+          <TeamBlock team={match.homeTeam} />
+          <span className="mx-2 text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+            {match.homeScore} – {match.awayScore}
+          </span>
+          <TeamBlock team={match.awayTeam} />
+        </div>
       </div>
-    </div>
+    </Link>
   );
 }
 

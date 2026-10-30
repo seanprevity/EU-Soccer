@@ -300,3 +300,23 @@ export async function deleteStaleLiveMatches(): Promise<number> {
 export async function getLiveMatchesService(): Promise<LiveMatch[]> {
   return await db.select().from(liveMatches).orderBy(asc(liveMatches.kickoff));
 }
+
+export async function getLiveMatchService(
+  espnId: string,
+): Promise<LiveMatch | null> {
+  const [row] = await db
+    .select()
+    .from(liveMatches)
+    .where(eq(liveMatches.espnId, espnId));
+  return row;
+}
+
+export async function getMatchIdByEspnIdService(
+  espnId: string,
+): Promise<number | null> {
+  const [row] = await db
+    .select({ id: matchStats.id })
+    .from(matchStats)
+    .where(eq(matchStats.espnId, espnId));
+  return row?.id ?? null;
+}

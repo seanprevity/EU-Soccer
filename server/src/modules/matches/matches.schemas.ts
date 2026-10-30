@@ -1,5 +1,6 @@
 import {
   idParamsSchema,
+  liveMatchQuerySchema,
   matchStatsQuerySchema,
   matchupQuerySchema,
   teamMatchesQuerySchema,
@@ -24,4 +25,8 @@ export const getTeamMatchesSchemas = {
 
 export const getMatchupSchemas = {
   query: matchupQuerySchema,
+} satisfies RequestSchemas;
+
+export const getLiveMatchSchemas = {
+  params: liveMatchQuerySchema,
 } satisfies RequestSchemas;

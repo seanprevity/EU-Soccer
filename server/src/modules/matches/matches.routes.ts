@@ -3,6 +3,7 @@ import { validate } from "../../middleware/validation";
 import {
   getHomeAwayMatches,
   getLast5Matches,
+  getLiveMatch,
   getLiveMatches,
   getMatchStats,
   getOdds,
@@ -13,6 +14,7 @@ import {
   getUpcomingMatches,
 } from "./matches.controller";
 import {
+  getLiveMatchSchemas,
   getMatchStatsSchemas,
   getMatchupSchemas,
   getOddsSchemas,
@@ -36,5 +38,6 @@ router.get("/recent", validate(getTeamMatchesSchemas), getRecentMatches);
 router.get("/simulation", validate(getMatchupSchemas), getSimulation);
 router.get("/home-away", validate(getMatchupSchemas), getHomeAwayMatches);
 router.get("/live", getLiveMatches);
+router.get("/live/:espnId", validate(getLiveMatchSchemas), getLiveMatch);
 
 export default router;

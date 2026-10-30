@@ -34,6 +34,8 @@ import {
   homeAwayMatchesSchema,
   LiveMatch,
   liveMatchSchema,
+  LiveMatchResponse,
+  liveMatchResponseSchema,
 } from "@epl/shared";
 import { withToast } from "@/lib/utils";
 import { z } from "zod";
@@ -447,6 +449,14 @@ export const api = createApi({
       }),
       transformResponse: (raw: unknown) => z.array(liveMatchSchema).parse(raw),
     }),
+
+    getLiveMatch: build.query<LiveMatchResponse, { espnId: string }>({
+      query: ({espnId}) => ({
+        url: `matches/live/${espnId}`,
+        method: "GET",
+      }),
+      transformResponse: (raw: unknown) => liveMatchResponseSchema.parse(raw),
+    }),
   }),
 });
 
@@ -475,6 +485,7 @@ export const {
   useGetTeamsExpectedStandingsQuery,
   useGetHomeAwayMatchStatsQuery,
   useGetLiveMatchesQuery,
+  useGetLiveMatchQuery,
 } = api;
 
 export const { endpoints } = api;

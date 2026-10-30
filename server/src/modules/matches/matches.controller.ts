@@ -3,6 +3,7 @@ import type {
   ApiError,
   HomeAwayMatches,
   LiveMatch,
+  LiveMatchResponse,
   MatchPreview,
   MatchStats,
   Odds,
@@ -12,6 +13,7 @@ import type {
 } from "@epl/shared";
 import type { Validated } from "../../middleware/validation";
 import type {
+  getLiveMatchSchemas,
   getMatchStatsSchemas,
   getMatchupSchemas,
   getOddsSchemas,
@@ -21,6 +23,8 @@ import type {
 import {
   getHomeAwayMatchesService,
   getLiveMatchesService,
+  getLiveMatchService,
+  getMatchIdByEspnIdService,
   getMatchStatsService,
   getOddsService,
   getPastMatchesService,
@@ -123,4 +127,28 @@ export const getLiveMatches = async (
   res: Response<LiveMatch[]>,
 ): Promise<void> => {
   res.json(await getLiveMatchesService());
+};
+
+export const getLiveMatch = async (
+  _req: Request,
+  res: Response<
+    LiveMatchResponse | ApiError,
+    Validated<typeof getLiveMatchSchemas>
+  >,
+): Promise<void> => {
+  const { espnId } = res.locals.validated.params;
+  const liveMatch = await getLiveMatchService(espnId);
+  if (liveMatch) {
+    res.json({ status: "live", match: liveMatch });
+    return;
+  }
+
+  const matchId = await getMatchIdByEspnIdService(espnId);
+  if (matchId !== null) {
+    res.json({ status: "finished", matchId });
+    return;
+  }
+  res
+    .status(404)
+    .json({ error: "No live or finished match with that ESPN id." });
 };
