@@ -24,7 +24,7 @@ jobs:
 
       # Step 2: setup PNPM and Node RTE
       - name: Set up PNPM
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
 
       - name: Set up Node
         uses: actions/setup-node@v5
