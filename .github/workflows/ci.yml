@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # Step 1: clone repo
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      # Step 2: setup PNPM and Node RTE
+      - name: Set up PNPM
+        uses: pnpm/action-setup@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Step 4: Run linter/tests/build
+      - name: Run Lint check
+        run: pnpm -r --if-present run lint
+
+      - name: Build project
+        run: pnpm build
+        env:
+            NEXT_PUBLIC_BASE_API_URL: https://api.example.invalid
