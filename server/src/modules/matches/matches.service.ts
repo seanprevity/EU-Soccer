@@ -76,7 +76,7 @@ export const getUpcomingMatchesService = async (): Promise<UpcomingMatch[]> => {
     .select()
     .from(upcomingMatches)
     .where(gt(upcomingMatches.matchDate, now))
-    .orderBy(asc(upcomingMatches.matchDate));
+    .orderBy(asc(upcomingMatches.matchDate), desc(upcomingMatches.id));
 };
 
 export const getPastMatchesService = (): Promise<MatchPreview[]> => {
