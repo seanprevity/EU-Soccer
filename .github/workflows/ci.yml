@@ -39,6 +39,9 @@ jobs:
       # Step 4: Run linter/tests/build
       - name: Run Lint check
         run: pnpm -r --if-present run lint
+      
+      - name: Run test check
+        run: pnpm -r --if-present run test
 
       - name: Build project
         run: pnpm build

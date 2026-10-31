@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "pnpm --filter @epl/shared build && pnpm -r --parallel dev",
     "build": "pnpm -r build",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
   }
 }
