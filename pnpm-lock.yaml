@@ -173,7 +173,7 @@ importers:
         version: link:../packages/shared
       '@hookform/resolvers':
         specifier: ^5.1.1
-        version: 5.9.2(@standard-schema/spec@1.1.0)(react-hook-form@7.90.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
+        version: 5.9.2(@standard-schema/spec@1.1.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@radix-ui/react-dialog':
         specifier: ^1.1.14
         version: 1.3.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -185,7 +185,7 @@ importers:
         version: 1.5.0(@types/react@19.3.0)(react@19.3.1)
       '@reduxjs/toolkit':
         specifier: ^2.9.0
-        version: 2.13.0(react-redux@9.3.0(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1))(react@19.3.1)
+        version: 2.13.0(react-redux@9.3.1(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1))(react@19.3.1)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -208,11 +208,11 @@ importers:
         specifier: ^19.3.0
         version: 19.3.1(react@19.3.1)
       react-hook-form:
-        specifier: ^7.59.0
-        version: 7.90.0(@types/react@19.3.0)(react@19.3.1)
+        specifier: ^7.91.0
+        version: 7.91.0(@types/react@19.3.0)(react@19.3.1)
       react-redux:
-        specifier: ^9.2.0
-        version: 9.3.0(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1)
+        specifier: ^9.3.1
+        version: 9.3.1(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1)
       recharts:
         specifier: ^3.3.0
         version: 3.10.1(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react-is@16.13.1)(react@19.3.1)(redux@5.0.1)
@@ -276,8 +276,8 @@ importers:
         specifier: workspace:*
         version: link:../packages/shared
       axios:
-        specifier: ^1.12.2
-        version: 1.20.0(debug@4.4.3(supports-color@5.5.0))(supports-color@5.5.0)
+        specifier: ^1.21.0
+        version: 1.21.0(debug@4.4.3(supports-color@5.5.0))(supports-color@5.5.0)
       bcryptjs:
         specifier: ^3.0.2
         version: 3.0.3
@@ -2031,8 +2031,8 @@ packages:
     resolution: {integrity: sha512-9WTZxEjsZ7b13TH8JPmbV2z8CHbl80/2hm3XPEG4JgNdQLK81IBRXmSxHfMAOkSqQeRxT/0dwNDz2GOm3zzpcQ==}
     engines: {node: '>=4'}
 
-  axios@1.20.0:
-    resolution: {integrity: sha512-r8aOh8j9cGKpgQAqpzrUHnSIc6a59Y3Xf/cv8sy1DrHCkZHzQGEuoq1tARk6qSyDdtQGSDgpb9kFlruzPvrgwg==}
+  axios@1.21.0:
+    resolution: {integrity: sha512-YCzXMB53Q9PZBsh7yN7wtapit4WepwcHS2fP8QhGsBxSz5YtgYobV7GGlWlAJi+RxfU77GQTQi2DSLUma42EYA==}
 
   axobject-query@4.1.0:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
@@ -3551,8 +3551,8 @@ packages:
     peerDependencies:
       react: ^19.3.1
 
-  react-hook-form@7.90.0:
-    resolution: {integrity: sha512-+NdG0FLzCPhFOp2NNxaUYLF9fyZhNjx9FTBBSYWF71/l6BBlmIc/j6xlp3DbaHWLJbIG7Zd8oznA19xJClU97w==}
+  react-hook-form@7.91.0:
+    resolution: {integrity: sha512-5BEBUnCBwa28AFXYTYmOaB/+CSpJ/+CWVASHEvIGUzFdHyUiPHeRhG7r5hOZ8nZi0yP7pbHdFNXO/p31EKTJFQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       '@types/react': '*'
@@ -3564,8 +3564,8 @@ packages:
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
 
-  react-redux@9.3.0:
-    resolution: {integrity: sha512-KQopgqFo/p/fgmAs5qz6p5RWaNAzq40WAu7fJIXnQpYxFPbJYtsJPWvGeF2rOBaY/kEuV77AVsX8TsQzKm+A/g==}
+  react-redux@9.3.1:
+    resolution: {integrity: sha512-vxMLT0lalUjbZPkoTepWyKAZbjIIFssNx/CEL9lTfwQBU6XpkGSmCNdcCIrkOBUgB68uftZMnbXVb6DwGnhRKQ==}
     peerDependencies:
       '@types/react': ^18.2.25 || ^19
       react: ^18.0 || ^19
@@ -4401,10 +4401,10 @@ snapshots:
       '@eslint/core': 0.17.0
       levn: 0.4.1
 
-  '@hookform/resolvers@5.9.2(@standard-schema/spec@1.1.0)(react-hook-form@7.90.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)':
+  '@hookform/resolvers@5.9.2(@standard-schema/spec@1.1.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)':
     dependencies:
       '@standard-schema/utils': 0.3.0
-      react-hook-form: 7.90.0(@types/react@19.3.0)(react@19.3.1)
+      react-hook-form: 7.91.0(@types/react@19.3.0)(react@19.3.1)
     optionalDependencies:
       '@standard-schema/spec': 1.1.0
       zod: 4.6.7
@@ -4754,7 +4754,7 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.3.0
 
-  '@reduxjs/toolkit@2.13.0(react-redux@9.3.0(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1))(react@19.3.1)':
+  '@reduxjs/toolkit@2.13.0(react-redux@9.3.1(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1))(react@19.3.1)':
     dependencies:
       '@standard-schema/spec': 1.1.0
       '@standard-schema/utils': 0.3.0
@@ -4764,7 +4764,7 @@ snapshots:
       reselect: 5.3.0
     optionalDependencies:
       react: 19.3.1
-      react-redux: 9.3.0(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1)
+      react-redux: 9.3.1(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1)
 
   '@rtsao/scc@1.1.0': {}
 
@@ -5328,7 +5328,7 @@ snapshots:
 
   axe-core@4.14.0: {}
 
-  axios@1.20.0(debug@4.4.3(supports-color@5.5.0))(supports-color@5.5.0):
+  axios@1.21.0(debug@4.4.3(supports-color@5.5.0))(supports-color@5.5.0):
     dependencies:
       follow-redirects: 1.16.1(debug@4.4.3(supports-color@5.5.0))
       form-data: 4.0.6
@@ -6969,7 +6969,7 @@ snapshots:
       react: 19.3.1
       scheduler: 0.28.0
 
-  react-hook-form@7.90.0(@types/react@19.3.0)(react@19.3.1):
+  react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1):
     dependencies:
       react: 19.3.1
     optionalDependencies:
@@ -6977,7 +6977,7 @@ snapshots:
 
   react-is@16.13.1: {}
 
-  react-redux@9.3.0(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1):
+  react-redux@9.3.1(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1):
     dependencies:
       '@types/use-sync-external-store': 0.0.6
       react: 19.3.1
@@ -7027,7 +7027,7 @@ snapshots:
 
   recharts@3.10.1(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react-is@16.13.1)(react@19.3.1)(redux@5.0.1):
     dependencies:
-      '@reduxjs/toolkit': 2.13.0(react-redux@9.3.0(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1))(react@19.3.1)
+      '@reduxjs/toolkit': 2.13.0(react-redux@9.3.1(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1))(react@19.3.1)
       clsx: 2.1.1
       decimal.js-light: 2.5.1
       es-toolkit: 1.52.0
@@ -7036,7 +7036,7 @@ snapshots:
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
       react-is: 16.13.1
-      react-redux: 9.3.0(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1)
+      react-redux: 9.3.1(@types/react@19.3.0)(react@19.3.1)(redux@5.0.1)
       reselect: 5.2.0
       tiny-invariant: 1.3.3
       use-sync-external-store: 1.7.0(react@19.3.1)
