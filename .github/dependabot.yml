@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pul-reqeusts-limit: 5
+    # Ignore major version upgrades, do those manually - for later
+    # ignore:
+    #   - dependency-name: "*"
+    #     update-type: ["version-update:semver-major"]
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+      commit-message:
+        prefix: "chore(deps)"
+  
+  # Updates GHA like checkout@v5 -> checkour@v6
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule: 
+      interval: "monthly"
+    commit-message:
+      prefix: "chore(ci)"
