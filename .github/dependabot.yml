@@ -5,18 +5,17 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pul-reqeusts-limit: 5
+    open-pull-requests-limit: 5
     # Ignore major version upgrades, do those manually - for later
     # ignore:
     #   - dependency-name: "*"
-    #     update-type: ["version-update:semver-major"]
+    #     update-types: ["version-update:semver-major"]
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
-      commit-message:
-        prefix: "chore(deps)"
-  
-  # Updates GHA like checkout@v5 -> checkour@v6
+    commit-message:
+      prefix: "chore(deps)"
+  # Updates GitHub Actions, e.g. checkout@v5 -> checkout@v6
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule: 
