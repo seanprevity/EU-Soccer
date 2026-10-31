@@ -20,7 +20,7 @@ jobs:
     steps:
       # Step 1: clone repo
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       # Step 2: setup PNPM and Node RTE
       - name: Set up PNPM
