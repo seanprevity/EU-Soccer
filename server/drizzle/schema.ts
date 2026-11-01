@@ -17,7 +17,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import type { MatchEvent, MatchLineups, MatchResult } from "@epl/shared";
+import type { HalfStats, MatchEvent, MatchLineups, MatchResult } from "@epl/shared";
 
 export const odds = pgTable(
   "odds",
@@ -218,6 +218,7 @@ export const matchStats = pgTable(
     hsv: integer("HSV"),
     asv: integer("ASV"),
     lineups: jsonb("Lineups").$type<MatchLineups>(),
+    firstHalf: jsonb("FirstHalf").$type<HalfStats>(),
   },
   (table) => [
     foreignKey({
@@ -512,6 +513,7 @@ export const liveMatches = pgTable(
     abs: integer("ABS"),
     hsv: integer("HSV"),
     asv: integer("ASV"),
+    firstHalf: jsonb("firstHalf").$type<HalfStats>(),
   },
   (table) => [
     foreignKey({

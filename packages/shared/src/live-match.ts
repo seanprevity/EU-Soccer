@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { matchEventSchema, matchLineupsSchema } from "./match-stats";
+import { halfStatsSchema, matchEventSchema, matchLineupsSchema } from "./match-stats";
 
 export const liveMatchSchema = z.object({
   id: z.number().int(),
@@ -36,6 +36,7 @@ export const liveMatchSchema = z.object({
   abs: z.number().int().nullable(),
   hsv: z.number().int().nullable(), // saves
   asv: z.number().int().nullable(),
+  firstHalf: halfStatsSchema.nullable(),
 });
 
 // automatically generated, omit for insert type

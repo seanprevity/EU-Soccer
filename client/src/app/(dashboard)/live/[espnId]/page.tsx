@@ -28,8 +28,13 @@ function toLiveInfo(live: LiveMatch): LiveInfo {
 
   let label = `Live · ${live.clock ?? ""}`;
   if (isHalfTime) label = "Half time";
-
-  return { label, isHalfTime, reachedHalfTime };
+  const minute = parseInt(live.clock ?? "", 10);
+  return {
+    label,
+    isHalfTime,
+    reachedHalfTime,
+    minute: Number.isFinite(minute) ? minute : null,
+  };
 }
 
 export default function LiveMatchPage() {

@@ -9,6 +9,7 @@ import {
 } from "../../../drizzle/schema";
 import { espnTeam } from "../../config/map";
 import {
+  HalfStats,
   LineupPlayer,
   MatchEvent,
   MatchLineups,
@@ -68,7 +69,20 @@ type MinuteParts = {
   extraMinute: number | null;
 };
 
+export type CoreStats = { home: StatValues | null; away: StatValues | null };
+
 // Small helpers
+
+// Both teams' core API statistics (the only source of xG)
+export async function fetchCoreStats(
+  espnLeague: string,
+  match: EspnMatch,
+): Promise<CoreStats> {
+  const home = await fetchCoreTeamStats(espnLeague, match.id, match.homeTeamId);
+  await sleep(ESPN_DELAY_MS);
+  const away = await fetchCoreTeamStats(espnLeague, match.id, match.awayTeamId);
+  return { home, away };
+}
 
 // "67'" becomes { minute: 67, extraMinute: null }; "45'+2'" becomes { minute: 45, extraMinute: 2 }
 function parseMinute(displayValue: string | undefined): MinuteParts {
@@ -499,6 +513,7 @@ export function toLiveRow(
   league: string,
   match: EspnMatch,
   summary?: any,
+  core?: CoreStats,
 ): NewLiveMatch | null {
   if (match.homeScore == null || match.awayScore == null || !match.date) {
     return null;
@@ -524,6 +539,20 @@ export function toLiveRow(
     ].sort(compareByMinute);
   }
 
+  if (core?.home?.expectedGoals != null) {
+    homeStats = { ...homeStats, expectedGoals: core.home.expectedGoals };
+  }
+  if (core?.away?.expectedGoals != null) {
+    awayStats = { ...awayStats, expectedGoals: core.away.expectedGoals };
+  }
+
+  const statColumns = buildStatColumns(homeStats, awayStats);
+
+  let firstHalf: HalfStats | null = null;
+  if (match.statusName === "STATUS_HALFTIME" && summary) {
+    firstHalf = statColumns;
+  }
+
   return {
     espnId: match.id,
     league,
@@ -539,6 +568,8 @@ export function toLiveRow(
     lineups,
     updatedAt: new Date().toISOString(),
     ...buildStatColumns(homeStats, awayStats),
+    ...statColumns,
+    firstHalf,
   };
 }
 
@@ -548,6 +579,25 @@ export async function upsertLiveMatch(row: NewLiveMatch): Promise<void> {
     .insert(liveMatches)
     .values(row)
     .onConflictDoUpdate({ target: liveMatches.espnId, set: withoutNulls(row) });
+}
+
+export async function copyFirstHalfToMatchStats(
+  espnIds: string[],
+): Promise<void> {
+  if (espnIds.length === 0) return;
+
+  const rows = await db
+    .select({ espnId: liveMatches.espnId, firstHalf: liveMatches.firstHalf })
+    .from(liveMatches)
+    .where(inArray(liveMatches.espnId, espnIds));
+
+  for (const row of rows) {
+    if (!row.firstHalf) continue;
+    await db
+      .update(matchStats)
+      .set({ firstHalf: row.firstHalf })
+      .where(eq(matchStats.espnId, row.espnId));
+  }
 }
 
 // Finished matches (daily import)

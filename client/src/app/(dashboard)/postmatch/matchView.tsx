@@ -24,6 +24,7 @@ export type LiveInfo = {
   label: string;
   isHalfTime: boolean;
   reachedHalfTime: boolean;
+  minute: number | null;
 };
 
 const teamHref = (team: string) => `/team/${team.split(" ").join("_")}`;
@@ -299,7 +300,7 @@ export default function MatchView({
               live={live}
             />
           )}
-          {active === "stats" && <Stats match={match} />}
+          {active === "stats" && <Stats match={match} live={live} />}
           {active === "table" && <MatchTable match={match} />}
           {active === "lineups" && <Lineups match={match} />}
         </div>

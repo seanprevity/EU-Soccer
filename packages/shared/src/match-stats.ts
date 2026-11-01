@@ -49,6 +49,30 @@ export const matchLineupsSchema = z.object({
 // Full-time result: home win, draw or away win.
 export const matchResultSchema = z.enum(["H", "D", "A"]);
 
+// stats to store by half
+export const halfStatsSchema = z.object({
+  hs: z.number().nullable(),
+  as: z.number().nullable(),
+  hst: z.number().int().nullable(),
+  ast: z.number().int().nullable(),
+  hc: z.number().int().nullable(),
+  ac: z.number().int().nullable(),
+  hf: z.number().int().nullable(),
+  af: z.number().int().nullable(),
+  hy: z.number().int().nullable(),
+  ay: z.number().int().nullable(),
+  hr: z.number().int().nullable(),
+  ar: z.number().int().nullable(),
+  hxg: z.number().nullable(),
+  axg: z.number().nullable(),
+  hposs: z.number().nullable(),
+  aposs: z.number().nullable(),
+  hbs: z.number().int().nullable(),
+  abs: z.number().int().nullable(),
+  hsv: z.number().int().nullable(),
+  asv: z.number().int().nullable(),
+});
+
 export const matchStatsSchema = z.object({
   id: z.number().int(),
   homeTeam: z.string(),
@@ -81,6 +105,7 @@ export const matchStatsSchema = z.object({
   asv: z.number().int().nullable(),
   events: z.array(matchEventSchema).nullable(),
   lineups: matchLineupsSchema.nullable(),
+  firstHalf: halfStatsSchema.nullable(),
 });
 
 // One match in a results list.
@@ -185,3 +210,4 @@ export type MatchStatsQuery = z.infer<typeof matchStatsQuerySchema>;
 export type TeamMatchesQuery = z.infer<typeof teamMatchesQuerySchema>;
 export type RecentMatchesQuery = z.infer<typeof recentMatchesQuerySchema>;
 export type MatchupQuery = z.infer<typeof matchupQuerySchema>;
+export type HalfStats = z.infer<typeof halfStatsSchema>;
