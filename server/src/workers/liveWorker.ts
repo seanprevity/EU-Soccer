@@ -1,7 +1,10 @@
 import "dotenv/config";
 import {
+  CoreStats,
   ESPN_DELAY_MS,
   EspnMatch,
+  copyFirstHalfToMatchStats,
+  fetchCoreStats,
   fetchScoreboard,
   fetchSummary,
   importEspnMatchesService,
@@ -28,9 +31,19 @@ type TickResult = {
 type Seen = {
   score: string;
   eventCount: number;
+  shots: string;
+  status: string;
   lastSummaryAt: number; // Date.now()
 };
 const seen = new Map<string, Seen>();
+
+function scoreOf(match: EspnMatch): string {
+  return `${match.homeScore}-${match.awayScore}`;
+}
+
+function shotsOf(match: EspnMatch): string {
+  return `${match.homeStats.totalShots ?? 0}-${match.awayStats.totalShots ?? 0}`;
+}
 
 function chooseSleep(result: TickResult | null): number {
   if (result === null || result.liveGames) return 30_000;
@@ -64,6 +77,8 @@ async function finishMatches(
 
   // import match stats from ESPN
   await importEspnMatchesService(league, espnLeague, dayStart, { to: dayEnd });
+  // copy each match's half-time snapshot into them
+  await copyFirstHalfToMatchStats(finished.map((match) => match.id));
 
   // update standings after matches added to match stats
   try {
@@ -87,11 +102,14 @@ function shouldFetchSummary(match: EspnMatch): boolean {
   const storedMatch = seen.get(match.id);
   if (storedMatch === undefined) return true;
 
-  // if it's been over 3 minutes, or events/scores changed, fetch
+  // status changed: at half time this is the tick that takes the first-half snapshot
+  if (storedMatch.status !== match.statusName) return true;
+  // a shot changes xG
+  if (storedMatch.shots !== shotsOf(match)) return true;
+  // nothing happened for 3 minutes: refresh anyway to catch substitutions
   if (Date.now() - storedMatch.lastSummaryAt > 3 * 60 * 1000) return true;
   if (storedMatch.eventCount !== match.events.length) return true;
-  if (storedMatch.score !== `${match.homeScore}-${match.awayScore}`)
-    return true;
+  if (storedMatch.score !== scoreOf(match)) return true;
 
   return false;
 }
@@ -110,14 +128,22 @@ async function tick(): Promise<TickResult> {
     const liveMatches = matches.filter((m) => m.state === "in"); // only keep live matches
     for (const m of liveMatches) {
       let summary: Awaited<ReturnType<typeof fetchSummary>> = null;
+      let core: CoreStats | undefined;
       const fetchIt = shouldFetchSummary(m);
 
       if (fetchIt) {
         summary = await fetchSummary(espn_leagues[i], m.id);
+        await sleep(ESPN_DELAY_MS);
+
+        // core stats are the only source of xG
+        core = await fetchCoreStats(espn_leagues[i], m);
+
         if (summary != null) {
           seen.set(m.id, {
-            score: `${m.homeScore}-${m.awayScore}`,
+            score: scoreOf(m),
             eventCount: m.events.length,
+            shots: shotsOf(m),
+            status: m.statusName,
             lastSummaryAt: Date.now(),
           });
         }
@@ -126,10 +152,10 @@ async function tick(): Promise<TickResult> {
       }
 
       console.log(
-        `[live] ${m.id} ${m.rawHome} ${m.homeScore}-${m.awayScore} ${m.rawAway} ${m.clock} summary: ${fetchIt ? "yes" : "no"}`,
+        `[live] ${m.id} ${m.rawHome} ${m.homeScore}-${m.awayScore} ${m.rawAway} ${m.clock} ${m.statusName} summary: ${fetchIt ? "yes" : "no"}`,
       );
 
-      const row = toLiveRow(Leagues[i], m, summary);
+      const row = toLiveRow(Leagues[i], m, summary, core);
       if (row) await upsertLiveMatch(row);
     }
 
