@@ -67,25 +67,13 @@ function TeamRow({
   );
 }
 
-// sort matches by kickoff
-const byKickoff = (a: MatchPreview, b: MatchPreview) => {
-  if (!a.matchDate || !b.matchDate)
-    return a.matchDate ? -1 : b.matchDate ? 1 : 0;
-  return (
-    a.matchDate.localeCompare(b.matchDate) ||
-    a.homeTeam.localeCompare(b.homeTeam)
-  );
-};
-
 export function PastMatchesList({ matches }: { matches: MatchPreview[] }) {
-  const ordered = [...matches].sort(byKickoff);
-
   // Neutral grey for every finished match: this list isn't from one team's side
   const colors = getResultColors("draw");
 
   return (
     <ul className="space-y-3">
-      {ordered.map((m) => {
+      {matches.map((m) => {
         const homeWon = m.fthg != null && m.ftag != null && m.fthg > m.ftag;
         const awayWon = m.fthg != null && m.ftag != null && m.ftag > m.fthg;
 

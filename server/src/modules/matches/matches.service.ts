@@ -76,7 +76,7 @@ export const getUpcomingMatchesService = async (): Promise<UpcomingMatch[]> => {
     .select()
     .from(upcomingMatches)
     .where(gt(upcomingMatches.matchDate, now))
-    .orderBy(asc(upcomingMatches.matchDate), desc(upcomingMatches.id));
+    .orderBy(asc(upcomingMatches.matchDate), asc(upcomingMatches.homeTeam));
 };
 
 export const getPastMatchesService = (): Promise<MatchPreview[]> => {
@@ -86,7 +86,8 @@ export const getPastMatchesService = (): Promise<MatchPreview[]> => {
   return db
     .select(previewColumns)
     .from(matchStats)
-    .where(gt(matchStats.matchDate, since.toISOString()));
+    .where(gt(matchStats.matchDate, since.toISOString()))
+    .orderBy(asc(matchStats.matchDate), asc(matchStats.homeTeam));
 };
 
 export const getOddsService = async (matchId: number): Promise<Odds[]> => {
