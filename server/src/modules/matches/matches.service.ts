@@ -7,6 +7,7 @@ import {
   gt,
   gte,
   inArray,
+  isNotNull,
   lt,
   or,
 } from "drizzle-orm";
@@ -17,7 +18,9 @@ import type {
   MatchStats,
   Odds,
   PaginatedMatches,
+  PreviousLineup,
   SimulationResult,
+  UpcomingLineups,
   UpcomingMatch,
 } from "@epl/shared";
 import {
@@ -334,4 +337,55 @@ export async function getMatchIdByEspnIdService(
     .from(matchStats)
     .where(eq(matchStats.espnId, espnId));
   return row?.id ?? null;
+}
+
+// pulls last lineups for a team - last matchStats entry
+async function lastLineupFor(team: string): Promise<PreviousLineup | null> {
+  const [row] = await db
+    .select({
+      id: matchStats.id,
+      homeTeam: matchStats.homeTeam,
+      awayTeam: matchStats.awayTeam,
+      matchDate: matchStats.matchDate,
+      lineups: matchStats.lineups,
+    })
+    .from(matchStats)
+    .where(
+      and(
+        or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)),
+        isNotNull(matchStats.lineups),
+      ),
+    )
+    .orderBy(desc(matchStats.matchDate))
+    .limit(1);
+
+  if (!row?.lineups || !row.matchDate) return null;
+  const wasHome = row.homeTeam === team;
+  return {
+    lineup: wasHome ? row.lineups.home : row.lineups.away,
+    matchId: row.id,
+    matchDate: row.matchDate,
+    opponent: wasHome ? row.awayTeam : row.homeTeam,
+    wasHome,
+  };
+}
+
+export async function getUpcomingLineupsService(
+  upcomingId: number,
+): Promise<UpcomingLineups | null> {
+  const [fixture] = await db
+    .select({
+      homeTeam: upcomingMatches.homeTeam,
+      awayTeam: upcomingMatches.awayTeam,
+    })
+    .from(upcomingMatches)
+    .where(eq(upcomingMatches.id, upcomingId));
+
+  if (!fixture) return null;
+
+  const [home, away] = await Promise.all([
+    lastLineupFor(fixture.homeTeam),
+    lastLineupFor(fixture.awayTeam),
+  ]);
+  return { home, away };
 }

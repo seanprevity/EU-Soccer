@@ -36,6 +36,8 @@ import {
   liveMatchSchema,
   LiveMatchResponse,
   liveMatchResponseSchema,
+  UpcomingLineups,
+  upcomingLineupsSchema,
 } from "@epl/shared";
 import { withToast } from "@/lib/utils";
 import { z } from "zod";
@@ -455,6 +457,14 @@ export const api = createApi({
       }),
       transformResponse: (raw: unknown) => liveMatchResponseSchema.parse(raw),
     }),
+
+    getUpcomingLineups: build.query<UpcomingLineups, number>({
+      query: (id) => ({
+        url: `matches/upcoming/${id}/lineups`,
+        method: "GET",
+      }),
+      transformResponse: (raw: unknown) => upcomingLineupsSchema.parse(raw),
+    }),
   }),
 });
 
@@ -484,6 +494,7 @@ export const {
   useGetHomeAwayMatchStatsQuery,
   useGetLiveMatchesQuery,
   useGetLiveMatchQuery,
+  useGetUpcomingLineupsQuery,
 } = api;
 
 export const { endpoints } = api;

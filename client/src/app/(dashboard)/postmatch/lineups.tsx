@@ -418,7 +418,13 @@ function BenchColumn({
   );
 }
 
-export default function Lineups({ match }: { match: MatchStats }) {
+export default function Lineups({
+  match,
+  prematch = false,
+}: {
+  match: MatchStats;
+  prematch: boolean;
+}) {
   if (!match.lineups)
     return (
       <p className="text-center text-sm text-gray-500 dark:text-gray-400">
@@ -438,15 +444,17 @@ export default function Lineups({ match }: { match: MatchStats }) {
       <Pitch match={match} marks={marks} />
 
       <div className="space-y-6 rounded-lg bg-white p-4 dark:bg-gray-900">
-        <section aria-label="Substitutions" className="space-y-3">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-            Substitutions
-          </h3>
-          <div className="grid gap-6 sm:grid-cols-2">
-            <SubColumn subs={subs.filter((s) => s.side === "home")} />
-            <SubColumn subs={subs.filter((s) => s.side === "away")} />
-          </div>
-        </section>
+        {!prematch && (
+          <section aria-label="Substitutions" className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+              Substitutions
+            </h3>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <SubColumn subs={subs.filter((s) => s.side === "home")} />
+              <SubColumn subs={subs.filter((s) => s.side === "away")} />
+            </div>
+          </section>
+        )}
 
         <section aria-label="Bench" className="space-y-3">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">

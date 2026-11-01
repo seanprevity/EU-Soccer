@@ -1,4 +1,18 @@
 import { z } from "zod";
+import { teamLineupSchema } from "./match-stats";
+
+export const previousLineupSchema = z.object({
+  lineup: teamLineupSchema,
+  matchId: z.number(),
+  matchDate: z.string(),
+  opponent: z.string(),
+  wasHome: z.boolean(),
+});
+
+export const upcomingLineupsSchema = z.object({
+  home: previousLineupSchema.nullable(),
+  away: previousLineupSchema.nullable(),
+});
 
 export const upcomingMatchSchema = z.object({
   id: z.number().int(),
@@ -8,4 +22,10 @@ export const upcomingMatchSchema = z.object({
   league: z.string(),
 });
 
+export const upcomingLineupsParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
 export type UpcomingMatch = z.infer<typeof upcomingMatchSchema>;
+export type PreviousLineup = z.infer<typeof previousLineupSchema>;
+export type UpcomingLineups = z.infer<typeof upcomingLineupsSchema>;

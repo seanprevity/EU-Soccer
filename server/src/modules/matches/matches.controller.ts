@@ -9,6 +9,7 @@ import type {
   Odds,
   PaginatedMatches,
   SimulationResult,
+  UpcomingLineups,
   UpcomingMatch,
 } from "@epl/shared";
 import type { Validated } from "../../middleware/validation";
@@ -19,6 +20,7 @@ import type {
   getOddsSchemas,
   getRecentMatchesSchemas,
   getTeamMatchesSchemas,
+  getUpcomingLineupsSchemas,
   getUpcomingMatchByIdSchemas,
 } from "./matches.schemas";
 import {
@@ -32,6 +34,7 @@ import {
   getRecentMatchesService,
   getSimulationService,
   getTeamMatchesService,
+  getUpcomingLineupsService,
   getUpcomingMatchByIdService,
   getUpcomingMatchesService,
 } from "./matches.service";
@@ -153,4 +156,20 @@ export const getLiveMatch = async (
   res
     .status(404)
     .json({ error: "No live or finished match with that ESPN id." });
+};
+
+export const getUpcomingLineups = async (
+  _req: Request,
+  res: Response<
+    UpcomingLineups | ApiError,
+    Validated<typeof getUpcomingLineupsSchemas>
+  >,
+): Promise<void> => {
+  const { id } = res.locals.validated.query;
+  const lineups = await getUpcomingLineupsService(id);
+  if (!lineups) {
+    res.status(404).json({ error: "No upcoming match with that id." });
+    return;
+  }
+  res.json(lineups);
 };
