@@ -157,8 +157,7 @@ export const upcomingMatches = pgTable(
       foreignColumns: [leagues.name],
       name: "upcoming_matches_League_fkey",
     }).onUpdate("cascade"),
-    unique("upcoming_match_unique_idx").on(
-      table.matchDate,
+    unique("upcomingMatches_teams_key").on(
       table.homeTeam,
       table.awayTeam,
     ),

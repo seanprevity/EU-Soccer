@@ -20,6 +20,7 @@ import {
   isNull,
   ne,
   notInArray,
+  inArray,
 } from "drizzle-orm";
 import { db } from "../../lib/db";
 import csv from "csv-parser";
@@ -190,12 +191,14 @@ export const updateFutureMatchesService = async (
       .delete(upcomingMatches)
       .where(lt(upcomingMatches.matchDate, new Date().toISOString()));
 
+    const listed = new Set<string>();
     // Insert upcoming matches
     for (const match of data["matches"]) {
       const home = map_team(match["homeTeam"]["shortName"]);
       const away = map_team(match["awayTeam"]["shortName"]);
       const date = new Date(match["utcDate"]);
       if (!home || !away || !date) continue;
+      listed.add(`${home}|${away}`);
       await db
         .insert(upcomingMatches)
         .values({
@@ -204,10 +207,38 @@ export const updateFutureMatchesService = async (
           matchDate: date.toISOString(),
           league: league,
         })
-        .onConflictDoNothing();
-      // update H2H for these two teams so that it will be shown
+        .onConflictDoUpdate({
+          target: [upcomingMatches.homeTeam, upcomingMatches.awayTeam],
+          set: { matchDate: date.toISOString() },
+        });
       await updateH2HService(home, away);
     }
+
+    if (listed.size > 0) {
+      const stored = await db
+        .select({
+          id: upcomingMatches.id,
+          homeTeam: upcomingMatches.homeTeam,
+          awayTeam: upcomingMatches.awayTeam,
+        })
+        .from(upcomingMatches)
+        .where(eq(upcomingMatches.league, league));
+
+      const staleIds: number[] = [];
+      for (const row of stored) {
+        if (!listed.has(`${row.homeTeam}|${row.awayTeam}`))
+          staleIds.push(row.id);
+      }
+      if (staleIds.length > 0) {
+        await db
+          .delete(upcomingMatches)
+          .where(inArray(upcomingMatches.id, staleIds));
+        console.log(
+          `[upcoming] removed ${staleIds.length} fixtures no longer listed for ${league}`,
+        );
+      }
+    }
+
     return { success: true, count: data["matches"].length };
   } catch (err: any) {
     console.error("Match API error:", err.message);
