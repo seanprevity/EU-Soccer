@@ -165,7 +165,7 @@ export const getUpcomingLineups = async (
     Validated<typeof getUpcomingLineupsSchemas>
   >,
 ): Promise<void> => {
-  const { id } = res.locals.validated.query;
+  const { id } = res.locals.validated.params;
   const lineups = await getUpcomingLineupsService(id);
   if (!lineups) {
     res.status(404).json({ error: "No upcoming match with that id." });

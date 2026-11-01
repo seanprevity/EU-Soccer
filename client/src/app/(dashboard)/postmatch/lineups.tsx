@@ -423,7 +423,7 @@ export default function Lineups({
   prematch = false,
 }: {
   match: MatchStats;
-  prematch: boolean;
+  prematch?: boolean;
 }) {
   if (!match.lineups)
     return (
@@ -432,11 +432,13 @@ export default function Lineups({
       </p>
     );
 
+  const marks = marksByPlayer(match.events);
+  if (prematch) return <Pitch match={match} marks={marks} />;
+
   const subs = (match.events ?? []).filter((e) => e.kind === "sub");
   const subMinutes = new Map(
     subs.filter((s) => s.player).map((s) => [s.player!, formatMinute(s)]),
   );
-  const marks = marksByPlayer(match.events);
   const colors = matchColors(match.homeTeam, match.awayTeam);
 
   return (
@@ -444,17 +446,15 @@ export default function Lineups({
       <Pitch match={match} marks={marks} />
 
       <div className="space-y-6 rounded-lg bg-white p-4 dark:bg-gray-900">
-        {!prematch && (
-          <section aria-label="Substitutions" className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-              Substitutions
-            </h3>
-            <div className="grid gap-6 sm:grid-cols-2">
-              <SubColumn subs={subs.filter((s) => s.side === "home")} />
-              <SubColumn subs={subs.filter((s) => s.side === "away")} />
-            </div>
-          </section>
-        )}
+        <section aria-label="Substitutions" className="space-y-3">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+            Substitutions
+          </h3>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <SubColumn subs={subs.filter((s) => s.side === "home")} />
+            <SubColumn subs={subs.filter((s) => s.side === "away")} />
+          </div>
+        </section>
 
         <section aria-label="Bench" className="space-y-3">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">

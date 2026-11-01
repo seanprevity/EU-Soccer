@@ -34,7 +34,9 @@ export default function UpcomingLineups({
   homeTeam: string;
   awayTeam: string;
 }) {
-  const { data, isLoading, isError } = useGetUpcomingLineupsQuery(matchId);
+  const { data, isLoading, isError } = useGetUpcomingLineupsQuery(matchId, {
+    pollingInterval: 5 * 60 * 1000,
+  });
 
   if (isLoading)
     return (
@@ -53,6 +55,24 @@ export default function UpcomingLineups({
       </p>
     );
 
+  if (data.confirmed) {
+    const match = {
+      homeTeam,
+      awayTeam,
+      events: [],
+      lineups: data.confirmed,
+    } as unknown as MatchStats;
+
+    return (
+      <div className="space-y-3">
+        <p className="rounded-lg bg-white p-3 text-center text-xs font-semibold text-green-700 dark:bg-gray-900 dark:text-green-400">
+          Confirmed lineups
+        </p>
+        <Lineups match={match} prematch />
+      </div>
+    );
+  }
+
   // Lineups draws from a MatchStats; only these fields are read
   const match = {
     homeTeam,
@@ -65,7 +85,7 @@ export default function UpcomingLineups({
   } as unknown as MatchStats;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       <div className="rounded-lg bg-white p-3 text-center text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-300">
         <p className="font-semibold text-gray-900 dark:text-white">
           Last starting XIs, not confirmed lineups

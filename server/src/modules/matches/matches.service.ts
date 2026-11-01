@@ -8,12 +8,14 @@ import {
   gte,
   inArray,
   isNotNull,
+  isNull,
   lt,
   or,
 } from "drizzle-orm";
 import type {
   HomeAwayMatches,
   LiveMatch,
+  MatchLineups,
   MatchPreview,
   MatchStats,
   Odds,
@@ -377,9 +379,11 @@ export async function getUpcomingLineupsService(
     .select({
       homeTeam: upcomingMatches.homeTeam,
       awayTeam: upcomingMatches.awayTeam,
+      lineups: upcomingMatches.lineups,
     })
     .from(upcomingMatches)
-    .where(eq(upcomingMatches.id, upcomingId));
+    .where(eq(upcomingMatches.id, upcomingId))
+    .limit(1);
 
   if (!fixture) return null;
 
@@ -387,5 +391,43 @@ export async function getUpcomingLineupsService(
     lastLineupFor(fixture.homeTeam),
     lastLineupFor(fixture.awayTeam),
   ]);
-  return { home, away };
+  return { confirmed: fixture.lineups ?? null, home, away };
+}
+
+// Matches that don't have a lineup and start today
+export async function getUpcomingAwaitingLineups(): Promise<
+  Map<string, number>
+> {
+  const now = new Date();
+  const dayAhead = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  const rows = await db
+    .select({
+      id: upcomingMatches.id,
+      homeTeam: upcomingMatches.homeTeam,
+      awayTeam: upcomingMatches.awayTeam,
+    })
+    .from(upcomingMatches)
+    .where(
+      and(
+        isNull(upcomingMatches.lineups),
+        gt(upcomingMatches.matchDate, now.toISOString()),
+        lt(upcomingMatches.matchDate, dayAhead.toISOString()),
+      ),
+    );
+
+  const idByFixture = new Map<string, number>();
+  for (const row of rows)
+    idByFixture.set(`${row.homeTeam}|${row.awayTeam}`, row.id);
+  return idByFixture;
+}
+
+export async function saveUpcomingLineups(
+  id: number,
+  lineups: MatchLineups,
+): Promise<void> {
+  await db
+    .update(upcomingMatches)
+    .set({ lineups })
+    .where(eq(upcomingMatches.id, id));
 }

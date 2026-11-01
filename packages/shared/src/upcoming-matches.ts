@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { teamLineupSchema } from "./match-stats";
+import { matchLineupsSchema, teamLineupSchema } from "./match-stats";
 
 export const previousLineupSchema = z.object({
   lineup: teamLineupSchema,
@@ -10,6 +10,7 @@ export const previousLineupSchema = z.object({
 });
 
 export const upcomingLineupsSchema = z.object({
+  confirmed: matchLineupsSchema.nullable().optional(),
   home: previousLineupSchema.nullable(),
   away: previousLineupSchema.nullable(),
 });
@@ -20,6 +21,7 @@ export const upcomingMatchSchema = z.object({
   homeTeam: z.string(),
   awayTeam: z.string(),
   league: z.string(),
+  lineups: matchLineupsSchema.nullable().optional(),
 });
 
 export const upcomingLineupsParamsSchema = z.object({

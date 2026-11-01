@@ -4,6 +4,7 @@ import {
   ESPN_DELAY_MS,
   EspnMatch,
   copyFirstHalfToMatchStats,
+  fetchConfirmedLineups,
   fetchCoreStats,
   fetchScoreboard,
   fetchSummary,
@@ -17,6 +18,8 @@ import {
   deleteLiveMatch,
   deleteStaleLiveMatches,
   getLiveMatchIds,
+  getUpcomingAwaitingLineups,
+  saveUpcomingLineups,
 } from "../modules/matches/matches.service";
 import client from "../lib/db";
 import { isRunning, sleepUntilStopped, stopOnSignals } from "./lifecycle";
@@ -26,6 +29,7 @@ import { curSeason } from "../config/map";
 type TickResult = {
   liveGames: boolean;
   nextKickoff: number | null;
+  nextLineupCheck: number | null;
 };
 
 type Seen = {
@@ -36,6 +40,9 @@ type Seen = {
   lastSummaryAt: number; // Date.now()
 };
 const seen = new Map<string, Seen>();
+const LINEUP_WINDOW_MS = 75 * 60 * 1000; // 75 min before kickoff lineups posted
+const LINEUP_CHECK_EVERY_MS = 5 * 60 * 1000; // recheck every 5 min until they appear
+const lineupCheckedAt = new Map<string, number>(); // ESPN id -> last time we checked
 
 function scoreOf(match: EspnMatch): string {
   return `${match.homeScore}-${match.awayScore}`;
@@ -48,10 +55,52 @@ function shotsOf(match: EspnMatch): string {
 function chooseSleep(result: TickResult | null): number {
   if (result === null || result.liveGames) return 30_000;
 
-  if (result.nextKickoff === null) return 3_600_000;
+  // Wake for either a lineup check, or 2 minutes before the next kickoff
+  const wakeTimes: number[] = [];
+  if (result.nextKickoff !== null) wakeTimes.push(result.nextKickoff - 120_000);
+  if (result.nextLineupCheck !== null) wakeTimes.push(result.nextLineupCheck);
+  if (wakeTimes.length === 0) return 3_600_000;
 
-  const untilKickoff = result.nextKickoff - 120_000 - Date.now();
-  return Math.min(Math.max(untilKickoff, 30_000), 3_600_000);
+  const untilWake = Math.min(...wakeTimes) - Date.now();
+  return Math.min(Math.max(untilWake, 30_000), 3_600_000);
+}
+
+async function checkLineups(
+  espnLeague: string,
+  match: EspnMatch,
+  upcomingId: number,
+  kickoff: number,
+): Promise<number | null> {
+  const now = Date.now();
+
+  // Too early: come back when the window opens
+  const windowOpens = kickoff - LINEUP_WINDOW_MS;
+  if (now < windowOpens) return windowOpens;
+
+  // Checked recently: come back in a few minutes
+  const lastCheck = lineupCheckedAt.get(match.id);
+  if (lastCheck !== undefined && now - lastCheck < LINEUP_CHECK_EVERY_MS) {
+    return lastCheck + LINEUP_CHECK_EVERY_MS;
+  }
+
+  lineupCheckedAt.set(match.id, now);
+  const lineups = await fetchConfirmedLineups(espnLeague, match.id);
+  await sleep(ESPN_DELAY_MS);
+
+  if (!lineups) {
+    console.log(
+      `[live] lineups not out yet for ${match.rawHome} vs ${match.rawAway}`,
+    );
+    return now + LINEUP_CHECK_EVERY_MS;
+  }
+
+  await saveUpcomingLineups(upcomingId, lineups);
+  lineupCheckedAt.delete(match.id);
+  const minutesBefore = Math.round((kickoff - now) / 60000);
+  console.log(
+    `[live] saved lineups for ${match.rawHome} vs ${match.rawAway}, ${minutesBefore} min before kickoff`,
+  );
+  return null;
 }
 
 // Handles live matches ending
@@ -120,6 +169,8 @@ async function tick(): Promise<TickResult> {
   const day = new Date().toISOString().slice(0, 10).replace(/-/g, ""); // 20261021
   let nextKickoff: number | null = null;
   let liveGames = false;
+  const awaitingLineups = await getUpcomingAwaitingLineups();
+  let nextLineupCheck: number | null = null;
 
   for (let i = 0; i < 5; i++) {
     const matches = await fetchScoreboard(espn_leagues[i], day);
@@ -171,10 +222,27 @@ async function tick(): Promise<TickResult> {
 
       const kickoff = new Date(match.date).getTime();
       if (nextKickoff === null || kickoff < nextKickoff) nextKickoff = kickoff;
+
+      // check if it's waiting for lineup
+      const upcomingId = awaitingLineups.get(`${match.home}|${match.away}`);
+      if (upcomingId === undefined) continue;
+
+      const checkAt = await checkLineups(
+        espn_leagues[i],
+        match,
+        upcomingId,
+        kickoff,
+      );
+      if (
+        checkAt !== null &&
+        (nextLineupCheck === null || checkAt < nextLineupCheck)
+      ) {
+        nextLineupCheck = checkAt;
+      }
     }
   }
 
-  return { liveGames, nextKickoff };
+  return { liveGames, nextKickoff, nextLineupCheck };
 }
 
 async function main() {

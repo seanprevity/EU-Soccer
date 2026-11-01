@@ -13,6 +13,7 @@ import React from "react";
 import Teams from "../teams";
 import RecentForm from "../recentForm";
 import Head2Head from "../Head2Head";
+import UpcomingLineups from "../upcomingLineups";
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
@@ -66,6 +67,18 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         awayForm={awayStanding?.form ?? null}
         matchweek={matchweek}
       />
+
+      <section className="">
+        <h2 className="text-center text-2xl font-bold text-gray-900 dark:text-white">
+          Lineups
+        </h2>
+        <UpcomingLineups
+          matchId={match.id}
+          homeTeam={match.homeTeam}
+          awayTeam={match.awayTeam}
+        />
+      </section>
+
       <div className="px-4 sm:px-6 md:px-16 lg:px-24">
         <Odds match={match} matchId={id} />
       </div>
