@@ -105,7 +105,7 @@ export const matchStatsSchema = z.object({
   asv: z.number().int().nullable(),
   events: z.array(matchEventSchema).nullable(),
   lineups: matchLineupsSchema.nullable(),
-  firstHalf: halfStatsSchema.nullable(),
+  firstHalf: halfStatsSchema.nullable().optional(),
 });
 
 // One match in a results list.
