@@ -418,7 +418,13 @@ function BenchColumn({
   );
 }
 
-export default function Lineups({ match }: { match: MatchStats }) {
+export default function Lineups({
+  match,
+  prematch = false,
+}: {
+  match: MatchStats;
+  prematch?: boolean;
+}) {
   if (!match.lineups)
     return (
       <p className="text-center text-sm text-gray-500 dark:text-gray-400">
@@ -426,11 +432,13 @@ export default function Lineups({ match }: { match: MatchStats }) {
       </p>
     );
 
+  const marks = marksByPlayer(match.events);
+  if (prematch) return <Pitch match={match} marks={marks} />;
+
   const subs = (match.events ?? []).filter((e) => e.kind === "sub");
   const subMinutes = new Map(
     subs.filter((s) => s.player).map((s) => [s.player!, formatMinute(s)]),
   );
-  const marks = marksByPlayer(match.events);
   const colors = matchColors(match.homeTeam, match.awayTeam);
 
   return (

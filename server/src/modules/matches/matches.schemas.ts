@@ -5,6 +5,7 @@ import {
   matchupQuerySchema,
   recentMatchesQuerySchema,
   teamMatchesQuerySchema,
+  upcomingLineupsParamsSchema,
 } from "@epl/shared";
 import type { RequestSchemas } from "../../middleware/validation";
 
@@ -34,4 +35,8 @@ export const getMatchupSchemas = {
 
 export const getLiveMatchSchemas = {
   params: liveMatchQuerySchema,
+} satisfies RequestSchemas;
+
+export const getUpcomingLineupsSchemas = {
+  params: upcomingLineupsParamsSchema,
 } satisfies RequestSchemas;
