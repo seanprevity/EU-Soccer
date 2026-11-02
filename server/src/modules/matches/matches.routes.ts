@@ -10,6 +10,7 @@ import {
   getPastMatches,
   getRecentMatches,
   getSimulation,
+  getUpcomingLineups,
   getUpcomingMatchById,
   getUpcomingMatches,
 } from "./matches.controller";
@@ -20,6 +21,7 @@ import {
   getOddsSchemas,
   getRecentMatchesSchemas,
   getTeamMatchesSchemas,
+  getUpcomingLineupsSchemas,
   getUpcomingMatchByIdSchemas,
 } from "./matches.schemas";
 
@@ -40,5 +42,10 @@ router.get("/simulation", validate(getMatchupSchemas), getSimulation);
 router.get("/home-away", validate(getMatchupSchemas), getHomeAwayMatches);
 router.get("/live", getLiveMatches);
 router.get("/live/:espnId", validate(getLiveMatchSchemas), getLiveMatch);
+router.get(
+  "/upcoming/:id/lineups",
+  validate(getUpcomingLineupsSchemas),
+  getUpcomingLineups,
+);
 
 export default router;

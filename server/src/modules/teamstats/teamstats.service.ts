@@ -1,4 +1,4 @@
-import { standings, matchStats } from "../../../drizzle/schema";
+import { standings } from "../../../drizzle/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../../lib/db";
 import { curSeason } from "../../config/map";
@@ -58,10 +58,7 @@ const calculateStats = (
   return result;
 };
 
-const calculateLast5Stats = (
-  team: string,
-  matches: (typeof matchStats.$inferSelect)[],
-) => {
+const calculateLast5Stats = (team: string, matches: MatchStats[]) => {
   let wins = 0;
   let draws = 0;
   let losses = 0;

@@ -17,7 +17,12 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import type { HalfStats, MatchEvent, MatchLineups, MatchResult } from "@epl/shared";
+import type {
+  HalfStats,
+  MatchEvent,
+  MatchLineups,
+  MatchResult,
+} from "@epl/shared";
 
 export const odds = pgTable(
   "odds",
@@ -140,6 +145,7 @@ export const upcomingMatches = pgTable(
     homeTeam: text("HomeTeam").notNull(),
     awayTeam: text("AwayTeam").notNull(),
     league: text("League").notNull(),
+    lineups: jsonb("lineups").$type<MatchLineups>(),
   },
   (table) => [
     foreignKey({
@@ -157,11 +163,7 @@ export const upcomingMatches = pgTable(
       foreignColumns: [leagues.name],
       name: "upcoming_matches_League_fkey",
     }).onUpdate("cascade"),
-    unique("upcoming_match_unique_idx").on(
-      table.matchDate,
-      table.homeTeam,
-      table.awayTeam,
-    ),
+    unique("upcomingMatches_teams_key").on(table.homeTeam, table.awayTeam),
     pgPolicy("Allow public read", {
       as: "permissive",
       for: "select",

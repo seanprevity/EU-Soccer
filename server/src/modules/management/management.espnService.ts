@@ -376,6 +376,29 @@ function parseLineups(summary: any): MatchLineups | null {
   return { home, away };
 }
 
+// Confirmed XIs for pre-matches - Null until ESPN publishes
+export async function fetchConfirmedLineups(
+  espnLeague: string,
+  eventId: string,
+): Promise<MatchLineups | null> {
+  const summary = await fetchSummary(espnLeague, eventId);
+  if (!summary) return null;
+
+  const lineups = parseLineups(summary);
+  if (!lineups) return null;
+
+  const homeStarters = lineups.home.players.filter(
+    (player) => player.starter,
+  ).length;
+  const awayStarters = lineups.away.players.filter(
+    (player) => player.starter,
+  ).length;
+  if (homeStarters < 11 || awayStarters < 11) return null;
+
+  await fillMissingHeadshots(lineups);
+  return lineups;
+}
+
 // "Assisted by Bukayo Saka with a cross." == "Bukayo Saka"
 function assistFromText(text: string | undefined): string | null {
   if (!text) {

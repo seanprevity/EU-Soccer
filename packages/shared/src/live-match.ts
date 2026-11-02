@@ -36,7 +36,7 @@ export const liveMatchSchema = z.object({
   abs: z.number().int().nullable(),
   hsv: z.number().int().nullable(), // saves
   asv: z.number().int().nullable(),
-  firstHalf: halfStatsSchema.nullable(),
+  firstHalf: halfStatsSchema.nullable().optional(),
 });
 
 // automatically generated, omit for insert type

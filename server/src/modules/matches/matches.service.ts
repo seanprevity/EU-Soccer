@@ -7,17 +7,22 @@ import {
   gt,
   gte,
   inArray,
+  isNotNull,
+  isNull,
   lt,
   or,
 } from "drizzle-orm";
 import type {
   HomeAwayMatches,
   LiveMatch,
+  MatchLineups,
   MatchPreview,
   MatchStats,
   Odds,
   PaginatedMatches,
+  PreviousLineup,
   SimulationResult,
+  UpcomingLineups,
   UpcomingMatch,
 } from "@epl/shared";
 import {
@@ -334,4 +339,95 @@ export async function getMatchIdByEspnIdService(
     .from(matchStats)
     .where(eq(matchStats.espnId, espnId));
   return row?.id ?? null;
+}
+
+// pulls last lineups for a team - last matchStats entry
+async function lastLineupFor(team: string): Promise<PreviousLineup | null> {
+  const [row] = await db
+    .select({
+      id: matchStats.id,
+      homeTeam: matchStats.homeTeam,
+      awayTeam: matchStats.awayTeam,
+      matchDate: matchStats.matchDate,
+      lineups: matchStats.lineups,
+    })
+    .from(matchStats)
+    .where(
+      and(
+        or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)),
+        isNotNull(matchStats.lineups),
+      ),
+    )
+    .orderBy(desc(matchStats.matchDate))
+    .limit(1);
+
+  if (!row?.lineups || !row.matchDate) return null;
+  const wasHome = row.homeTeam === team;
+  return {
+    lineup: wasHome ? row.lineups.home : row.lineups.away,
+    matchId: row.id,
+    matchDate: row.matchDate,
+    opponent: wasHome ? row.awayTeam : row.homeTeam,
+    wasHome,
+  };
+}
+
+export async function getUpcomingLineupsService(
+  upcomingId: number,
+): Promise<UpcomingLineups | null> {
+  const [fixture] = await db
+    .select({
+      homeTeam: upcomingMatches.homeTeam,
+      awayTeam: upcomingMatches.awayTeam,
+      lineups: upcomingMatches.lineups,
+    })
+    .from(upcomingMatches)
+    .where(eq(upcomingMatches.id, upcomingId))
+    .limit(1);
+
+  if (!fixture) return null;
+
+  const [home, away] = await Promise.all([
+    lastLineupFor(fixture.homeTeam),
+    lastLineupFor(fixture.awayTeam),
+  ]);
+  return { confirmed: fixture.lineups ?? null, home, away };
+}
+
+// Matches that don't have a lineup and start today
+export async function getUpcomingAwaitingLineups(): Promise<
+  Map<string, number>
+> {
+  const now = new Date();
+  const dayAhead = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  const rows = await db
+    .select({
+      id: upcomingMatches.id,
+      homeTeam: upcomingMatches.homeTeam,
+      awayTeam: upcomingMatches.awayTeam,
+    })
+    .from(upcomingMatches)
+    .where(
+      and(
+        isNull(upcomingMatches.lineups),
+        gt(upcomingMatches.matchDate, now.toISOString()),
+        lt(upcomingMatches.matchDate, dayAhead.toISOString()),
+      ),
+    );
+
+  const idByFixture = new Map<string, number>();
+  for (const row of rows)
+    idByFixture.set(`${row.homeTeam}|${row.awayTeam}`, row.id);
+  return idByFixture;
+}
+
+export async function saveUpcomingLineups(
+  id: number,
+  lineups: MatchLineups,
+): Promise<void> {
+  await db
+    .update(upcomingMatches)
+    .set({ lineups })
+    .where(eq(upcomingMatches.id, id));
 }
