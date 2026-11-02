@@ -339,6 +339,19 @@ function parseSubstitutions(summary: any, match: EspnMatch): MatchEvent[] {
   return substitutions;
 }
 
+// ESPN can publish the names before the positions.
+function hasPlacedStarters(lineups: MatchLineups): boolean {
+  for (const lineup of [lineups.home, lineups.away]) {
+    let placed = 0;
+    for (const player of lineup.players) {
+      if (player.starter && player.formationPlace && player.formationPlace > 0)
+        placed++;
+    }
+    if (placed < 11) return false;
+  }
+  return true;
+}
+
 // Both teams' lineups from the summary's rosters. Null unless both teams have one.
 function parseLineups(summary: any): MatchLineups | null {
   function lineupFor(side: Side): TeamLineup | null {
@@ -385,7 +398,7 @@ export async function fetchConfirmedLineups(
   if (!summary) return null;
 
   const lineups = parseLineups(summary);
-  if (!lineups) return null;
+  if (!lineups || !hasPlacedStarters(lineups)) return null;
 
   const homeStarters = lineups.home.players.filter(
     (player) => player.starter,
@@ -731,6 +744,7 @@ export async function importEspnMatchesService(
         storedMatch.espnId != null &&
         storedMatch.events != null &&
         storedMatch.lineups != null &&
+        hasPlacedStarters(storedMatch.lineups) &&
         storedMatch.hxg != null;
       if (alreadyComplete && !refresh) {
         continue;
