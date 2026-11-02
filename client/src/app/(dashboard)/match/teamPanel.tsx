@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import type { PlayerCount, TeamLineup, TeamPreview } from "@epl/shared";
 import { cn, getLogoFile } from "@/lib/utils";
 import { lineupChanges } from "@/lib/lineups";
@@ -57,6 +57,27 @@ function FormationList({ preview }: { preview: TeamPreview }) {
         </div>
       )}
     </Block>
+  );
+}
+
+// "A, B and C" with each name in bold
+function NameList({ names }: { names: string[] }) {
+  return (
+    <>
+      {names.map((name, index) => {
+        let separator = "";
+        if (index > 0) separator = index === names.length - 1 ? " and " : ", ";
+
+        return (
+          <Fragment key={name}>
+            {separator}
+            <strong className="font-semibold text-gray-900 dark:text-white">
+              {name}
+            </strong>
+          </Fragment>
+        );
+      })}
+    </>
   );
 }
 
@@ -213,13 +234,7 @@ function StatusBadge({
   preview: TeamPreview;
   confirmed: boolean;
 }) {
-  if (confirmed) {
-    return (
-      <span className="inline-flex w-fit rounded-full bg-green-600/15 px-2.5 py-0.5 text-xs font-semibold text-green-700 dark:text-green-400">
-        Confirmed lineup
-      </span>
-    );
-  }
+  if (confirmed) return null;
   if (!preview.previous) {
     return (
       <span className="inline-flex w-fit rounded-full bg-gray-500/15 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300">
@@ -281,24 +296,22 @@ export default function TeamPanel({
       </div>
 
       {changes && (
-        <Block title="Changes from last match">
+        <Block
+          title={
+            changes.cameIn.length === 0
+              ? "Changes from last match"
+              : `Changes from last match · ${changes.cameIn.length}`
+          }
+        >
           {changes.cameIn.length === 0 ? (
             <p className="text-sm text-gray-700 dark:text-gray-300">
               Unchanged XI
             </p>
           ) : (
-            <div className="space-y-1 text-sm">
-              <p className="font-semibold text-gray-900 dark:text-white">
-                {changes.cameIn.length} change
-                {changes.cameIn.length === 1 ? "" : "s"}
-              </p>
-              <p className="text-green-700 dark:text-green-400">
-                In: {changes.cameIn.join(", ")}
-              </p>
-              <p className="text-red-700 dark:text-red-400">
-                Out: {changes.droppedOut.join(", ")}
-              </p>
-            </div>
+            <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+              <NameList names={changes.cameIn} /> in for{" "}
+              <NameList names={changes.droppedOut} />.
+            </p>
           )}
         </Block>
       )}
