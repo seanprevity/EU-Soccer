@@ -9,10 +9,29 @@ export const previousLineupSchema = z.object({
   wasHome: z.boolean(),
 });
 
+const playerCountSchema = z.object({
+  name: z.string(),
+  count: z.number(),
+  jersey: z.string().nullable(),
+});
+
+const formationCountSchema = z.object({ name: z.string(), count: z.number() });
+
+export const teamPreviewSchema = z.object({
+  team: z.string(),
+  previous: previousLineupSchema.nullable(),
+  lineupMatches: z.number(), // number of matches where we have lineups
+  formations: z.array(formationCountSchema),
+  scorers: z.array(playerCountSchema),
+  assisters: z.array(playerCountSchema),
+  yellowCards: z.array(playerCountSchema),
+  redCards: z.array(playerCountSchema),
+});
+
 export const upcomingLineupsSchema = z.object({
   confirmed: matchLineupsSchema.nullable().optional(),
-  home: previousLineupSchema.nullable(),
-  away: previousLineupSchema.nullable(),
+  home: teamPreviewSchema,
+  away: teamPreviewSchema,
 });
 
 export const upcomingMatchSchema = z.object({
@@ -31,3 +50,5 @@ export const upcomingLineupsParamsSchema = z.object({
 export type UpcomingMatch = z.infer<typeof upcomingMatchSchema>;
 export type PreviousLineup = z.infer<typeof previousLineupSchema>;
 export type UpcomingLineups = z.infer<typeof upcomingLineupsSchema>;
+export type PlayerCount = z.infer<typeof playerCountSchema>;
+export type TeamPreview = z.infer<typeof teamPreviewSchema>;

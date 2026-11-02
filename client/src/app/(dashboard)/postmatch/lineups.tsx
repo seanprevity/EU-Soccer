@@ -17,7 +17,7 @@ type PlayerMarks = {
 };
 
 const LABEL_FONT_PX = 10;
-const LABEL_PADDING_PX = 8; // px-1 on each side
+const LABEL_PADDING_PX = 0;
 const LABEL_GAP_PX = 4; // minimum space kept between two neighbouring names
 
 function NumberCircle({
@@ -38,11 +38,11 @@ function NumberCircle({
       className={cn(
         "relative flex shrink-0 items-center justify-center rounded-full font-bold tabular-nums",
         size === "md"
-          ? "h-8 w-8 text-sm ring-2 ring-white/80"
+          ? "h-8 w-8 text-sm ring-1 ring-white/80"
           : "h-7 w-7 text-xs",
         color
           ? "ring-1 ring-white"
-          : cn("text-white", isPitch ? "bg-gray-600/30" : "bg-gray-600"),
+          : cn("text-white", isPitch ? "bg-gray-600/70" : "bg-gray-600"),
       )}
       style={
         color ? { backgroundColor: color.bg, color: color.text } : undefined
@@ -172,7 +172,7 @@ let measureCtx: CanvasRenderingContext2D | null = null;
 const textWidth = (text: string, fontFamily: string) => {
   measureCtx ??= document.createElement("canvas").getContext("2d");
   if (!measureCtx) return text.length * LABEL_FONT_PX * 0.6;
-  measureCtx.font = `${LABEL_FONT_PX}px ${fontFamily}`;
+  measureCtx.font = `600 ${LABEL_FONT_PX}px ${fontFamily}`;
   return measureCtx.measureText(text).width;
 };
 
@@ -329,7 +329,7 @@ function Pitch({
             </NumberCircle>
             <span
               title={p.player.name}
-              className="mt-1 truncate whitespace-nowrap rounded bg-black/45 px-1 leading-tight text-white"
+              className="mt-1 truncate whitespace-nowrap font-semibold leading-tight text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.9),0_0_6px_rgb(0_0_0/0.6)]"
               style={{
                 fontSize: LABEL_FONT_PX,
                 maxWidth: width ? Math.max(maxWidth, 24) : 64,
