@@ -1,10 +1,12 @@
 "use client";
 
 import { useGetUpcomingLineupsQuery } from "@/state/api";
-import type { MatchStats, PreviousLineup, TeamLineup } from "@epl/shared";
-import Lineups from "../postmatch/lineups";
+import type { MatchStats, TeamLineup } from "@epl/shared";
+import Lineups from "../postmatch/lineups"; // adjust to where Lineups lives
+import TeamPanel from "./teamPanel";
+import { matchColors } from "@/lib/array";
 
-// The previous match's sub flags would show "Sub 67'" on this page, so clear them
+// The previous match's sub flags would show "Sub 67'" here, so clear them
 function withoutSubs(lineup: TeamLineup): TeamLineup {
   return {
     ...lineup,
@@ -14,15 +16,6 @@ function withoutSubs(lineup: TeamLineup): TeamLineup {
       subbedOut: false,
     })),
   };
-}
-
-function describe(team: string, previous: PreviousLineup): string {
-  const date = new Date(previous.matchDate).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-  });
-  const venue = previous.wasHome ? "vs" : "at";
-  return `${team} ${venue} ${previous.opponent}, ${date}`;
 }
 
 export default function UpcomingLineups({
@@ -48,29 +41,16 @@ export default function UpcomingLineups({
         Lineups couldn&apos;t be loaded.
       </p>
     );
-  if (!data.home || !data.away)
-    return (
-      <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-        No previous lineup is available for {data.home ? awayTeam : homeTeam}.
-      </p>
-    );
 
-  if (data.confirmed) {
-    const match = {
-      homeTeam,
-      awayTeam,
-      events: [],
-      lineups: data.confirmed,
-    } as unknown as MatchStats;
+  const confirmed = data.confirmed ?? null;
 
-    return (
-      <div className="space-y-3">
-        <p className="rounded-lg bg-white p-3 text-center text-xs font-semibold text-green-700 dark:bg-gray-900 dark:text-green-400">
-          Confirmed lineups
-        </p>
-        <Lineups match={match} prematch />
-      </div>
-    );
+  // The confirmed lineups if they're out, otherwise each team's last XI
+  let lineups = confirmed;
+  if (!lineups && data.home.previous && data.away.previous) {
+    lineups = {
+      home: withoutSubs(data.home.previous.lineup),
+      away: withoutSubs(data.away.previous.lineup),
+    };
   }
 
   // Lineups draws from a MatchStats; only these fields are read
@@ -78,22 +58,49 @@ export default function UpcomingLineups({
     homeTeam,
     awayTeam,
     events: [],
-    lineups: {
-      home: withoutSubs(data.home.lineup),
-      away: withoutSubs(data.away.lineup),
-    },
+    lineups,
   } as unknown as MatchStats;
 
+  const colors = matchColors(homeTeam, awayTeam);
+
+  let heading = "Unconfirmed lineups";
+  if (confirmed) heading = "Confirmed lineups";
+
   return (
-    <div className="space-y-1">
-      <div className="rounded-lg bg-white p-3 text-center text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-300">
-        <p className="font-semibold text-gray-900 dark:text-white">
-          Last starting XIs, not confirmed lineups
-        </p>
-        <p>{describe(homeTeam, data.home)}</p>
-        <p>{describe(awayTeam, data.away)}</p>
+    <section className="space-y-4 px-4 sm:px-6 lg:px-10">
+      <h2 className="text-center text-2xl font-bold text-gray-900 dark:text-white">
+        {heading}
+      </h2>
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)_minmax(0,1fr)] lg:gap-8">
+        {/* Home: drawn at the bottom of the pitch, so its panel sits low in its column */}
+        <div className="order-3 lg:order-1 lg:self-start">
+          <TeamPanel
+            preview={data.home}
+            confirmed={confirmed?.home ?? null}
+            color={colors.home}
+          />
+        </div>
+
+        <div className="order-2">
+          {lineups ? (
+            <Lineups match={match} prematch />
+          ) : (
+            <p className="rounded-lg bg-white p-6 text-center text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+              No lineup available yet.
+            </p>
+          )}
+        </div>
+
+        {/* Away: drawn at the top, so its panel sits high */}
+        <div className="order-1 lg:order-3 lg:self-start">
+          <TeamPanel
+            preview={data.away}
+            confirmed={confirmed?.away ?? null}
+            color={colors.away}
+          />
+        </div>
       </div>
-      <Lineups match={match} prematch />
-    </div>
+    </section>
   );
 }

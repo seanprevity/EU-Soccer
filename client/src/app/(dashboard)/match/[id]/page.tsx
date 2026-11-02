@@ -68,16 +68,11 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         matchweek={matchweek}
       />
 
-      <section className="">
-        <h2 className="text-center text-2xl font-bold text-gray-900 dark:text-white">
-          Lineups
-        </h2>
-        <UpcomingLineups
-          matchId={match.id}
-          homeTeam={match.homeTeam}
-          awayTeam={match.awayTeam}
-        />
-      </section>
+      <UpcomingLineups
+        matchId={match.id}
+        homeTeam={match.homeTeam}
+        awayTeam={match.awayTeam}
+      />
 
       <div className="px-4 sm:px-6 md:px-16 lg:px-24">
         <Odds match={match} matchId={id} />

@@ -20,8 +20,10 @@ import type {
   MatchStats,
   Odds,
   PaginatedMatches,
+  PlayerCount,
   PreviousLineup,
   SimulationResult,
+  TeamPreview,
   UpcomingLineups,
   UpcomingMatch,
 } from "@epl/shared";
@@ -341,7 +343,27 @@ export async function getMatchIdByEspnIdService(
   return row?.id ?? null;
 }
 
-// pulls last lineups for a team - last matchStats entry
+type LineupRow = {
+  id: number;
+  homeTeam: string;
+  awayTeam: string;
+  matchDate: string | null;
+  lineups: MatchLineups | null;
+};
+
+function toPreviousLineup(team: string, row: LineupRow): PreviousLineup | null {
+  if (!row.lineups || !row.matchDate) return null;
+  const wasHome = row.homeTeam === team;
+  return {
+    lineup: wasHome ? row.lineups.home : row.lineups.away,
+    matchId: row.id,
+    matchDate: row.matchDate,
+    opponent: wasHome ? row.awayTeam : row.homeTeam,
+    wasHome,
+  };
+}
+
+// The team's most recent match with lineups, from any season
 async function lastLineupFor(team: string): Promise<PreviousLineup | null> {
   const [row] = await db
     .select({
@@ -360,15 +382,106 @@ async function lastLineupFor(team: string): Promise<PreviousLineup | null> {
     )
     .orderBy(desc(matchStats.matchDate))
     .limit(1);
+  return row ? toPreviousLineup(team, row) : null;
+}
 
-  if (!row?.lineups || !row.matchDate) return null;
-  const wasHome = row.homeTeam === team;
+function increment(counts: Map<string, number>, name: string): void {
+  counts.set(name, (counts.get(name) ?? 0) + 1);
+}
+
+// The highest counts first; ties in alphabetical order so the list never reshuffles
+function sortedCounts(
+  counts: Map<string, number>,
+  jerseys: Map<string, string | null>,
+): PlayerCount[] {
+  const entries: PlayerCount[] = [];
+  for (const [name, count] of counts)
+    entries.push({ name, count, jersey: jerseys.get(name) ?? null });
+  entries.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  return entries;
+}
+
+async function teamPreviewFor(team: string): Promise<TeamPreview> {
+  const seasonStart = `${curSeason}-07-01T00:00:00.000Z`;
+
+  const rows = await db
+    .select({
+      id: matchStats.id,
+      homeTeam: matchStats.homeTeam,
+      awayTeam: matchStats.awayTeam,
+      matchDate: matchStats.matchDate,
+      lineups: matchStats.lineups,
+      events: matchStats.events,
+    })
+    .from(matchStats)
+    .where(
+      and(
+        or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)),
+        gte(matchStats.matchDate, seasonStart),
+      ),
+    )
+    .orderBy(desc(matchStats.matchDate));
+
+  const formations = new Map<string, number>();
+  const jerseys = new Map<string, string | null>();
+  const goals = new Map<string, number>();
+  const assists = new Map<string, number>();
+  const yellows = new Map<string, number>();
+  const reds = new Map<string, number>();
+  let lineupMatches = 0;
+
+  for (const row of rows) {
+    const side = row.homeTeam === team ? "home" : "away";
+
+    const lineup = row.lineups?.[side];
+    if (lineup) {
+      lineupMatches++;
+      if (lineup.formation) increment(formations, lineup.formation);
+      for (const player of lineup.players) {
+        if (!jerseys.has(player.name))
+          jerseys.set(player.name, player.jersey ?? null);
+      }
+    }
+
+    for (const event of row.events ?? []) {
+      if (event.side !== side || !event.player) continue;
+
+      // Own goals are credited to this side but scored by an opponent, so they're skipped
+      if ((event.kind === "goal" || event.kind === "penalty") && event.player) {
+        increment(goals, event.player);
+      }
+      if (event.kind === "goal" && event.assist)
+        increment(assists, event.assist);
+
+      if (event.kind === "yellow") {
+        increment(yellows, event.player);
+      }
+      if (event.kind === "red" || event.kind === "second_yellow")
+        increment(yellows, event.player);
+    }
+  }
+
+  const latest = rows.find((row) => row.lineups);
+  const previous = latest
+    ? toPreviousLineup(team, latest)
+    : await lastLineupFor(team);
+
+  const formationList = sortedCounts(formations, new Map()).map(
+    ({ name, count }) => ({
+      name,
+      count,
+    }),
+  );
+
   return {
-    lineup: wasHome ? row.lineups.home : row.lineups.away,
-    matchId: row.id,
-    matchDate: row.matchDate,
-    opponent: wasHome ? row.awayTeam : row.homeTeam,
-    wasHome,
+    team,
+    previous,
+    lineupMatches,
+    formations: formationList,
+    scorers: sortedCounts(goals, jerseys),
+    assisters: sortedCounts(assists, jerseys),
+    yellowCards: sortedCounts(yellows, jerseys),
+    redCards: sortedCounts(reds, jerseys),
   };
 }
 
@@ -388,8 +501,8 @@ export async function getUpcomingLineupsService(
   if (!fixture) return null;
 
   const [home, away] = await Promise.all([
-    lastLineupFor(fixture.homeTeam),
-    lastLineupFor(fixture.awayTeam),
+    teamPreviewFor(fixture.homeTeam),
+    teamPreviewFor(fixture.awayTeam),
   ]);
   return { confirmed: fixture.lineups ?? null, home, away };
 }
