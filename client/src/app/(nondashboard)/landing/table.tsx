@@ -14,7 +14,6 @@ import {
 } from "@/lib/utils";
 import { renderForm } from "@/lib/uiUtils";
 import { useAppSelector } from "@/state/redux";
-import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useDispatch } from "react-redux";
 import { setLeague, setSeason } from "@/state";
@@ -192,6 +191,8 @@ export default function Table() {
       return { ...p, rank };
     });
   }, [topPlayers]);
+
+  const showTopPlayers = priority === "table";
 
   return (
     <section
@@ -416,101 +417,96 @@ export default function Table() {
       </div>
 
       {/* RHS: Top Scorers */}
-      <AnimatePresence mode="wait">
-        {priority === "table" && (
-          <motion.div
-            key={priority}
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0, transition: { delay: 0.15 } }}
-            exit={{
-              opacity: 0,
-              x: 60,
-              transition: { duration: 0.15 },
-            }}
-            transition={{ duration: 1, ease: [0.45, 0, 0.55, 1] }}
-            className={`w-full lg:w-[280px] flex-shrink-0 overflow-hidden`}
-          >
-            <div className="mb-3 flex items-center justify-between gap-2 border-b border-gray-200 pb-1 dark:border-gray-400">
-              <h3 className="truncate text-lg font-semibold text-[#38003c] dark:text-gray-200">
-                {activeCategory?.title}
-              </h3>
-              <select
-                value={category}
-                onChange={(e) =>
-                  setCategory(e.target.value as TopPlayerCategory)
-                }
-                aria-label="Top players category"
-                className="shrink-0 cursor-pointer rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-              >
-                {TOP_PLAYER_CATEGORIES.map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+      <div
+        inert={!showTopPlayers}
+        className={cn(
+          "w-full shrink-0 overflow-hidden motion-reduce:transition-none lg:w-[280px]",
+          "transition-[width,margin,opacity,transform] duration-500 ease-[cubic-bezier(0.45,0,0.55,1)]",
+          showTopPlayers
+            ? "translate-x-0 opacity-100"
+            : "translate-x-10 opacity-0 max-lg:hidden lg:-ml-6 lg:w-0",
+        )}
+      >
+        {/* Fixed width inside, so the content doesn't squash while the outer width animates */}
+        <div className="w-full lg:w-[280px]">
+          <div className="mb-3 flex items-center justify-between gap-2 border-b border-gray-200 pb-1 dark:border-gray-400">
+            <h3 className="truncate text-lg font-semibold text-[#38003c] dark:text-gray-200">
+              {activeCategory?.title}
+            </h3>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as TopPlayerCategory)}
+              aria-label="Top players category"
+              className="shrink-0 cursor-pointer rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+            >
+              {TOP_PLAYER_CATEGORIES.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            {isTopPlayersLoading ? (
-              <p className="text-gray-500 dark:text-gray-200 text-sm text-center py-4">
-                Loading…
-              </p>
-            ) : rankedPlayers.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-200 text-sm text-center py-4">
-                No {activeCategory?.label.toLowerCase()} data for {season}.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {rankedPlayers.map((p) => (
-                  <div
-                    key={p.player}
-                    className="flex items-center justify-between bg-[#f8f8f8] dark:bg-gray-700 px-3 py-2 rounded-md border-l-4 border-[#38003c] dark:border-indigo-400"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className="text-sm font-bold text-gray-800 dark:text-gray-200 w-5 text-center">
-                        {p.rank}
-                      </span>
-                      <div className="relative w-[38px] h-[38px] flex-shrink-0 rounded-full overflow-hidden">
-                        <Image
-                          src={p.imageUrl || "/placeholder-player.svg"}
-                          alt={`${p.player} picture`}
-                          fill
-                          className={`${p.imageUrl ? "scale-175" : "scale-100"} origin-top`}
-                        />
-                      </div>
-                      <div className="flex min-w-0 flex-col leading-tight">
-                        <span className="truncate font-medium text-sm text-gray-800 dark:text-gray-200">
-                          {p.player}
-                        </span>
-                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-300">
-                          <div className="relative w-[16px] h-[16px] flex-shrink-0">
-                            <Image
-                              src={`/${getLogoFile(p.team)}`}
-                              alt={`${p.team} logo`}
-                              fill
-                              className="object-contain"
-                            />
-                          </div>
-                          <span className="truncate">{p.team}</span>
-                        </div>
-                      </div>
+          {isTopPlayersLoading ? (
+            <p className="text-gray-500 dark:text-gray-200 text-sm text-center py-4">
+              Loading…
+            </p>
+          ) : rankedPlayers.length === 0 ? (
+            <p className="text-gray-500 dark:text-gray-200 text-sm text-center py-4">
+              No {activeCategory?.label.toLowerCase()} data for {season}.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {rankedPlayers.map((p) => (
+                <div
+                  key={p.player}
+                  className="flex items-center justify-between bg-[#f8f8f8] dark:bg-gray-700 px-3 py-2 rounded-md border-l-4 border-[#38003c] dark:border-indigo-400"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="text-sm font-bold text-gray-800 dark:text-gray-200 w-5 text-center">
+                      {p.rank}
+                    </span>
+                    <div className="relative w-[38px] h-[38px] flex-shrink-0 rounded-full overflow-hidden">
+                      <Image
+                        src={p.imageUrl || "/placeholder-player.svg"}
+                        alt={`${p.player} picture`}
+                        fill
+                        className={`${p.imageUrl ? "scale-175" : "scale-100"} origin-top`}
+                      />
                     </div>
-                    <div className="ml-2 flex shrink-0 flex-col items-end leading-tight">
-                      <span className="font-semibold text-[#38003c] dark:text-gray-200 text-sm tabular-nums">
-                        {p.value}
+                    <div className="flex min-w-0 flex-col leading-tight">
+                      <span className="truncate font-medium text-sm text-gray-800 dark:text-gray-200">
+                        {p.player}
                       </span>
-                      {p.appearances != null && (
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
-                          {p.appearances} apps
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-300">
+                        <div className="relative w-[16px] h-[16px] flex-shrink-0">
+                          <Image
+                            src={`/${getLogoFile(p.team)}`}
+                            alt={`${p.team} logo`}
+                            fill
+                            className="object-contain"
+                          />
+                        </div>
+                        <span className="truncate">{p.team}</span>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+                  <div className="ml-2 flex shrink-0 flex-col items-end leading-tight">
+                    <span className="font-semibold text-[#38003c] dark:text-gray-200 text-sm tabular-nums">
+                      {p.value}
+                    </span>
+                    {p.appearances != null && (
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">
+                        {p.appearances} apps
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </section>
   );
 }
