@@ -1,7 +1,7 @@
 "use client";
 
 import { useGetUpcomingLineupsQuery } from "@/state/api";
-import type { MatchStats, TeamLineup } from "@epl/shared";
+import type { MatchLineups, MatchStats, TeamLineup } from "@epl/shared";
 import Lineups from "../postmatch/lineups"; // adjust to where Lineups lives
 import TeamPanel from "./teamPanel";
 import { matchColors } from "@/lib/array";
@@ -45,8 +45,13 @@ export default function UpcomingLineups({
   const confirmed = data.confirmed ?? null;
 
   // The confirmed lineups if they're out, otherwise each team's last XI
-  let lineups = confirmed;
-  if (!lineups && data.home.previous && data.away.previous) {
+  let lineups: MatchLineups | null = null;
+  if (confirmed) {
+    lineups = {
+      home: withoutSubs(confirmed.home),
+      away: withoutSubs(confirmed.away),
+    };
+  } else if (data.home.previous && data.away.previous) {
     lineups = {
       home: withoutSubs(data.home.previous.lineup),
       away: withoutSubs(data.away.previous.lineup),

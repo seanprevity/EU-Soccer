@@ -352,6 +352,15 @@ function hasPlacedStarters(lineups: MatchLineups): boolean {
   return true;
 }
 
+// ESPN sends as t/f or as { didSub: boolean } for prematch
+function didSub(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  if (value && typeof value === "object" && "didSub" in value) {
+    return (value as { didSub: unknown }).didSub === true;
+  }
+  return false;
+}
+
 // Both teams' lineups from the summary's rosters. Null unless both teams have one.
 function parseLineups(summary: any): MatchLineups | null {
   function lineupFor(side: Side): TeamLineup | null {
@@ -373,8 +382,8 @@ function parseLineups(summary: any): MatchLineups | null {
         ? Number(entry.formationPlace)
         : null,
       starter: Boolean(entry.starter),
-      subbedIn: Boolean(entry.subbedIn),
-      subbedOut: Boolean(entry.subbedOut),
+      subbedIn: didSub(entry.subbedIn),
+      subbedOut: didSub(entry.subbedOut),
       headshot: entry.athlete?.headshot?.href ?? null,
     }));
 
