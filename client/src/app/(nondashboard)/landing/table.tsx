@@ -200,60 +200,53 @@ export default function Table() {
     >
       {/* LHS: Standings Table */}
       <div className="flex-1 min-w-0">
-        <div className="@container flex w-full flex-wrap items-center gap-3 mb-4 sm:flex-nowrap">
-          <div className="flex gap-2 flex-wrap w-full sm:w-auto sm:shrink-0">
-            <select
-              value={league}
-              onChange={(e) => dispatch(setLeague(e.target.value))}
-              className="bg-white dark:bg-gray-700 dark:hover:bg-gray-600 border-none px-3 py-2 rounded text-gray-800 dark:text-gray-200 font-medium cursor-pointer flex-1 sm:flex-none"
-            >
-              {LEAGUES.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
+        <div className="flex flex-wrap items-center gap-2 pb-2.5">
+          <select
+            value={league}
+            onChange={(e) => dispatch(setLeague(e.target.value))}
+            className="flex-1 cursor-pointer rounded border-none bg-white px-3 py-2 font-medium text-gray-800 sm:flex-none dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          >
+            {LEAGUES.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
 
-            <select
-              value={season}
-              onChange={(e) => dispatch(setSeason(e.target.value))}
-              className="bg-white dark:bg-gray-700 border-none px-3 py-2 rounded text-gray-800 dark:text-gray-200 dark:hover:bg-gray-600 font-medium cursor-pointer flex-1 sm:flex-none"
-            >
-              {seasons.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+          <select
+            value={season}
+            onChange={(e) => dispatch(setSeason(e.target.value))}
+            className="flex-1 cursor-pointer rounded border-none bg-white px-3 py-2 font-medium text-gray-800 sm:flex-none dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          >
+            {seasons.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
 
-            <div className="flex gap-2 w-full sm:w-auto">
-              {(["TOTAL", "HOME", "AWAY"] as const).map((t) => {
-                const label = t.charAt(0) + t.substring(1).toLowerCase();
-                return (
-                  <button
-                    key={t}
-                    onClick={() => setType(t)}
-                    className={`
-                    flex-1 sm:flex-none px-3 py-2 rounded-3xl font-medium text-xs sm:text-sm
-                    transition-colors duration-150 cursor-pointer
-                    ${
-                      type === t
-                        ? "bg-[#38003c] dark:bg-purple-900 text-white shadow-md"
-                        : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600/80"
-                    }
-                  `}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="flex w-full gap-2 sm:w-auto">
+            {(["TOTAL", "HOME", "AWAY"] as const).map((t) => {
+              const label = t.charAt(0) + t.substring(1).toLowerCase();
+              return (
+                <button
+                  key={t}
+                  onClick={() => setType(t)}
+                  className={cn(
+                    "flex-1 cursor-pointer rounded-3xl px-3 py-2 text-xs font-medium transition-colors duration-150 sm:flex-none sm:text-sm",
+                    type === t
+                      ? "bg-[#38003c] text-white shadow-md dark:bg-purple-900"
+                      : "bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600/80",
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
+
           <div className="ml-auto hidden shrink-0 items-center gap-2 sm:flex">
-            <div
-              className="relative h-[28px] w-[28px] flex-shrink-0 md:h-[36px] md:w-[36px]"
-              title={league}
-            >
+            <div className="relative size-7 shrink-0 md:size-9" title={league}>
               <Image
                 src={getLeagueFile(league)}
                 alt={`${league} logo`}
