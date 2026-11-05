@@ -20,6 +20,7 @@ import { setLeague, setSeason } from "@/state";
 import { Standing, TopPlayerCategory } from "@epl/shared";
 import { StandingType, useLiveStandings } from "@/lib/liveStandings";
 import { LiveDot, LiveScore, Movement } from "@/components/liveBadges";
+import { zoneFor, ZoneLegend, ZONES } from "@/lib/zones";
 
 const TOP_PLAYER_CATEGORIES: {
   key: TopPlayerCategory;
@@ -37,63 +38,6 @@ const TOP_PLAYER_CATEGORIES: {
 const LEAGUE_HEADERS = HEADER_CONFIG.filter(
   (h) => h.key !== "expectedPosition",
 );
-
-// relegation or european football decided by spots on league table
-type Zone =
-  | "championsLeague"
-  | "championsLeagueQualifying"
-  | "europaLeague"
-  | "conferenceLeague"
-  | "relegationPlayOff"
-  | "relegation";
-
-// Colour and description of each zone
-const ZONES: Record<Zone, { color: string; label: string }> = {
-  championsLeague: {
-    color: "bg-[#38003c] dark:bg-blue-600",
-    label: "Champions League",
-  },
-  championsLeagueQualifying: {
-    color: "bg-[#301934] dark:bg-purple-800",
-    label: "Champions League qualifying",
-  },
-  europaLeague: { color: "bg-[#ff3333]", label: "Europa League" },
-  conferenceLeague: {
-    color: "bg-[#00A300]",
-    label: "Conference League qualifying",
-  },
-  relegationPlayOff: { color: "bg-[#ADADAD]", label: "Relegation play-off" },
-  relegation: { color: "bg-[#ff2882]", label: "Relegation" },
-};
-
-// Zones for european football or relegation
-function zoneFor(
-  index: number,
-  teamCount: number,
-  league: string,
-): Zone | null {
-  const thirdFromBottom = teamCount - 3;
-
-  if (index <= 3 && (league !== "Ligue 1" || index !== 3))
-    return "championsLeague";
-  if (index === 3 && league === "Ligue 1") return "championsLeagueQualifying";
-  if (index === 4) return "europaLeague";
-  if (index === 5 && league !== "Premier League") return "conferenceLeague";
-  if (index > thirdFromBottom) return "relegation";
-
-  if (index === thirdFromBottom) {
-    if (
-      league === "Premier League" ||
-      league === "Serie A" ||
-      league === "La Liga"
-    )
-      return "relegation";
-    if (league === "Ligue 1" || league === "Bundesliga")
-      return "relegationPlayOff";
-  }
-
-  return null;
-}
 
 export default function Table() {
   const dispatch = useDispatch();
@@ -171,16 +115,6 @@ export default function Table() {
       return 0;
     });
   }, [liveTeams, sortConfig]);
-
-  // The zones this league's table uses, in table order, for the key underneath
-  const zonesInTable = useMemo(() => {
-    const found: Zone[] = [];
-    for (let index = 0; index < sortedTeams.length; index++) {
-      const zone = zoneFor(index, sortedTeams.length, league);
-      if (zone && !found.includes(zone)) found.push(zone);
-    }
-    return found;
-  }, [sortedTeams.length, league]);
 
   // Sort and ranks top players
   const rankedPlayers = useMemo(() => {
@@ -306,7 +240,7 @@ export default function Table() {
                   </td>
                 </tr>
               ) : (
-                sortedTeams.map((team, idx) => {
+                sortedTeams.map((team) => {
                   const logo = getLogoFile(team.name);
 
                   const zone = zoneFor(
@@ -390,23 +324,7 @@ export default function Table() {
             </tbody>
           </table>
         </div>
-
-        {zonesInTable.length > 0 && (
-          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-600 dark:text-gray-300">
-            {zonesInTable.map((zone) => (
-              <li key={zone} className="flex items-center gap-1.5">
-                <span
-                  aria-hidden
-                  className={cn(
-                    "h-2 w-2 shrink-0 rounded-full",
-                    ZONES[zone].color,
-                  )}
-                />
-                {ZONES[zone].label}
-              </li>
-            ))}
-          </ul>
-        )}
+        <ZoneLegend teamCount={sortedTeams.length} league={league} />
       </div>
 
       {/* RHS: Top Scorers */}

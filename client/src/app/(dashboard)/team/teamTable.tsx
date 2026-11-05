@@ -11,6 +11,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import React, { useMemo, useState } from "react";
+import { zoneFor, ZoneLegend, ZONES } from "@/lib/zones";
 
 function PerformanceArrow({
   position,
@@ -184,50 +185,15 @@ const TeamTable = ({
           </thead>
 
           <tbody className="bg-white dark:bg-gray-800">
-            {sortedTeams.map((team: any, idx: number) => {
+            {sortedTeams.map((team) => {
               const logo = getLogoFile(team.name);
-
-              // Border color by rank + league
-              let borderClass = "";
-              let borderColor = "";
-              // Champions League
-              if (idx <= 3 && (league !== "Ligue 1" || idx !== 3)) {
-                borderColor = "bg-[#38003c] dark:bg-blue-600";
-              }
-              // Champions League Qualification
-              else if (idx === 3 && league === "Ligue 1") {
-                borderColor = "bg-[#301934] dark:bg-purple-800";
-              }
-              // Europa League
-              else if (idx === 4) {
-                borderColor = "bg-[#ff3333]";
-              }
-              // Europa Conference League Qualification
-              else if (idx === 5 && league !== "Premier League") {
-                borderColor = "bg-[#00A300]";
-              }
-              // Relegation
-              else if (idx > sortedTeams.length - 3) {
-                borderColor = "bg-[#ff2882]";
-              }
-              // Relegation
-              else if (
-                idx === sortedTeams.length - 3 &&
-                (league === "Premier League" ||
-                  league === "Serie A" ||
-                  league === "La Liga")
-              ) {
-                borderColor = "bg-[#ff2882]";
-              }
-              // Relegation Play-Off
-              else if (
-                idx === sortedTeams.length - 3 &&
-                (league === "Ligue 1" || league === "Bundesliga")
-              ) {
-                borderColor = "bg-[#ADADAD]";
-              }
-              if (borderColor !== "") borderClass = "relative";
-
+              const zone = zoneFor(
+                team.position - 1,
+                sortedTeams.length,
+                league,
+              );
+              const borderColor = zone ? ZONES[zone].color : "";
+              const borderClass = zone ? "relative" : "";
               return (
                 <tr
                   key={team.name}
@@ -327,6 +293,7 @@ const TeamTable = ({
           </tbody>
         </table>
       </div>
+      <ZoneLegend teamCount={sortedTeams.length} league={league} />
     </div>
   );
 };
