@@ -199,7 +199,7 @@ export default function Table() {
       className={`w-full bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 md:p-5 flex flex-col lg:flex-row gap-6 transition-all duration-500`}
     >
       {/* LHS: Standings Table */}
-      <div className="flex-1 min-w-0">
+      <div className="@container min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2 pb-2.5">
           <select
             value={league}
