@@ -11,10 +11,14 @@ import {
   isNull,
   lt,
   or,
+  SQL,
+  sql,
 } from "drizzle-orm";
 import type {
   HomeAwayMatches,
   LiveMatch,
+  MatchFilterOptions,
+  MatchFilters,
   MatchLineups,
   MatchPreview,
   MatchStats,
@@ -112,32 +116,159 @@ export const getUpcomingMatchByIdService = async (
   return row ?? null;
 };
 
-// Matches involving the team, newest first, from `offset` onwards
+// Matches involving the team, newest first, from `offset` onwards - used for any paginated match history (team, upcoming page)
 export const getRecentMatchesService = async (
   team: string,
   offset: number,
   limit: number,
+  filters: MatchFilters = {},
 ): Promise<PaginatedMatches> => {
+  const where = and(...matchConditions(team, filters));
   const [matches, [totalRow]] = await Promise.all([
     db
       .select(previewColumns)
       .from(matchStats)
-      .where(involves(team))
+      .where(where)
       .orderBy(desc(matchStats.matchDate), desc(matchStats.id))
       .limit(limit)
       .offset(offset),
-    db.select({ total: count() }).from(matchStats).where(involves(team)),
+    db.select({ total: count() }).from(matchStats).where(where),
   ]);
 
   return { matches, total: totalRow?.total ?? 0 };
 };
 
-// Page-based version for the routes that still use pages
-export const getTeamMatchesService = async (
+// Filter functions
+
+// The season starts Aug 2026, so Aug 2026 to Jul 2027 is 2026. (Serie A Covid edge case - Aug 3)
+const seasonOf = sql<number>`extract(year from (${matchStats.matchDate}::timestamp - interval '7 months 3 days'))::int`;
+
+const teamGoals = (team: string) =>
+  sql<number>`case when ${matchStats.homeTeam} = ${team} then ${matchStats.fthg} else ${matchStats.ftag} end`;
+
+const opponentGoals = (team: string) =>
+  sql<number>`case when ${matchStats.homeTeam} = ${team} then ${matchStats.ftag} else ${matchStats.fthg} end`;
+
+const opponentOf = (team: string) =>
+  sql<string>`case when ${matchStats.homeTeam} = ${team} then ${matchStats.awayTeam} else ${matchStats.homeTeam} end`;
+
+// W / D / L, and for W or L optionally the winning margin (3 = 3 or more)
+function resultCondition(
   team: string,
-  page = 0,
-): Promise<PaginatedMatches> => {
-  return getRecentMatchesService(team, page * PAGE_SIZE, PAGE_SIZE);
+  result: "W" | "D" | "L",
+  margin?: number,
+): SQL | undefined {
+  const scored = teamGoals(team);
+  const conceded = opponentGoals(team);
+  if (result === "D") return eq(scored, conceded);
+
+  let difference = sql<number>`${scored} - ${conceded}`;
+  if (result === "L") difference = sql<number>`${conceded} - ${scored}`;
+
+  if (margin === undefined) return gt(difference, 0);
+  if (margin >= 3) return gte(difference, 3);
+  return eq(difference, margin);
+}
+
+function goalsCondition(
+  team: string,
+  goals: NonNullable<MatchFilters["goals"]>,
+): SQL | undefined {
+  const scored = teamGoals(team);
+  const conceded = opponentGoals(team);
+
+  if (goals === "over2.5") return gte(sql<number>`${scored} + ${conceded}`, 3);
+  if (goals === "btts") return and(gt(scored, 0), gt(conceded, 0));
+  if (goals === "cleanSheet") return eq(conceded, 0);
+  return eq(scored, 0); // no goals
+}
+
+// Everything a match list can be filtered by
+function matchConditions(
+  team: string,
+  filters: MatchFilters,
+): (SQL | undefined)[] {
+  const conditions: (SQL | undefined)[] = [involves(team)];
+
+  if (filters.season !== undefined)
+    conditions.push(eq(seasonOf, filters.season));
+  if (filters.venue === "home") conditions.push(eq(matchStats.homeTeam, team));
+  if (filters.venue === "away") conditions.push(eq(matchStats.awayTeam, team));
+
+  if (filters.opponent) {
+    conditions.push(
+      or(
+        and(
+          eq(matchStats.homeTeam, team),
+          eq(matchStats.awayTeam, filters.opponent),
+        ),
+        and(
+          eq(matchStats.awayTeam, team),
+          eq(matchStats.homeTeam, filters.opponent),
+        ),
+      ),
+    );
+  }
+
+  // An exact scoreline decides result, so it takes priority over result/margin
+  if (filters.scoreline) {
+    const [scored, conceded] = filters.scoreline.split("-").map(Number);
+    conditions.push(
+      eq(teamGoals(team), scored),
+      eq(opponentGoals(team), conceded),
+    );
+  } else if (filters.result) {
+    conditions.push(resultCondition(team, filters.result, filters.margin));
+  }
+
+  if (filters.goals) conditions.push(goalsCondition(team, filters.goals));
+  // TODO: filters.comeback - needs hthg and htag in match stats, maybe rebuild from timeline?
+
+  return conditions;
+}
+
+// returns match filter settings
+export const getMatchFilterOptionsService = async (
+  team: string,
+): Promise<MatchFilterOptions> => {
+  const [seasonRows, opponents, scorelines] = await Promise.all([
+    db
+      .selectDistinct({ season: seasonOf })
+      .from(matchStats)
+      .where(involves(team))
+      .orderBy(desc(seasonOf)),
+
+    // "group by 1" groups by first selected column.
+    db
+      .select({ team: opponentOf(team), count: count() })
+      .from(matchStats)
+      .where(involves(team))
+      .groupBy(sql`1`)
+      .orderBy(sql`1`),
+
+    db
+      .select({
+        goalsFor: teamGoals(team),
+        goalsAgainst: opponentGoals(team),
+        count: count(),
+      })
+      .from(matchStats)
+      .where(
+        and(
+          involves(team),
+          isNotNull(matchStats.fthg),
+          isNotNull(matchStats.ftag),
+        ),
+      )
+      .groupBy(sql`1, 2`)
+      .orderBy(desc(count())),
+  ]);
+
+  return {
+    seasons: seasonRows.map((row) => row.season),
+    opponents,
+    scorelines,
+  };
 };
 
 export const getTeamMatchStatsService = (

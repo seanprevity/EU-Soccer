@@ -4,6 +4,7 @@ import type {
   HomeAwayMatches,
   LiveMatch,
   LiveMatchResponse,
+  MatchFilterOptions,
   MatchPreview,
   MatchStats,
   Odds,
@@ -15,11 +16,11 @@ import type {
 import type { Validated } from "../../middleware/validation";
 import type {
   getLiveMatchSchemas,
+  getMatchFilterOptionsSchemas,
   getMatchStatsSchemas,
   getMatchupSchemas,
   getOddsSchemas,
   getRecentMatchesSchemas,
-  getTeamMatchesSchemas,
   getUpcomingLineupsSchemas,
   getUpcomingMatchByIdSchemas,
 } from "./matches.schemas";
@@ -27,13 +28,13 @@ import {
   getHomeAwayMatchesService,
   getLiveMatchesService,
   getLiveMatchService,
+  getMatchFilterOptionsService,
   getMatchIdByEspnIdService,
   getMatchStatsService,
   getOddsService,
   getPastMatchesService,
   getRecentMatchesService,
   getSimulationService,
-  getTeamMatchesService,
   getUpcomingLineupsService,
   getUpcomingMatchByIdService,
   getUpcomingMatchesService,
@@ -85,20 +86,23 @@ export const getUpcomingMatchById = async (
   res.json(match);
 };
 
-export const getLast5Matches = async (
-  _req: Request,
-  res: Response<PaginatedMatches, Validated<typeof getTeamMatchesSchemas>>,
-): Promise<void> => {
-  const { team, page } = res.locals.validated.query;
-  res.json(await getTeamMatchesService(team, page));
-};
-
 export const getRecentMatches = async (
   _req: Request,
   res: Response<PaginatedMatches, Validated<typeof getRecentMatchesSchemas>>,
 ): Promise<void> => {
-  const { team, offset, limit } = res.locals.validated.query;
-  res.json(await getRecentMatchesService(team, offset, limit));
+  const { team, offset, limit, ...filters } = res.locals.validated.query;
+  res.json(await getRecentMatchesService(team, offset, limit, filters));
+};
+
+export const getMatchFilterOptions = async (
+  _req: Request,
+  res: Response<
+    MatchFilterOptions,
+    Validated<typeof getMatchFilterOptionsSchemas>
+  >,
+): Promise<void> => {
+  const { team } = res.locals.validated.query;
+  res.json(await getMatchFilterOptionsService(team));
 };
 
 export const getSimulation = async (

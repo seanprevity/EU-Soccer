@@ -1,10 +1,10 @@
 import {
   idParamsSchema,
   liveMatchQuerySchema,
+  matchFilterOptionsQuerySchema,
   matchStatsQuerySchema,
   matchupQuerySchema,
   recentMatchesQuerySchema,
-  teamMatchesQuerySchema,
   upcomingLineupsParamsSchema,
 } from "@epl/shared";
 import type { RequestSchemas } from "../../middleware/validation";
@@ -21,12 +21,12 @@ export const getOddsSchemas = {
   params: idParamsSchema,
 } satisfies RequestSchemas;
 
-export const getTeamMatchesSchemas = {
-  query: teamMatchesQuerySchema,
-} satisfies RequestSchemas;
-
 export const getRecentMatchesSchemas = {
   query: recentMatchesQuerySchema,
+} satisfies RequestSchemas;
+
+export const getMatchFilterOptionsSchemas = {
+  query: matchFilterOptionsQuerySchema,
 } satisfies RequestSchemas;
 
 export const getMatchupSchemas = {

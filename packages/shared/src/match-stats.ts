@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { idListSchema, pageSchema } from "./common";
+import { idListSchema } from "./common";
 
 export const matchEventKindSchema = z.enum([
   "goal",
@@ -168,17 +168,41 @@ export const simulationResultSchema = z.object({
 // /matches/stats?ids=12,15
 export const matchStatsQuerySchema = z.object({ ids: idListSchema });
 
-// /matches/last5
-export const teamMatchesQuerySchema = z.object({
-  team: z.string().trim().min(1),
-  page: pageSchema,
+export const matchFiltersSchema = z.object({
+  season: z.coerce.number().int().min(2005).optional(),
+  venue: z.enum(["home", "away"]).optional(),
+  opponent: z.string().min(1).optional(),
+  result: z.enum(["W", "D", "L"]).optional(),
+  margin: z.coerce.number().int().min(1).optional(),
+  scoreline: z
+    .string()
+    .regex(/^\d{1,2}-\d{1,2}$/)
+    .optional(),
+  goals: z.enum(["over2.5", "btts", "cleanSheet", "failedToScore"]).optional(),
+  comeback: z.enum(["wonFromBehind", "leadLost"]).optional(),
 });
 
 // /matches/recent
-export const recentMatchesQuerySchema = z.object({
-  team: z.string(),
-  offset: z.coerce.number().int().min(0).default(0),
-  limit: z.coerce.number().int().min(1).max(20).default(5),
+export const recentMatchesQuerySchema = z
+  .object({
+    team: z.string(),
+    offset: z.coerce.number().int().min(0).default(0),
+    limit: z.coerce.number().int().min(1).max(20).default(5),
+  })
+  .extend(matchFiltersSchema.shape);
+
+// /matches/filters - everything filter controls need
+export const matchFilterOptionsQuerySchema = z.object({ team: z.string() });
+export const matchFilterOptionsSchema = z.object({
+  seasons: z.array(z.number().int()),
+  opponents: z.array(z.object({ team: z.string(), count: z.number().int() })),
+  scorelines: z.array(
+    z.object({
+      goalsFor: z.number().int(),
+      goalsAgainst: z.number().int(),
+      count: z.number().int(),
+    }),
+  ),
 });
 
 const teamNameParam = z
@@ -207,7 +231,8 @@ export type PaginatedMatches = z.infer<typeof paginatedMatchesSchema>;
 export type HomeAwayMatches = z.infer<typeof homeAwayMatchesSchema>;
 export type SimulationResult = z.infer<typeof simulationResultSchema>;
 export type MatchStatsQuery = z.infer<typeof matchStatsQuerySchema>;
-export type TeamMatchesQuery = z.infer<typeof teamMatchesQuerySchema>;
 export type RecentMatchesQuery = z.infer<typeof recentMatchesQuerySchema>;
 export type MatchupQuery = z.infer<typeof matchupQuerySchema>;
 export type HalfStats = z.infer<typeof halfStatsSchema>;
+export type MatchFilters = z.infer<typeof matchFiltersSchema>;
+export type MatchFilterOptions = z.infer<typeof matchFilterOptionsSchema>;
