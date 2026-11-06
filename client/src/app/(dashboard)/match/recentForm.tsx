@@ -2,7 +2,6 @@
 
 import { RedCardBadge } from "@/lib/uiUtils";
 import { getLogoFile, getResultColors, getMatchResult } from "@/lib/utils";
-import { useGetLast5MatchesQuery } from "@/state/api";
 import Image from "next/image";
 import Link from "next/link";
 import Pager from "@/components/Pager";
@@ -10,15 +9,17 @@ import { useDispatch } from "react-redux";
 import { useAppSelector } from "@/state/redux";
 import { setAwayRFPage, setHomeRFPage } from "@/state";
 import { MatchPreview } from "@epl/shared";
+import { useGetRecentMatchesQuery } from "@/state/api";
 
 const PAGE_SIZE = 5;
 
 const teamHref = (team: string) => `/team/${team.split(" ").join("_")}`;
 
 function useRecentMatches(team: string, page: number) {
-  const { data, isLoading, isFetching } = useGetLast5MatchesQuery({
+  const { data, isLoading, isFetching } = useGetRecentMatchesQuery({
     team,
-    page,
+    offset: page * PAGE_SIZE,
+    limit: PAGE_SIZE,
   });
   return {
     matches: data?.matches ?? [],

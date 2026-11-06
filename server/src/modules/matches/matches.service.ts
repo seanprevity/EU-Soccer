@@ -112,7 +112,7 @@ export const getUpcomingMatchByIdService = async (
   return row ?? null;
 };
 
-// Matches involving the team, newest first, from `offset` onwards
+// Matches involving the team, newest first, from `offset` onwards - used for any paginated match history (team, upcoming page)
 export const getRecentMatchesService = async (
   team: string,
   offset: number,
@@ -130,14 +130,6 @@ export const getRecentMatchesService = async (
   ]);
 
   return { matches, total: totalRow?.total ?? 0 };
-};
-
-// Page-based version for the routes that still use pages
-export const getTeamMatchesService = async (
-  team: string,
-  page = 0,
-): Promise<PaginatedMatches> => {
-  return getRecentMatchesService(team, page * PAGE_SIZE, PAGE_SIZE);
 };
 
 export const getTeamMatchStatsService = (

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { idListSchema, pageSchema } from "./common";
+import { idListSchema } from "./common";
 
 export const matchEventKindSchema = z.enum([
   "goal",
@@ -168,12 +168,6 @@ export const simulationResultSchema = z.object({
 // /matches/stats?ids=12,15
 export const matchStatsQuerySchema = z.object({ ids: idListSchema });
 
-// /matches/last5
-export const teamMatchesQuerySchema = z.object({
-  team: z.string().trim().min(1),
-  page: pageSchema,
-});
-
 // /matches/recent
 export const recentMatchesQuerySchema = z.object({
   team: z.string(),
@@ -207,7 +201,6 @@ export type PaginatedMatches = z.infer<typeof paginatedMatchesSchema>;
 export type HomeAwayMatches = z.infer<typeof homeAwayMatchesSchema>;
 export type SimulationResult = z.infer<typeof simulationResultSchema>;
 export type MatchStatsQuery = z.infer<typeof matchStatsQuerySchema>;
-export type TeamMatchesQuery = z.infer<typeof teamMatchesQuerySchema>;
 export type RecentMatchesQuery = z.infer<typeof recentMatchesQuerySchema>;
 export type MatchupQuery = z.infer<typeof matchupQuerySchema>;
 export type HalfStats = z.infer<typeof halfStatsSchema>;

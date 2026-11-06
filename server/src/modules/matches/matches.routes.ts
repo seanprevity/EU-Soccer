@@ -2,7 +2,6 @@ import express from "express";
 import { validate } from "../../middleware/validation";
 import {
   getHomeAwayMatches,
-  getLast5Matches,
   getLiveMatch,
   getLiveMatches,
   getMatchStats,
@@ -20,7 +19,6 @@ import {
   getMatchupSchemas,
   getOddsSchemas,
   getRecentMatchesSchemas,
-  getTeamMatchesSchemas,
   getUpcomingLineupsSchemas,
   getUpcomingMatchByIdSchemas,
 } from "./matches.schemas";
@@ -36,7 +34,6 @@ router.get(
   getUpcomingMatchById,
 );
 router.get("/odds/:id", validate(getOddsSchemas), getOdds);
-router.get("/last5", validate(getTeamMatchesSchemas), getLast5Matches);
 router.get("/recent", validate(getRecentMatchesSchemas), getRecentMatches);
 router.get("/simulation", validate(getMatchupSchemas), getSimulation);
 router.get("/home-away", validate(getMatchupSchemas), getHomeAwayMatches);

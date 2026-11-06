@@ -225,27 +225,6 @@ export const api = createApi({
       },
     }),
 
-    // gets last 5 matches in league (not h2h)
-    getLast5Matches: build.query<
-      PaginatedMatches,
-      { team: string; page?: number }
-    >({
-      query: ({ team, page = 0 }) => ({
-        url: `/matches/last5`,
-        method: "GET",
-        params: {
-          team: team,
-          page: page,
-        },
-      }),
-      transformResponse: (raw: unknown) => paginatedMatchesSchema.parse(raw),
-      async onQueryStarted(_, { queryFulfilled }) {
-        await withToast(queryFulfilled, {
-          error: "Failed to fetch last 5 matches.",
-        });
-      },
-    }),
-
     // gets odds for a specific match
     getOdds: build.query<Odds[], { id: string }>({
       query: ({ id }) => ({
@@ -478,7 +457,6 @@ export const {
   useGetOddsQuery,
   useGetUpcomingMatchesQuery,
   useGetPastMatchesQuery,
-  useGetLast5MatchesQuery,
   useGetTeamStandingsQuery,
   useGetSeasonTeamStatsQuery,
   useGetLast5TeamStatsQuery,
