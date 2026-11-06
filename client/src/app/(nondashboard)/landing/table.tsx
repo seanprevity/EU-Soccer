@@ -20,6 +20,7 @@ import { setLeague, setSeason } from "@/state";
 import { Standing, TopPlayerCategory } from "@epl/shared";
 import { StandingType, useLiveStandings } from "@/lib/liveStandings";
 import { LiveDot, LiveScore, Movement } from "@/components/liveBadges";
+import { zoneFor, ZoneLegend, ZONES } from "@/lib/zones";
 
 const TOP_PLAYER_CATEGORIES: {
   key: TopPlayerCategory;
@@ -37,63 +38,6 @@ const TOP_PLAYER_CATEGORIES: {
 const LEAGUE_HEADERS = HEADER_CONFIG.filter(
   (h) => h.key !== "expectedPosition",
 );
-
-// relegation or european football decided by spots on league table
-type Zone =
-  | "championsLeague"
-  | "championsLeagueQualifying"
-  | "europaLeague"
-  | "conferenceLeague"
-  | "relegationPlayOff"
-  | "relegation";
-
-// Colour and description of each zone
-const ZONES: Record<Zone, { color: string; label: string }> = {
-  championsLeague: {
-    color: "bg-[#38003c] dark:bg-blue-600",
-    label: "Champions League",
-  },
-  championsLeagueQualifying: {
-    color: "bg-[#301934] dark:bg-purple-800",
-    label: "Champions League qualifying",
-  },
-  europaLeague: { color: "bg-[#ff3333]", label: "Europa League" },
-  conferenceLeague: {
-    color: "bg-[#00A300]",
-    label: "Conference League qualifying",
-  },
-  relegationPlayOff: { color: "bg-[#ADADAD]", label: "Relegation play-off" },
-  relegation: { color: "bg-[#ff2882]", label: "Relegation" },
-};
-
-// Zones for european football or relegation
-function zoneFor(
-  index: number,
-  teamCount: number,
-  league: string,
-): Zone | null {
-  const thirdFromBottom = teamCount - 3;
-
-  if (index <= 3 && (league !== "Ligue 1" || index !== 3))
-    return "championsLeague";
-  if (index === 3 && league === "Ligue 1") return "championsLeagueQualifying";
-  if (index === 4) return "europaLeague";
-  if (index === 5 && league !== "Premier League") return "conferenceLeague";
-  if (index > thirdFromBottom) return "relegation";
-
-  if (index === thirdFromBottom) {
-    if (
-      league === "Premier League" ||
-      league === "Serie A" ||
-      league === "La Liga"
-    )
-      return "relegation";
-    if (league === "Ligue 1" || league === "Bundesliga")
-      return "relegationPlayOff";
-  }
-
-  return null;
-}
 
 export default function Table() {
   const dispatch = useDispatch();
@@ -172,16 +116,6 @@ export default function Table() {
     });
   }, [liveTeams, sortConfig]);
 
-  // The zones this league's table uses, in table order, for the key underneath
-  const zonesInTable = useMemo(() => {
-    const found: Zone[] = [];
-    for (let index = 0; index < sortedTeams.length; index++) {
-      const zone = zoneFor(index, sortedTeams.length, league);
-      if (zone && !found.includes(zone)) found.push(zone);
-    }
-    return found;
-  }, [sortedTeams.length, league]);
-
   // Sort and ranks top players
   const rankedPlayers = useMemo(() => {
     if (!topPlayers) return [];
@@ -199,61 +133,54 @@ export default function Table() {
       className={`w-full bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 md:p-5 flex flex-col lg:flex-row gap-6 transition-all duration-500`}
     >
       {/* LHS: Standings Table */}
-      <div className="flex-1 min-w-0">
-        <div className="@container flex w-full flex-wrap items-center gap-3 mb-4 sm:flex-nowrap">
-          <div className="flex gap-2 flex-wrap w-full sm:w-auto sm:shrink-0">
-            <select
-              value={league}
-              onChange={(e) => dispatch(setLeague(e.target.value))}
-              className="bg-white dark:bg-gray-700 dark:hover:bg-gray-600 border-none px-3 py-2 rounded text-gray-800 dark:text-gray-200 font-medium cursor-pointer flex-1 sm:flex-none"
-            >
-              {LEAGUES.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
+      <div className="@container min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2 pb-2.5">
+          <select
+            value={league}
+            onChange={(e) => dispatch(setLeague(e.target.value))}
+            className="flex-1 cursor-pointer rounded border-none bg-white px-3 py-2 font-medium text-gray-800 sm:flex-none dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          >
+            {LEAGUES.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
 
-            <select
-              value={season}
-              onChange={(e) => dispatch(setSeason(e.target.value))}
-              className="bg-white dark:bg-gray-700 border-none px-3 py-2 rounded text-gray-800 dark:text-gray-200 dark:hover:bg-gray-600 font-medium cursor-pointer flex-1 sm:flex-none"
-            >
-              {seasons.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+          <select
+            value={season}
+            onChange={(e) => dispatch(setSeason(e.target.value))}
+            className="flex-1 cursor-pointer rounded border-none bg-white px-3 py-2 font-medium text-gray-800 sm:flex-none dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          >
+            {seasons.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
 
-            <div className="flex gap-2 w-full sm:w-auto">
-              {(["TOTAL", "HOME", "AWAY"] as const).map((t) => {
-                const label = t.charAt(0) + t.substring(1).toLowerCase();
-                return (
-                  <button
-                    key={t}
-                    onClick={() => setType(t)}
-                    className={`
-                    flex-1 sm:flex-none px-3 py-2 rounded-3xl font-medium text-xs sm:text-sm
-                    transition-colors duration-150 cursor-pointer
-                    ${
-                      type === t
-                        ? "bg-[#38003c] dark:bg-purple-900 text-white shadow-md"
-                        : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600/80"
-                    }
-                  `}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="flex w-full gap-2 sm:w-auto">
+            {(["TOTAL", "HOME", "AWAY"] as const).map((t) => {
+              const label = t.charAt(0) + t.substring(1).toLowerCase();
+              return (
+                <button
+                  key={t}
+                  onClick={() => setType(t)}
+                  className={cn(
+                    "flex-1 cursor-pointer rounded-3xl px-3 py-2 text-xs font-medium transition-colors duration-150 sm:flex-none sm:text-sm",
+                    type === t
+                      ? "bg-[#38003c] text-white shadow-md dark:bg-purple-900"
+                      : "bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600/80",
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
+
           <div className="ml-auto hidden shrink-0 items-center gap-2 sm:flex">
-            <div
-              className="relative h-[28px] w-[28px] flex-shrink-0 md:h-[36px] md:w-[36px]"
-              title={league}
-            >
+            <div className="relative size-7 shrink-0 md:size-9" title={league}>
               <Image
                 src={getLeagueFile(league)}
                 alt={`${league} logo`}
@@ -313,7 +240,7 @@ export default function Table() {
                   </td>
                 </tr>
               ) : (
-                sortedTeams.map((team, idx) => {
+                sortedTeams.map((team) => {
                   const logo = getLogoFile(team.name);
 
                   const zone = zoneFor(
@@ -397,23 +324,7 @@ export default function Table() {
             </tbody>
           </table>
         </div>
-
-        {zonesInTable.length > 0 && (
-          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-600 dark:text-gray-300">
-            {zonesInTable.map((zone) => (
-              <li key={zone} className="flex items-center gap-1.5">
-                <span
-                  aria-hidden
-                  className={cn(
-                    "h-2 w-2 shrink-0 rounded-full",
-                    ZONES[zone].color,
-                  )}
-                />
-                {ZONES[zone].label}
-              </li>
-            ))}
-          </ul>
-        )}
+        <ZoneLegend teamCount={sortedTeams.length} league={league} />
       </div>
 
       {/* RHS: Top Scorers */}

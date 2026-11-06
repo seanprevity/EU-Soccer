@@ -241,7 +241,7 @@ export const statsKeys = [
 
 export const HEADER_CONFIG = [
   { label: "Position", key: "position" },
-  { label: "XPosition", key: "expectedPosition" },
+  { label: "XPos", key: "expectedPosition" },
   { label: "Club", key: "name" },
   { label: "P", key: "played" },
   { label: "W", key: "won" },

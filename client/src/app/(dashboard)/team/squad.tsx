@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useMemo } from "react";
 import { useGetSquadQuery } from "@/state/api";
 import { SquadPlayerWithImage } from "@epl/shared";
+import { cn } from "@/lib/utils";
 
 const POSITION_ORDER = [
   "Coach",
@@ -58,11 +59,12 @@ const groupLabel = (position: string) =>
     ? position
     : `${position}s`;
 
-// Same padding and border as a player row, so the stat labels line up with the numbers
-function StatHeader({ stats }: { stats: StatColumn[] }) {
+function StatHeader({ stats, note }: { stats: StatColumn[]; note?: string }) {
   return (
     <div className="flex items-center gap-2 border border-transparent px-3">
-      <span className="flex-1" />
+      <span className="flex-1 text-xs text-gray-500 dark:text-gray-400">
+        {note}
+      </span>
       <div className="flex shrink-0">
         {stats.map((s) => (
           <span
@@ -97,9 +99,15 @@ function PlayerRow({
     .filter(Boolean)
     .join(" · ");
   const shirt = !isCoach && p.number != null ? `#${p.number}` : null;
+  const hasPlayed = isCoach || Boolean(p.appearances);
 
   return (
-    <li className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
+    <li
+      className={cn(
+        "flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700",
+        !hasPlayed && "opacity-50 hover:opacity-100",
+      )}
+    >
       <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
         <Image
           src={p.imageUrl || "/placeholder-player.svg"}
@@ -150,7 +158,7 @@ function PlayerRow({
               }
               className="w-9 text-center text-sm tabular-nums text-gray-900 sm:w-11 dark:text-gray-100"
             >
-              {p[s.key] ?? "–"}
+              {hasPlayed ? (p[s.key] ?? "–") : "–"}
             </span>
           ))}
         </div>
@@ -184,6 +192,13 @@ const Squad = ({ team }: { team: string }) => {
 
   const statsSeason = squad?.find((p) => p.statsSeason)?.statsSeason;
 
+  const statsNote = statsSeason
+    ? `League stats, ${statsSeason}/${(Number(statsSeason) + 1) % 100}`
+    : undefined;
+  const firstStatsPosition = grouped.find(
+    (group) => group.position !== "Coach",
+  )?.position;
+
   if (isLoading) {
     return (
       <div className="flex min-h-[72.4vh] w-full items-center justify-center bg-background dark:bg-gray-900">
@@ -207,12 +222,6 @@ const Squad = ({ team }: { team: string }) => {
 
   return (
     <div className="space-y-6 bg-background p-4 dark:bg-gray-900">
-      {statsSeason && (
-        <p className="text-right text-xs text-gray-500 dark:text-gray-400">
-          League stats, {statsSeason}/{(Number(statsSeason) + 1) % 100}
-        </p>
-      )}
-
       {grouped.map(({ position, players }) => {
         const isCoach = position === "Coach";
         const stats = position === "Goalkeeper" ? KEEPER_STATS : OUTFIELD_STATS;
@@ -228,7 +237,12 @@ const Squad = ({ team }: { team: string }) => {
             </div>
             <div className="h-px bg-border dark:bg-gray-700" />
 
-            {!isCoach && <StatHeader stats={stats} />}
+            {!isCoach && (
+              <StatHeader
+                stats={stats}
+                note={position === firstStatsPosition ? statsNote : undefined}
+              />
+            )}
             <ul className="space-y-1.5">
               {players.map((p) => (
                 <PlayerRow

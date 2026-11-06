@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { MatchEvent, MatchStats } from "@epl/shared";
 import { LiveDot } from "@/components/liveBadges";
+import { SegmentedTabs } from "@/components/segmentedTabs";
 
 type Tab = "timeline" | "table" | "stats" | "lineups";
 type Side = "home" | "away";
@@ -26,6 +27,13 @@ export type LiveInfo = {
   reachedHalfTime: boolean;
   minute: number | null;
 };
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: "timeline", label: "Timeline" },
+  { key: "stats", label: "Stats" },
+  { key: "table", label: "Table" },
+  { key: "lineups", label: "Lineups" },
+];
 
 const teamHref = (team: string) => `/team/${team.split(" ").join("_")}`;
 
@@ -207,48 +215,6 @@ function Header({ match, live }: { match: MatchStats; live?: LiveInfo }) {
   );
 }
 
-function Tabs({
-  active,
-  available,
-  onChange,
-}: {
-  active: Tab;
-  available: Record<Tab, boolean>;
-  onChange: (tab: Tab) => void;
-}) {
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "timeline", label: "Timeline" },
-    { key: "stats", label: "Stats" },
-    { key: "table", label: "Table" },
-    { key: "lineups", label: "Lineups" },
-  ];
-  return (
-    <div
-      role="tablist"
-      className="mx-auto flex w-fit rounded-lg bg-gray-200 p-1 dark:bg-gray-800"
-    >
-      {tabs.map(({ key, label }) => (
-        <button
-          key={key}
-          role="tab"
-          aria-selected={active === key}
-          disabled={!available[key]}
-          title={available[key] ? undefined : "Not available for this match"}
-          onClick={() => onChange(key)}
-          className={cn(
-            "rounded-md px-4 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-            active === key
-              ? "bg-white text-gray-900 shadow-sm dark:bg-gray-950 dark:text-white"
-              : "text-gray-600 enabled:hover:text-gray-900 dark:text-gray-400 dark:enabled:hover:text-white hover:cursor-pointer ",
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // The full match page body. Used by /match/[id] (finished) and /live/[espnId] (in play).
 export default function MatchView({
   match,
@@ -291,7 +257,17 @@ export default function MatchView({
       </div>
       <main className="mx-auto max-w-3xl space-y-6 p-4">
         <Header match={match} live={live} />
-        <Tabs active={active} available={available} onChange={setTab} />
+        <SegmentedTabs
+          ariaLabel="Match sections"
+          options={TABS.map((tab) => ({
+            ...tab,
+            disabled: !available[tab.key],
+            disabledTitle: "Not available for this match",
+          }))}
+          value={active}
+          
+          onChange={setTab}
+        />
         <div role="tabpanel">
           {active === "timeline" && (
             <Timeline
