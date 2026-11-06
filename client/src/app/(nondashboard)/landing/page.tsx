@@ -6,6 +6,7 @@ import Table from "./table";
 import { useAppSelector } from "@/state/redux";
 import { useDispatch } from "react-redux";
 import Matches from "./matches";
+import { SegmentedTabs } from "@/components/segmentedTabs";
 
 const Landing = () => {
   const dispatch = useDispatch();
@@ -16,28 +17,16 @@ const Landing = () => {
       <div className="w-full max-w-[1400px] flex flex-col gap-6">
         {/* View toggle */}
         <div className="mb-1 flex justify-center">
-          <div className="inline-flex rounded-lg bg-gray-200 p-1 dark:bg-gray-800/80">
-            {(
-              [
-                ["upcoming", "Upcoming Matches"],
-                ["table", "Table Statistics"],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={priority === key}
-                onClick={() => dispatch(setPriority(key))}
-                className={`cursor-pointer rounded-md px-4 py-2 text-sm font-semibold transition-colors sm:px-5 ${
-                  priority === key
-                    ? "bg-white text-gray-900 shadow-sm dark:bg-purple-900 dark:text-white"
-                    : "text-gray-600 hover:text-gray-900 dark:text-gray-300/80 dark:hover:text-white"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <SegmentedTabs
+            ariaLabel="Home view"
+            className="mb-1"
+            options={[
+              { key: "upcoming", label: "Upcoming Matches" },
+              { key: "table", label: "Table Statistics" },
+            ]}
+            value={priority}
+            onChange={(next) => dispatch(setPriority(next))}
+          />
         </div>
 
         <div className="flex flex-col lg:flex-row gap-4 w-full transition-all duration-500">

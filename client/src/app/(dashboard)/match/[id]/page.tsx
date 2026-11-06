@@ -9,13 +9,14 @@ import Teams from "../teams";
 import RecentForm from "../recentForm";
 import Head2Head from "../Head2Head";
 import UpcomingLineups from "../upcomingLineups";
-import { cn, emptyH2H } from "@/lib/utils";
+import { emptyH2H } from "@/lib/utils";
 import {
   useGetHead2HeadQuery,
   useGetTeamStandingsQuery,
   useGetUpcomingLineupsQuery,
   useGetUpcomingMatchByIdQuery,
 } from "@/state/api";
+import { SegmentedTabs } from "@/components/segmentedTabs";
 
 const TABS = [
   { key: "preview", label: "Preview" },
@@ -30,57 +31,6 @@ const NARROW = "mx-auto w-full max-w-6xl px-4 sm:px-6";
 
 function isTabKey(value: string | null): value is TabKey {
   return TABS.some((tab) => tab.key === value);
-}
-
-function ConfirmedDot() {
-  return (
-    <span className="relative flex size-2" title="Confirmed lineups">
-      <span className="absolute inline-flex size-full animate-ping rounded-full bg-green-400 opacity-60 motion-reduce:hidden" />
-      <span className="relative inline-flex size-2 rounded-full bg-green-500" />
-      <span className="sr-only">(confirmed)</span>
-    </span>
-  );
-}
-
-function MatchTabs({
-  active,
-  onSelect,
-  withDot = [],
-}: {
-  active: TabKey;
-  onSelect: (tab: TabKey) => void;
-  withDot?: TabKey[];
-}) {
-  return (
-    <div
-      role="tablist"
-      aria-label="Match sections"
-      className="mx-auto my-6 flex w-fit gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-800"
-    >
-      {TABS.map((tab) => {
-        const selected = tab.key === active;
-        const showDot = withDot.includes(tab.key);
-        return (
-          <button
-            key={tab.key}
-            role="tab"
-            aria-selected={selected}
-            onClick={() => onSelect(tab.key)}
-            className={cn(
-              "inline-flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 sm:px-6",
-              "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500",
-              selected
-                ? "bg-[#38003c] text-white shadow-md dark:bg-gray-900"
-                : "text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700",
-            )}
-          >
-            {tab.label}
-            {showDot && <ConfirmedDot />}
-          </button>
-        );
-      })}
-    </div>
-  );
 }
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
@@ -147,10 +97,17 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         matchweek={matchweek}
       />
 
-      <MatchTabs
-        active={activeTab}
-        onSelect={selectTab}
-        withDot={lineupsConfirmed ? ["lineups"] : []}
+      <SegmentedTabs
+        ariaLabel="Match sections"
+        className="my-6"
+        options={TABS.map((tab) => ({
+          ...tab,
+          dot: tab.key === "lineups" && lineupsConfirmed,
+          dotLabel: "Confirmed lineups",
+        }))}
+        value={activeTab}
+        variant="underline"
+        onChange={selectTab}
       />
 
       {activeTab === "preview" && (

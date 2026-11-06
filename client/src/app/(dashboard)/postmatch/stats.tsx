@@ -1,11 +1,11 @@
-import { cn, statsKeys } from "@/lib/utils";
+import { statsKeys, getLogoFile } from "@/lib/utils";
 import { StatBar } from "@/lib/uiUtils";
 import Image from "next/image";
-import { getLogoFile } from "@/lib/utils";
 import { MatchStats } from "@epl/shared";
 import { statsForPeriod, StatsPeriod } from "@/lib/halfStats";
 import { useState } from "react";
 import { LiveInfo } from "./matchView";
+import { SegmentedTabs } from "@/components/segmentedTabs";
 
 function TeamLogo({ team }: { team: string }) {
   return (
@@ -108,31 +108,17 @@ export default function Stats({
       aria-label="Match stats"
       className="space-y-3 rounded-lg bg-white p-4 dark:bg-gray-900"
     >
-      <div
-        role="tablist"
-        className="mx-auto flex w-fit rounded-md bg-gray-100 p-0.5 dark:bg-gray-800"
-      >
-        {PERIODS.map(({ key, label }) => (
-          <button
-            key={key}
-            role="tab"
-            aria-selected={active === key}
-            disabled={!available[key]}
-            title={
-              available[key] ? undefined : "Not available for this match yet"
-            }
-            onClick={() => setPeriod(key)}
-            className={cn(
-              "rounded px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-              active === key
-                ? "bg-white text-gray-900 shadow-sm dark:bg-gray-950 dark:text-white"
-                : "cursor-pointer text-gray-600 dark:text-gray-400",
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs
+        ariaLabel="Stats period"
+        size="sm"
+        options={PERIODS.map((p) => ({
+          ...p,
+          disabled: !available[p.key],
+          disabledTitle: "Not available for this match yet",
+        }))}
+        value={active}
+        onChange={setPeriod}
+      />
 
       {rows.length ? (
         <>

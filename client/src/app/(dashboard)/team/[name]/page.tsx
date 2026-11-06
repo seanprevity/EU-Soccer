@@ -12,6 +12,7 @@ import { useAppSelector } from "@/state/redux";
 import { setTab } from "@/state";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { SegmentedTabs } from "@/components/segmentedTabs";
 
 export default function Page({
   params,
@@ -59,36 +60,18 @@ export default function Page({
         </div>
       </div>
 
-      {/* --- Tabs Bar --- */}
-      <div className="w-full flex justify-center mb-1">
-        <div className="flex justify-center items-center dark:bg-gray-900 rounded-xl px-1 py-0.5">
-          {["History", "Table", "Squad"].map((t, idx) => (
-            <React.Fragment key={t}>
-              <button
-                onClick={() => dispatch(setTab(t as typeof tab))}
-                className={`px-3 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm md:text-base font-semibold transition-all duration-300 w-[125px] sm:w-[130px] md:w-[150px] text-center rounded-lg shadow-sm cursor-pointer ${
-                  tab === t
-                    ? "bg-[#38003c] text-white dark:bg-gray-600 dark:text-white scale-102 ring-1 ring-[#38003c]/20 dark:ring-gray-500/30"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
-                }`}
-              >
-                {t === "History"
-                  ? "Matches"
-                  : t === "Table"
-                    ? "Table"
-                    : "Squad"}
-              </button>
-
-              {/* Divider */}
-              {idx < 2 && (
-                <span className="text-gray-300 dark:text-gray-600 mx-4 select-none text-2xl font-light">
-                  |
-                </span>
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
+      <SegmentedTabs
+        ariaLabel="Team sections"
+        className="mb-4 mt-2"
+        options={[
+          { key: "History", label: "Matches" },
+          { key: "Table", label: "Table" },
+          { key: "Squad", label: "Squad" },
+        ]}
+        value={tab}
+        variant="underline"
+        onChange={(next) => dispatch(setTab(next))}
+      />
 
       {/* --- Tab Content --- */}
       <div className="w-full max-w-5xl mx-auto">
