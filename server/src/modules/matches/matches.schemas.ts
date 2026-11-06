@@ -1,6 +1,7 @@
 import {
   idParamsSchema,
   liveMatchQuerySchema,
+  matchFilterOptionsQuerySchema,
   matchStatsQuerySchema,
   matchupQuerySchema,
   recentMatchesQuerySchema,
@@ -22,6 +23,10 @@ export const getOddsSchemas = {
 
 export const getRecentMatchesSchemas = {
   query: recentMatchesQuerySchema,
+} satisfies RequestSchemas;
+
+export const getMatchFilterOptionsSchemas = {
+  query: matchFilterOptionsQuerySchema,
 } satisfies RequestSchemas;
 
 export const getMatchupSchemas = {

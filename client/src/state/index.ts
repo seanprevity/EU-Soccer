@@ -1,5 +1,8 @@
 import { genCurrentSeason } from "@/lib/utils";
+import { MatchFilters } from "@epl/shared";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+
+type MatchHistoryEntry = { filters: MatchFilters; page: number };
 
 interface GlobalState {
   theme: "light" | "dark";
@@ -10,9 +13,8 @@ interface GlobalState {
   season: string;
   matchDate: string;
   h2hPage: number;
-  homeRFPage: number;
-  awayRFPage: number;
-  teamPage: { team: string; page: number };
+  // Keyed by list and team, e.g. "team:Arsenal", "preview-home:Arsenal"
+  matchHistory: Record<string, MatchHistoryEntry>;
 }
 
 const today = () => {
@@ -30,9 +32,7 @@ const initialState: GlobalState = {
   season: genCurrentSeason(),
   matchDate: today(),
   h2hPage: 0,
-  homeRFPage: 0,
-  awayRFPage: 0,
-  teamPage: { team: "", page: 0 },
+  matchHistory: {},
 };
 
 const globalSlice = createSlice({
@@ -66,17 +66,22 @@ const globalSlice = createSlice({
     setH2HPage: (state, action: PayloadAction<number>) => {
       state.h2hPage = action.payload;
     },
-    setHomeRFPage: (state, action: PayloadAction<number>) => {
-      state.homeRFPage = action.payload;
-    },
-    setAwayRFPage: (state, action: PayloadAction<number>) => {
-      state.awayRFPage = action.payload;
-    },
-    setTeamPage: (
+    setMatchHistory: (
       state,
-      action: PayloadAction<{ team: string; page: number }>,
+      action: PayloadAction<{
+        key: string;
+        filters?: Partial<MatchFilters>;
+        page?: number;
+      }>,
     ) => {
-      state.teamPage = action.payload;
+      const { key, filters, page } = action.payload;
+      const entry = state.matchHistory[key] ?? { filters: {}, page: 0 };
+      if (filters) {
+        entry.filters = { ...entry.filters, ...filters };
+        entry.page = 0;
+      }
+      if (page !== undefined) entry.page = page;
+      state.matchHistory[key] = entry;
     },
   },
 });
@@ -91,8 +96,6 @@ export const {
   setSeason,
   setMatchDate,
   setH2HPage,
-  setHomeRFPage,
-  setAwayRFPage,
-  setTeamPage,
+  setMatchHistory,
 } = globalSlice.actions;
 export default globalSlice.reducer;

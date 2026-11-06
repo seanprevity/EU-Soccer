@@ -38,6 +38,9 @@ import {
   liveMatchResponseSchema,
   UpcomingLineups,
   upcomingLineupsSchema,
+  MatchFilters,
+  MatchFilterOptions,
+  matchFilterOptionsSchema,
 } from "@epl/shared";
 import { withToast } from "@/lib/utils";
 import { z } from "zod";
@@ -338,17 +341,32 @@ export const api = createApi({
     // gets recent matches for team history page
     getRecentMatches: build.query<
       PaginatedMatches,
-      { team: string; offset: number; limit: number }
+      { team: string; offset: number; limit: number } & MatchFilters
     >({
-      query: ({ team, offset, limit }) => ({
+      query: (args) => ({
         url: `/matches/recent`,
         method: "GET",
-        params: { team, offset, limit },
+        params: args,
       }),
       transformResponse: (raw: unknown) => paginatedMatchesSchema.parse(raw),
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
           error: "Failed to load recent matches.",
+        });
+      },
+    }),
+
+    // everything the match filter controls need
+    getMatchFilterOptions: build.query<MatchFilterOptions, { team: string }>({
+      query: ({ team }) => ({
+        url: `/matches/filters`,
+        method: "GET",
+        params: { team },
+      }),
+      transformResponse: (raw: unknown) => matchFilterOptionsSchema.parse(raw),
+      async onQueryStarted(_, { queryFulfilled }) {
+        await withToast(queryFulfilled, {
+          error: "Failed to load match filters.",
         });
       },
     }),
@@ -465,6 +483,7 @@ export const {
   useGetTeamByNameQuery,
   useGetLeagueByTeamQuery,
   useGetRecentMatchesQuery,
+  useGetMatchFilterOptionsQuery,
   useGetSquadQuery,
   useGetSimulationQuery,
   useGetTeamsExpectedStandingsQuery,
