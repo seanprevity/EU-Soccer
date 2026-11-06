@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import TeamStats from "../teamStats";
 import HomeAwayRecord from "../homeAwayRecord";
@@ -35,8 +35,8 @@ function isTabKey(value: string | null): value is TabKey {
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
-  const tabsRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
+  const tabsAnchorRef = useRef<HTMLDivElement>(null);
+  const scrollOnTabChange = useRef(false);
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -44,18 +44,12 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
   const activeTab: TabKey = isTabKey(tabParam) ? tabParam : "preview";
 
   function selectTab(tab: TabKey) {
+    const anchorTop = tabsAnchorRef.current?.getBoundingClientRect().top ?? 0;
+    scrollOnTabChange.current = anchorTop < 0;
+
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set("tab", tab);
     router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
-
-    // If we've scrolled past the bar, start the new tab at its top
-    const barTop = tabsRef.current?.getBoundingClientRect().top ?? 1;
-    if (barTop <= 0) {
-      contentRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }
   }
 
   const { data: match, isLoading: matchLoading } = useGetUpcomingMatchByIdQuery(
@@ -76,6 +70,15 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     pollingInterval: LINEUPS_POLL_MS,
   });
   const lineupsConfirmed = Boolean(lineups?.confirmed);
+
+  useEffect(() => {
+    if (!scrollOnTabChange.current || !tabsAnchorRef.current) return;
+    scrollOnTabChange.current = false;
+
+    const anchorTop =
+      tabsAnchorRef.current.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({ top: anchorTop, behavior: "smooth" });
+  }, [activeTab]);
 
   if (matchLoading || !match || h2hLoading || standingsLoading) {
     return (
@@ -107,10 +110,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         awayForm={awayStanding?.form ?? null}
         matchweek={matchweek}
       />
-      <div
-        ref={tabsRef}
-        className="sticky top-0 z-30 mb-6 bg-white/90 py-2 backdrop-blur dark:bg-gray-900/90"
-      >
+      <div ref={tabsAnchorRef} />
+      <div className="sticky top-0 z-30 mb-6 bg-white/90 py-2 backdrop-blur dark:bg-gray-900/90">
         <SegmentedTabs
           ariaLabel="Match sections"
           variant="underline"
@@ -123,7 +124,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
           onChange={selectTab}
         />
       </div>
-      <div ref={contentRef} className="scroll-mt-16">
+      <div className="min-h-screen">
         {activeTab === "preview" && (
           <div className="flex flex-col">
             <div className="px-4 sm:px-6 md:px-16 lg:px-24">
