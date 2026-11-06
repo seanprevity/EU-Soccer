@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import TeamStats from "../teamStats";
 import HomeAwayRecord from "../homeAwayRecord";
@@ -35,6 +35,8 @@ function isTabKey(value: string | null): value is TabKey {
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -45,6 +47,15 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set("tab", tab);
     router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
+
+    // If we've scrolled past the bar, start the new tab at its top
+    const barTop = tabsRef.current?.getBoundingClientRect().top ?? 1;
+    if (barTop <= 0) {
+      contentRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
   }
 
   const { data: match, isLoading: matchLoading } = useGetUpcomingMatchByIdQuery(
@@ -96,52 +107,56 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         awayForm={awayStanding?.form ?? null}
         matchweek={matchweek}
       />
-
-      <SegmentedTabs
-        ariaLabel="Match sections"
-        className="my-6"
-        options={TABS.map((tab) => ({
-          ...tab,
-          dot: tab.key === "lineups" && lineupsConfirmed,
-          dotLabel: "Confirmed lineups",
-        }))}
-        value={activeTab}
-        variant="underline"
-        onChange={selectTab}
-      />
-
-      {activeTab === "preview" && (
-        <div className="flex flex-col">
-          <div className="px-4 sm:px-6 md:px-16 lg:px-24">
-            <Odds match={match} matchId={id} />
-          </div>
-          <RecentForm homeTeam={match.homeTeam} awayTeam={match.awayTeam} />
-          <div className="px-4 sm:px-8 md:px-16 lg:px-24">
-            <Head2Head h2h={h2h ?? emptyH2H} homeTeam={match.homeTeam} />
-          </div>
-        </div>
-      )}
-
-      {activeTab === "lineups" && (
-        <UpcomingLineups
-          matchId={match.id}
-          homeTeam={match.homeTeam}
-          awayTeam={match.awayTeam}
+      <div
+        ref={tabsRef}
+        className="sticky top-0 z-30 mb-6 bg-white/90 py-2 backdrop-blur dark:bg-gray-900/90"
+      >
+        <SegmentedTabs
+          ariaLabel="Match sections"
+          variant="underline"
+          options={TABS.map((tab) => ({
+            ...tab,
+            dot: tab.key === "lineups" && lineupsConfirmed,
+            dotLabel: "Confirmed lineups",
+          }))}
+          value={activeTab}
+          onChange={selectTab}
         />
-      )}
-
-      {activeTab === "stats" && (
-        <div className="flex flex-col">
-          <TeamStats homeTeam={match.homeTeam} awayTeam={match.awayTeam} />
-          <div className="px-2 sm:px-4 md:px-8 lg:px-16">
-            <HomeAwayRecord
-              stats={standings ?? []}
-              homeTeam={match.homeTeam}
-              awayTeam={match.awayTeam}
-            />
+      </div>
+      <div ref={contentRef} className="scroll-mt-16">
+        {activeTab === "preview" && (
+          <div className="flex flex-col">
+            <div className="px-4 sm:px-6 md:px-16 lg:px-24">
+              <Odds match={match} matchId={id} />
+            </div>
+            <RecentForm homeTeam={match.homeTeam} awayTeam={match.awayTeam} />
+            <div className="px-4 sm:px-8 md:px-16 lg:px-24">
+              <Head2Head h2h={h2h ?? emptyH2H} homeTeam={match.homeTeam} />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {activeTab === "lineups" && (
+          <UpcomingLineups
+            matchId={match.id}
+            homeTeam={match.homeTeam}
+            awayTeam={match.awayTeam}
+          />
+        )}
+
+        {activeTab === "stats" && (
+          <div className="flex flex-col">
+            <TeamStats homeTeam={match.homeTeam} awayTeam={match.awayTeam} />
+            <div className="px-2 sm:px-4 md:px-8 lg:px-16">
+              <HomeAwayRecord
+                stats={standings ?? []}
+                homeTeam={match.homeTeam}
+                awayTeam={match.awayTeam}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
