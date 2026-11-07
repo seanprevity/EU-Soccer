@@ -173,8 +173,7 @@ function Card({
           )}
         />
 
-        {/* Fixed width, so the team names line up from card to card */}
-        <div className="w-18 shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
+        <div className="flex w-18 shrink-0 items-center justify-center whitespace-nowrap text-xs font-medium tabular-nums text-gray-500 dark:text-gray-400">
           {label}
         </div>
 
@@ -227,7 +226,7 @@ function LiveMatchCard({ match }: { match: LiveMatch }) {
       href={`/live/${match.espnId}`}
       colors={getResultColors("live")}
       label={
-        <span className="flex items-center gap-1.5 font-semibold text-orange-600 dark:text-orange-400">
+        <span className="inline-flex items-center gap-1.5 font-semibold leading-none text-orange-600 dark:text-orange-400">
           <LiveDot />
           {minute}
         </span>
