@@ -75,16 +75,26 @@ export function seasonLabel(startYear: number): string {
   return `${startYear}/${endYear}`;
 }
 
-// "Sun 2 Nov", or "Sun 2 Nov 2026" when seasons are mixed together
-function formatMatchDate(isoDate: string | null, withYear: boolean): string {
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+// "2 Nov 2026"
+function formatMatchDate(isoDate: string | null): string {
   if (!isoDate) return "N/A";
-  const options: Intl.DateTimeFormatOptions = {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  };
-  if (withYear) options.year = "numeric";
-  return new Date(isoDate).toLocaleDateString("en-GB", options);
+  const date = new Date(isoDate);
+  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 type Side = {
@@ -164,7 +174,7 @@ function Card({
         />
 
         {/* Fixed width, so the team names line up from card to card */}
-        <div className="w-24 shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
+        <div className="w-18 shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
           {label}
         </div>
 
@@ -183,15 +193,7 @@ function Card({
   );
 }
 
-function MatchCard({
-  match,
-  team,
-  withYear,
-}: {
-  match: MatchPreview;
-  team: string;
-  withYear: boolean;
-}) {
+function MatchCard({ match, team }: { match: MatchPreview; team: string }) {
   const homeGoals = match.fthg ?? 0;
   const awayGoals = match.ftag ?? 0;
 
@@ -199,7 +201,7 @@ function MatchCard({
     <Card
       href={`/postmatch/${match.id}`}
       colors={getResultColors(getMatchResult(match, team))}
-      label={formatMatchDate(match.matchDate, withYear)}
+      label={formatMatchDate(match.matchDate)}
       home={{
         team: match.homeTeam,
         score: match.fthg,
@@ -838,12 +840,7 @@ export default function MatchHistory({
             <LiveMatchCard match={liveMatch} />
           )}
           {matches.map((match) => (
-            <MatchCard
-              key={match.id}
-              match={match}
-              team={team}
-              withYear={filters.season === undefined}
-            />
+            <MatchCard key={match.id} match={match} team={team} />
           ))}
         </ul>
       )}

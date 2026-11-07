@@ -1,17 +1,37 @@
 "use client";
 
 import { LiveDot, LiveScore, Movement } from "@/components/liveBadges";
-import { useLiveStandings } from "@/lib/liveStandings";
+import { SegmentedTabs } from "@/components/segmentedTabs";
+import { StandingType, useLiveStandings } from "@/lib/liveStandings";
 import { renderForm } from "@/lib/uiUtils";
 import { currentSeason, getLogoFile, HEADER_CONFIG } from "@/lib/utils";
 import {
+  useGetMatchFilterOptionsQuery,
   useGetRecentTableStandingsQuery,
+  useGetStandingsQuery,
   useGetTeamsExpectedStandingsQuery,
 } from "@/state/api";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useMemo, useState } from "react";
 import { zoneFor, ZoneLegend, ZONES } from "@/lib/zones";
+
+const TYPE_OPTIONS = [
+  { key: "TOTAL", label: "Total" },
+  { key: "HOME", label: "Home" },
+  { key: "AWAY", label: "Away" },
+] as const;
+
+const HEADERS_WITHOUT_EXPECTED = HEADER_CONFIG.filter(
+  (h) => h.key !== "expectedPosition",
+);
+
+// "2026" -> "2026/27"
+function seasonLabel(season: string): string {
+  const startYear = Number(season);
+  const endYear = String((startYear + 1) % 100).padStart(2, "0");
+  return `${startYear}/${endYear}`;
+}
 
 function PerformanceArrow({
   position,
@@ -52,15 +72,51 @@ const TeamTable = ({
   teamName: string;
   league: string;
 }) => {
+  const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
+  const [type, setType] = useState<StandingType>("TOTAL");
+  const [sortConfig, setSortConfig] = useState({
+    key: "position",
+    direction: "asc",
+  });
+
+  // The team's latest table: where we start, before a season is picked
+  const { data: recentTable, isLoading: isRecentLoading } =
+    useGetRecentTableStandingsQuery({
+      team: teamName,
+    });
+  const defaultSeason = recentTable?.[0]?.season ?? currentSeason;
+  const season = selectedSeason ?? defaultSeason;
+
+  // Seasons the team has matches in, i.e. was in this league. Shared with the Matches tab
+  const { data: filterOptions } = useGetMatchFilterOptionsQuery({
+    team: teamName,
+  });
+  const seasonOptions = useMemo(() => {
+    const seasons = (filterOptions?.seasons ?? []).map(String);
+    // Always offer the season being shown, even before they've played a match in it
+    if (!seasons.includes(defaultSeason)) seasons.unshift(defaultSeason);
+    return seasons;
+  }, [filterOptions, defaultSeason]);
+
+  // The chosen season's table: all three types come back, Total/Home/Away picks one
   const {
-    data: teams,
+    data: standings,
     isLoading: isStandingsLoading,
+    isFetching: isStandingsFetching,
     refetch: refetchStandings,
-  } = useGetRecentTableStandingsQuery({ team: teamName });
+  } = useGetStandingsQuery({ league, season }, { skip: isRecentLoading });
+
+  // In table order
+  const tableRows = useMemo(() => {
+    if (!standings) return [];
+    return standings
+      .filter((t) => t.type === type)
+      .sort((a, b) => a.position - b.position);
+  }, [standings, type]);
 
   const teamNames = useMemo(
-    () => (teams ?? []).map((t) => t.name).sort(),
-    [teams],
+    () => tableRows.map((t) => t.name).sort(),
+    [tableRows],
   );
   const { data: xPositions, isFetching: isXPositionsLoading } =
     useGetTeamsExpectedStandingsQuery(
@@ -68,17 +124,12 @@ const TeamTable = ({
       { skip: teamNames.length === 0 },
     );
 
-  // In table order
-  const tableRows = useMemo(
-    () => [...(teams ?? [])].sort((a, b) => a.position - b.position),
-    [teams],
-  );
-
-  const isCurrentSeason = teams?.[0]?.season === currentSeason;
+  const isCurrentSeason = season === currentSeason;
   const liveTeams = useLiveStandings(
     tableRows,
     isCurrentSeason,
     refetchStandings,
+    type,
   );
   const isLive = liveTeams.some((team) => team.live !== null);
 
@@ -100,18 +151,21 @@ const TeamTable = ({
     });
   }, [liveTeams, xPositions]);
 
-  const [sortConfig, setSortConfig] = useState({
-    key: "position",
-    direction: "asc",
-  });
+  const showExpected = type === "TOTAL";
+  const headers = showExpected ? HEADER_CONFIG : HEADERS_WITHOUT_EXPECTED;
+
+  function changeType(next: StandingType) {
+    setType(next);
+    // The xPos column disappears off Total, so don't stay sorted by it
+    if (next !== "TOTAL" && sortConfig.key === "expectedPosition") {
+      setSortConfig({ key: "position", direction: "asc" });
+    }
+  }
 
   const handleSort = (key: string) => {
     setSortConfig((prev) => {
       if (prev.key === key) {
-        return {
-          key,
-          direction: prev.direction === "asc" ? "desc" : "asc",
-        };
+        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
       }
       return { key, direction: "desc" };
     });
@@ -141,7 +195,7 @@ const TeamTable = ({
     });
   }, [rows, sortConfig]);
 
-  if (isStandingsLoading) {
+  if (isRecentLoading || isStandingsLoading) {
     return (
       <div className="flex justify-center items-center min-h-[75vh] w-full bg-gray-50 dark:bg-gray-900">
         <p className="text-gray-600 dark:text-gray-300 text-lg font-medium animate-pulse">
@@ -153,22 +207,44 @@ const TeamTable = ({
 
   return (
     <div className="p-4 bg-white dark:bg-gray-900">
-      <span className="block text-center text-gray-600 dark:text-gray-400 mb-1 text-sm font-medium">
-        {teams?.[0]?.season
-          ? `${teams[0].season}/${(Number(teams[0].season) + 1) % 2000}`
-          : `${currentSeason}/${(Number(currentSeason) + 1) % 2000}`}
-      </span>
+      <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
+        <select
+          aria-label="Season"
+          value={season}
+          onChange={(event) => setSelectedSeason(event.target.value)}
+          className="cursor-pointer rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800 hover:bg-gray-200 sm:text-sm dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+        >
+          {seasonOptions.map((option) => (
+            <option key={option} value={option}>
+              {seasonLabel(option)}
+            </option>
+          ))}
+        </select>
+
+        <SegmentedTabs
+          ariaLabel="Table type"
+          size="sm"
+          className="mx-0"
+          options={TYPE_OPTIONS}
+          value={type}
+          onChange={changeType}
+        />
+      </div>
+
       {isLive && (
         <p className="mb-2 flex items-center justify-center gap-1.5 text-xs font-medium text-orange-600 dark:text-orange-400">
           <LiveDot />
           Live table, as it stands
         </p>
       )}
-      <div className="w-full overflow-x-auto rounded-lg">
+
+      <div
+        className={`w-full overflow-x-auto rounded-lg transition-opacity ${isStandingsFetching ? "opacity-50" : ""}`}
+      >
         <table className="w-full border-collapse shadow-sm text-[0.65rem] sm:text-[0.75rem] md:text-[0.85rem] lg:text-[0.9rem]">
           <thead className="bg-[#38003c] dark:bg-gray-900 text-white sticky top-0 z-10">
             <tr>
-              {HEADER_CONFIG.map(({ label, key }) => (
+              {headers.map(({ label, key }) => (
                 <th
                   key={key}
                   onClick={() => handleSort(key)}
@@ -185,6 +261,17 @@ const TeamTable = ({
           </thead>
 
           <tbody className="bg-white dark:bg-gray-800">
+            {sortedTeams.length === 0 && (
+              <tr>
+                <td
+                  colSpan={headers.length}
+                  className="py-8 text-center text-gray-600 dark:text-gray-400"
+                >
+                  No table for {seasonLabel(season)}.
+                </td>
+              </tr>
+            )}
+
             {sortedTeams.map((team) => {
               const logo = getLogoFile(team.name);
               const zone = zoneFor(
@@ -198,18 +285,14 @@ const TeamTable = ({
                 <tr
                   key={team.name}
                   className={`border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 hover:bg-gray-50 dark:hover:bg-gray-700
-                      ${
-                        team.name === teamName
-                          ? "bg-gray-400 dark:bg-gray-600"
-                          : ""
-                      }`}
+                      ${team.name === teamName ? "bg-gray-400 dark:bg-gray-600" : ""}`}
                 >
                   <td
                     className={`px-1 py-1 text-center ${borderClass} text-black dark:text-gray-200`}
                   >
                     {borderColor && (
                       <div
-                        className={`absolute left-0 top-1/2 -translate-y-1/2 w-3 h-[60%] ${borderColor} rounded-r-md -translate-x-1/2`}
+                        className={`absolute left-0 top-1/2 h-[70%] w-1 -translate-y-1/2 rounded-r ${borderColor}`}
                       />
                     )}
                     <span className="relative z-10 inline-flex items-center gap-1">
@@ -217,28 +300,32 @@ const TeamTable = ({
                       <Movement value={team.movement} />
                     </span>
                   </td>
-                  <td
-                    className="px-1 py-1 text-center tabular-nums text-black dark:text-gray-200"
-                    title={
-                      team.hasHistory
-                        ? `Average finish over ${team.expectedSeasons} season${team.expectedSeasons === 1 ? "" : "s"}`
-                        : "No previous seasons in this league, showing current position"
-                    }
-                  >
-                    {isXPositionsLoading ? (
-                      "…"
-                    ) : (
-                      <span className="inline-flex items-center justify-center gap-1">
-                        {team.hasHistory
-                          ? team.expectedPosition.toFixed(1)
-                          : team.expectedPosition}
-                        <PerformanceArrow
-                          position={team.position}
-                          expected={team.expectedPosition}
-                        />
-                      </span>
-                    )}
-                  </td>
+
+                  {showExpected && (
+                    <td
+                      className="px-1 py-1 text-center tabular-nums text-black dark:text-gray-200"
+                      title={
+                        team.hasHistory
+                          ? `Average finish over ${team.expectedSeasons} season${team.expectedSeasons === 1 ? "" : "s"}`
+                          : "No previous seasons in this league, showing current position"
+                      }
+                    >
+                      {isXPositionsLoading ? (
+                        "…"
+                      ) : (
+                        <span className="inline-flex items-center justify-center gap-1">
+                          {team.hasHistory
+                            ? team.expectedPosition.toFixed(1)
+                            : team.expectedPosition}
+                          <PerformanceArrow
+                            position={team.position}
+                            expected={team.expectedPosition}
+                          />
+                        </span>
+                      )}
+                    </td>
+                  )}
+
                   <td className="px-2 py-1 text-left font-medium">
                     <Link
                       href={`/team/${team.name.split(" ").join("_")}`}
