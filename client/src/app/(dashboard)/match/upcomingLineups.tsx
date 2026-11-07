@@ -68,7 +68,7 @@ export default function UpcomingLineups({
 
   const colors = matchColors(homeTeam, awayTeam);
 
-  let heading = "Unconfirmed lineups";
+  let heading = "Possible lineups";
   if (confirmed) heading = "Confirmed lineups";
 
   return (

@@ -2,25 +2,20 @@
 
 import { useState, useMemo } from "react";
 import Image from "next/image";
-import { useGetTopPlayersQuery, useGetStandingsQuery } from "@/state/api";
+import { useGetTopPlayersQuery } from "@/state/api";
 import {
   generateSeasons,
   LEAGUES,
   getLogoFile,
   getLeagueFile,
-  HEADER_CONFIG,
   cn,
-  genCurrentSeason,
 } from "@/lib/utils";
-import { renderForm } from "@/lib/uiUtils";
 import { useAppSelector } from "@/state/redux";
-import Link from "next/link";
 import { useDispatch } from "react-redux";
 import { setLeague, setSeason } from "@/state";
-import { Standing, TopPlayerCategory } from "@epl/shared";
-import { StandingType, useLiveStandings } from "@/lib/liveStandings";
-import { LiveDot, LiveScore, Movement } from "@/components/liveBadges";
-import { zoneFor, ZoneLegend, ZONES } from "@/lib/zones";
+import { TopPlayerCategory } from "@epl/shared";
+import { StandingType } from "@/lib/liveStandings";
+import LeagueTable from "@/components/leagueTable";
 
 const TOP_PLAYER_CATEGORIES: {
   key: TopPlayerCategory;
@@ -34,27 +29,13 @@ const TOP_PLAYER_CATEGORIES: {
   { key: "red_cards", label: "Reds", title: "Most Red Cards" },
 ];
 
-// remove xPosition on this pages table
-const LEAGUE_HEADERS = HEADER_CONFIG.filter(
-  (h) => h.key !== "expectedPosition",
-);
-
 export default function Table() {
   const dispatch = useDispatch();
   const priority = useAppSelector((state) => state.global.priority);
   const league = useAppSelector((state) => state.global.league);
   const season = useAppSelector((state) => state.global.season);
   const [type, setType] = useState<StandingType>("TOTAL");
-  const [sortConfig, setSortConfig] = useState({
-    key: "position",
-    direction: "asc",
-  });
   const seasons = generateSeasons();
-  const {
-    data: teams,
-    isLoading: isStandingsLoading,
-    refetch: refetchStandings,
-  } = useGetStandingsQuery({ league, season });
   const [category, setCategory] = useState<TopPlayerCategory>("goals");
   const activeCategory = TOP_PLAYER_CATEGORIES.find((c) => c.key === category);
 
@@ -64,57 +45,6 @@ export default function Table() {
       season,
       category,
     });
-
-  const filteredTeams = useMemo(() => {
-    if (!teams) return [];
-    return teams
-      .filter((t) => t.type === type)
-      .sort((a, b) => a.position - b.position);
-  }, [teams, type]);
-
-  const isCurrentSeason = season === genCurrentSeason();
-  const liveTeams = useLiveStandings(
-    filteredTeams,
-    isCurrentSeason,
-    refetchStandings,
-    type,
-  );
-  const isLive = liveTeams.some((team) => team.live !== null);
-
-  const handleSort = (key: string) => {
-    setSortConfig((prev) => {
-      if (prev.key === key) {
-        return {
-          key,
-          direction: prev.direction === "asc" ? "desc" : "asc",
-        };
-      }
-      return { key, direction: "desc" };
-    });
-  };
-
-  const sortedTeams = useMemo(() => {
-    return [...liveTeams].sort((a, b) => {
-      const key = sortConfig.key as keyof Standing;
-      let aVal = a[key];
-      let bVal = b[key];
-
-      if (sortConfig.key === "form") {
-        const score = (str: string) => {
-          const wins = (str.match(/W/g) || []).length;
-          const draws = (str.match(/D/g) || []).length;
-          return wins * 3 + draws;
-        };
-        aVal = score(a.form || "");
-        bVal = score(b.form || "");
-      }
-      if (aVal == null) return 1;
-      if (bVal == null) return -1;
-      if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
-    });
-  }, [liveTeams, sortConfig]);
 
   // Sort and ranks top players
   const rankedPlayers = useMemo(() => {
@@ -169,7 +99,7 @@ export default function Table() {
                   className={cn(
                     "flex-1 cursor-pointer rounded-3xl px-3 py-2 text-xs font-medium transition-colors duration-150 sm:flex-none sm:text-sm",
                     type === t
-                      ? "bg-[#38003c] text-white shadow-md dark:bg-purple-900"
+                      ? "bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-white dark:ring-gray-500"
                       : "bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600/80",
                   )}
                 >
@@ -201,130 +131,7 @@ export default function Table() {
           </div>
         </div>
 
-        {isLive && (
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-orange-600 dark:text-orange-400">
-            <LiveDot />
-            Live table, as it stands
-          </p>
-        )}
-
-        {/* Table */}
-        <div className="w-full overflow-x-auto rounded-lg">
-          <table className="w-full border-collapse shadow-sm text-[0.65rem] sm:text-[0.75rem] md:text-[0.85rem] lg:text-[0.9rem]">
-            <thead className="bg-[#38003c] dark:bg-gray-900 text-white sticky top-0 z-10">
-              <tr>
-                {LEAGUE_HEADERS.map(({ label, key }) => (
-                  <th
-                    key={key}
-                    onClick={() => handleSort(key)}
-                    className={`px-1 py-2 text-center font-semibold cursor-pointer select-none hover:bg-white/10 text-[0.65rem] sm:text-[0.75rem] md:text-[0.85rem]
-                      ${key === "position" ? "w-[60px] sm:w-[80px]" : ""}
-                    `}
-                  >
-                    {label}
-                    {sortConfig.key === key &&
-                      (sortConfig.direction === "asc" ? " ↑" : " ↓")}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody className="bg-white dark:bg-gray-800">
-              {isStandingsLoading ? (
-                <tr>
-                  <td
-                    colSpan={LEAGUE_HEADERS.length}
-                    className="py-8 text-center text-gray-600 dark:text-gray-400"
-                  >
-                    Loading {season}…
-                  </td>
-                </tr>
-              ) : (
-                sortedTeams.map((team) => {
-                  const logo = getLogoFile(team.name);
-
-                  const zone = zoneFor(
-                    team.position - 1,
-                    sortedTeams.length,
-                    league,
-                  );
-                  const borderColor = zone ? ZONES[zone].color : "";
-                  const borderClass = zone ? "relative" : "";
-
-                  return (
-                    <tr
-                      key={team.name}
-                      className={`border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 hover:bg-gray-50 dark:hover:bg-gray-700`}
-                    >
-                      <td
-                        className={`px-1 py-1 text-center ${borderClass} text-black dark:text-gray-200 overflow-hidden`}
-                      >
-                        {borderColor && (
-                          <div
-                            className={`absolute left-0 top-1/2 -translate-y-1/2 w-3 h-[70%] ${borderColor} rounded-r-md -translate-x-1/2`}
-                          />
-                        )}
-                        <span className="relative z-10 inline-flex items-center gap-1">
-                          {team.position}
-                          <Movement value={team.movement} />
-                        </span>
-                      </td>
-                      <td className="px-2 py-1 text-left font-medium">
-                        <Link
-                          href={`/team/${team.name.split(" ").join("_")}`}
-                          className="no-underline flex items-center hover:opacity-90 transition-opacity"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="relative w-[20px] h-[20px] sm:w-[24px] sm:h-[24px] flex-shrink-0 md:w-[28px] md:h-[28px]">
-                              <Image
-                                src={`/${logo}`}
-                                alt={`${team.name} logo`}
-                                fill
-                                className="object-contain"
-                              />
-                            </div>
-                            <span className="whitespace-nowrap text-black dark:text-gray-200">
-                              {team.name}
-                            </span>
-                            {team.live && <LiveScore live={team.live} />}
-                          </div>
-                        </Link>
-                      </td>
-                      <td className="px-1 py-2 text-center text-black dark:text-gray-200">
-                        {team.played}
-                      </td>
-                      <td className="px-1 py-2 text-center text-black dark:text-gray-200">
-                        {team.won}
-                      </td>
-                      <td className="px-1 py-2 text-center text-black dark:text-gray-200">
-                        {team.draw}
-                      </td>
-                      <td className="px-1 py-2 text-center text-black dark:text-gray-200">
-                        {team.lost}
-                      </td>
-                      <td className="px-1 py-1 text-center text-black dark:text-gray-200">
-                        {team.goalsFor}
-                      </td>
-                      <td className="px-1 py-1 text-center text-black dark:text-gray-200">
-                        {team.goalsAgainst}
-                      </td>
-                      <td className="px-1 py-1 text-center text-black dark:text-gray-200">
-                        {team.goalDifference}
-                      </td>
-                      <td className="px-1 py-2 text-center text-black dark:text-gray-200">
-                        {team.points}
-                      </td>
-                      <td className="px-1 py-2 justify-center gap-[2px] flex">
-                        {renderForm(team.form)}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        <ZoneLegend teamCount={sortedTeams.length} league={league} />
+        <LeagueTable league={league} season={season} type={type} />
       </div>
 
       {/* RHS: Top Scorers */}

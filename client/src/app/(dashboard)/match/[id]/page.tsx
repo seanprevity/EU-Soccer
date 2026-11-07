@@ -17,10 +17,12 @@ import {
   useGetUpcomingMatchByIdQuery,
 } from "@/state/api";
 import { SegmentedTabs } from "@/components/segmentedTabs";
+import MatchLeagueTable from "../matchLeagueTable";
 
 const TABS = [
   { key: "preview", label: "Preview" },
   { key: "lineups", label: "Lineups" },
+  { key: "table", label: "Table" },
   { key: "stats", label: "Stats" },
 ] as const;
 
@@ -140,6 +142,14 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         {activeTab === "lineups" && (
           <UpcomingLineups
             matchId={match.id}
+            homeTeam={match.homeTeam}
+            awayTeam={match.awayTeam}
+          />
+        )}
+
+        {activeTab === "table" && (
+          <MatchLeagueTable
+            league={match.league}
             homeTeam={match.homeTeam}
             awayTeam={match.awayTeam}
           />
