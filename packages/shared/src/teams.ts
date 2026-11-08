@@ -21,6 +21,12 @@ export const teamStatsSchema = z.object({
   xg: z.number(), // total expected goals (not an integer)
   shots: z.number().int(),
   shotsOnTarget: z.number().int(),
+  oppShots: z.number().int(),
+  oppShotsOnTarget: z.number().int(),
+  xga: z.number(),
+  cleanSheets: z.number().int(),
+  failedToScore: z.number().int(),
+  possession: z.number(),
   corners: z.number().int(),
   yellows: z.number().int(),
   reds: z.number().int(),

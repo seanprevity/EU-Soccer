@@ -55,7 +55,7 @@ const TeamStats = ({
         onChange={setMode}
       />
 
-      <div className="flex justify-around max-w-3xl mx-auto flex-col md:flex-row md:items-start items-center gap-4 md:gap-0">
+      <div className="mx-auto flex max-w-4xl flex-col items-center gap-4 md:flex-row md:items-start md:justify-center md:gap-6">
         {homeStats && awayStats ? (
           <TeamStatsCard teamStandings={homeStats} opponentStats={awayStats} />
         ) : (

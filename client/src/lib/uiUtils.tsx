@@ -218,6 +218,129 @@ function TeamStatsRow({
   );
 }
 
+// Per-game averages
+function perGame(total: number, games: number): number {
+  if (games === 0) return 0;
+  return Number((total / games).toFixed(2));
+}
+
+type Tone = "positive" | "negative" | "neutral";
+
+const TONE_CLASS: Record<Tone, string> = {
+  positive: "text-emerald-600 dark:text-emerald-400",
+  negative: "text-red-500 dark:text-red-400",
+  neutral: "text-gray-900 dark:text-gray-100",
+};
+
+// Green when the number is good for the team, red when it's bad
+function toneOf(value: number, higherIsBetter = true): Tone {
+  if (value === 0) return "neutral";
+  const good = higherIsBetter ? value > 0 : value < 0;
+  return good ? "positive" : "negative";
+}
+
+// "+3", "-1.2", "0"
+function signed(value: number, decimals = 0): string {
+  const text = value.toFixed(decimals);
+  return value > 0 ? `+${text}` : text;
+}
+
+const BAR_FILL: Record<Tone, string> = {
+  positive: "bg-emerald-600 dark:bg-emerald-400",
+  negative: "bg-red-500 dark:bg-red-400",
+  neutral: "bg-gray-400 dark:bg-gray-500",
+};
+
+function XgBar({
+  heading,
+  actualLabel,
+  actual,
+  expectedLabel,
+  expected,
+  max,
+  higherIsBetter,
+}: {
+  heading: string;
+  actualLabel: string;
+  actual: number;
+  expectedLabel: string;
+  expected: number;
+  max: number;
+  higherIsBetter: boolean;
+}) {
+  const difference = actual - expected;
+  const tone = toneOf(difference, higherIsBetter);
+  const actualWidth = max > 0 ? Math.min((actual / max) * 100, 100) : 0;
+  const expectedLeft = max > 0 ? Math.min((expected / max) * 100, 100) : 0;
+
+  let caption = "Exactly as expected";
+  if (difference > 0)
+    caption = `${signed(difference, 1)} ${higherIsBetter ? "above" : "more than"} expected`;
+  if (difference < 0)
+    caption = `${signed(difference, 1)} ${higherIsBetter ? "below" : "fewer than"} expected`;
+
+  return (
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          {heading}
+        </span>
+        <span className="text-xs text-gray-600 dark:text-gray-300">
+          {actualLabel}{" "}
+          <span className="text-gray-900 dark:text-white">{actual}</span>
+          <span className="mx-1.5 text-gray-300 dark:text-gray-600">·</span>
+          {expectedLabel}{" "}
+          <span className="text-gray-900 dark:text-white">
+            {expected.toFixed(1)}
+          </span>
+        </span>
+      </div>
+
+      <div
+        className="relative h-2.5 rounded-full bg-gray-200 dark:bg-gray-700"
+        role="img"
+        aria-label={`${actualLabel} ${actual}, ${expectedLabel} ${expected.toFixed(1)}`}
+      >
+        <div
+          className={cn(
+            "h-full rounded-full transition-[width] duration-500",
+            BAR_FILL[tone],
+          )}
+          style={{ width: `${actualWidth}%` }}
+        />
+        {/* The expected value, as a marker across the bar */}
+        <div
+          className="absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gray-900 dark:bg-white"
+          style={{ left: `${expectedLeft}%` }}
+          title={`${expectedLabel} ${expected.toFixed(1)}`}
+        />
+      </div>
+
+      <p className={cn("mt-1 text-xs", TONE_CLASS[tone])}>{caption}</p>
+    </div>
+  );
+}
+
+// A number with its label underneath, for the results row
+function MiniStat({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string | number;
+  tone?: Tone;
+}) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className={cn("text-lg", TONE_CLASS[tone])}>{value}</span>
+      <span className="text-[11px] text-gray-500 dark:text-gray-400">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 export function TeamStatsCard({
   teamStandings,
   opponentStats,
@@ -225,42 +348,47 @@ export function TeamStatsCard({
   teamStandings: TeamStats;
   opponentStats: TeamStats;
 }) {
-  const avgGpg = Number((teamStandings.gf / teamStandings.played).toFixed(2));
-  const avgGaPg = Number((teamStandings.ga / teamStandings.played).toFixed(2));
-  const avgShotsPg = Number(
-    (teamStandings.shots / teamStandings.played).toFixed(2),
+  const avgGpg = perGame(teamStandings.gf, teamStandings.played);
+  const avgGaPg = perGame(teamStandings.ga, teamStandings.played);
+  const avgShotsPg = perGame(teamStandings.shots, teamStandings.played);
+  const avgShotsOnTargetPg = perGame(
+    teamStandings.shotsOnTarget,
+    teamStandings.played,
   );
-  const avgShotsOnTargetPg = Number(
-    (teamStandings.shotsOnTarget / teamStandings.played).toFixed(2),
+  const avgCornerPg = perGame(teamStandings.corners, teamStandings.played);
+  const avgYellowsPg = perGame(teamStandings.yellows, teamStandings.played);
+  const avgXgPg = perGame(teamStandings.xg, teamStandings.played);
+  const avgOppShotsPg = perGame(teamStandings.oppShots, teamStandings.played);
+  const avgOppShotsOnTargetPg = perGame(
+    teamStandings.oppShotsOnTarget,
+    teamStandings.played,
   );
-  const avgCornerPg = Number(
-    (teamStandings.corners / teamStandings.played).toFixed(2),
+  const avgPossessionPg = perGame(
+    teamStandings.possession,
+    teamStandings.played,
   );
-  const avgYellowsPg = Number(
-    (teamStandings.yellows / teamStandings.played).toFixed(2),
-  );
-  const avgXgPg = Number((teamStandings.xg / teamStandings.played).toFixed(2));
 
-  const oppAvgGpg = Number(
-    (opponentStats.gf / opponentStats.played).toFixed(2),
+  const oppAvgGpg = perGame(opponentStats.gf, opponentStats.played);
+  const oppAvgGaPg = perGame(opponentStats.ga, opponentStats.played);
+  const oppAvgShotsPg = perGame(opponentStats.shots, opponentStats.played);
+  const oppAvgShotsOnTargetPg = perGame(
+    opponentStats.shotsOnTarget,
+    opponentStats.played,
   );
-  const oppAvgGaPg = Number(
-    (opponentStats.ga / opponentStats.played).toFixed(2),
+  const oppAvgCornersPg = perGame(opponentStats.corners, opponentStats.played);
+  const oppAvgYellowsPg = perGame(opponentStats.yellows, opponentStats.played);
+  const oppAvgXgPg = perGame(opponentStats.xg, opponentStats.played);
+  const oppAvgOppShotsPg = perGame(
+    opponentStats.oppShots,
+    opponentStats.played,
   );
-  const oppAvgShotsPg = Number(
-    (opponentStats.shots / opponentStats.played).toFixed(2),
+  const oppAvgOppShotsOnTargetPg = perGame(
+    opponentStats.oppShotsOnTarget,
+    opponentStats.played,
   );
-  const oppAvgShotsOnTargetPg = Number(
-    (opponentStats.shotsOnTarget / opponentStats.played).toFixed(2),
-  );
-  const oppAvgCornersPg = Number(
-    (opponentStats.corners / opponentStats.played).toFixed(2),
-  );
-  const oppAvgYellowsPg = Number(
-    (opponentStats.yellows / opponentStats.played).toFixed(2),
-  );
-  const oppAvgXgPg = Number(
-    (opponentStats.xg / opponentStats.played).toFixed(2),
+  const oppAvgPossessionPg = perGame(
+    opponentStats.possession,
+    opponentStats.played,
   );
 
   const goalsScoredPercentage = calculatePercentage(avgGpg, oppAvgGpg);
@@ -273,12 +401,32 @@ export function TeamStatsCard({
   const cornersPercentage = calculatePercentage(avgCornerPg, oppAvgCornersPg);
   const yellowsPercentage = calculatePercentage(avgYellowsPg, oppAvgYellowsPg);
   const xgPercentage = calculatePercentage(avgXgPg, oppAvgXgPg);
-  const xgTotal = teamStandings.xg;
-  const goalsMinusXg = teamStandings.gf - teamStandings.xg;
+  const oppShotsPercentage = calculatePercentage(
+    avgOppShotsPg,
+    oppAvgOppShotsPg,
+  );
+  const oppShotsOnTargetPercentage = calculatePercentage(
+    avgOppShotsOnTargetPg,
+    oppAvgOppShotsOnTargetPg,
+  );
+  const possessionPercentage = calculatePercentage(
+    avgPossessionPg,
+    oppAvgPossessionPg,
+  );
+  const points = teamStandings.won * 3 + teamStandings.draw;
+  const pointsPerGame = perGame(points, teamStandings.played);
+  const barMax = Math.max(
+    teamStandings.gf,
+    teamStandings.xg,
+    teamStandings.ga,
+    teamStandings.xga,
+    opponentStats.gf,
+    opponentStats.xg,
+    opponentStats.ga,
+    opponentStats.xga,
+  );
   return (
-    <div
-      className={`flex flex-col gap-2 min-w-[250px] max-w-[350px] flex-1 p-6 rounded-xl shadow-md bg-gray-100 dark:bg-gray-800/40`}
-    >
+    <div className="flex min-w-[270px] max-w-[380px] flex-1 flex-col gap-2 rounded-xl bg-gray-100 p-6 shadow-md dark:bg-gray-800/40">
       <div className="flex justify-center items-center">
         <Image
           src={`/${getLogoFile(teamStandings.name)}`}
@@ -329,11 +477,19 @@ export function TeamStatsCard({
         />
 
         <TeamStatsRow
-          label="Expected Goals (xG)"
+          label="xG"
           value={avgXgPg}
           percentage={xgPercentage}
           isPositive={avgXgPg > oppAvgXgPg}
           isEqual={avgXgPg === oppAvgXgPg}
+        />
+
+        <TeamStatsRow
+          label="Possession"
+          value={avgPossessionPg}
+          percentage={possessionPercentage}
+          isPositive={avgPossessionPg > oppAvgPossessionPg}
+          isEqual={avgPossessionPg === oppAvgPossessionPg}
         />
 
         <TeamStatsRow
@@ -353,19 +509,35 @@ export function TeamStatsCard({
         />
 
         <TeamStatsRow
+          label="Shots Allowed"
+          value={avgOppShotsPg}
+          percentage={oppShotsPercentage}
+          isPositive={avgOppShotsPg < oppAvgOppShotsPg}
+          isEqual={avgOppShotsPg === oppAvgOppShotsPg}
+        />
+
+        <TeamStatsRow
+          label="Shots on target Allowed"
+          value={avgOppShotsOnTargetPg}
+          percentage={oppShotsOnTargetPercentage}
+          isPositive={avgOppShotsOnTargetPg < oppAvgOppShotsOnTargetPg}
+          isEqual={avgOppShotsOnTargetPg === oppAvgOppShotsOnTargetPg}
+        />
+
+        <TeamStatsRow
+          label="Goals Conceded"
+          value={avgGaPg}
+          percentage={goalsConcededPercentage}
+          isPositive={avgGaPg < oppAvgGaPg}
+          isEqual={avgGaPg === oppAvgGaPg}
+        />
+
+        <TeamStatsRow
           label="Corners"
           value={avgCornerPg}
           percentage={cornersPercentage}
           isPositive={avgCornerPg > oppAvgCornersPg}
           isEqual={avgCornerPg === oppAvgCornersPg}
-        />
-
-        <TeamStatsRow
-          label="Conceded"
-          value={avgGaPg}
-          percentage={goalsConcededPercentage}
-          isPositive={avgGaPg < oppAvgGaPg}
-          isEqual={avgGaPg === oppAvgGaPg}
         />
 
         <TeamStatsRow
@@ -377,74 +549,38 @@ export function TeamStatsCard({
         />
       </div>
 
-      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex justify-between items-center gap-2">
-          <div className="text-center flex-1">
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
-              GF
-            </div>
-            <div className="text-base font-semibold dark:text-gray-200">
-              {teamStandings.gf}
-            </div>
-          </div>
-
-          <div className="text-center flex-1">
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
-              GA
-            </div>
-            <div className="text-base font-semibold dark:text-gray-200">
-              {teamStandings.ga}
-            </div>
-          </div>
-
-          <div className="text-center flex-1">
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
-              GD
-            </div>
-            <div
-              className={`text-base font-bold ${
-                teamStandings.gd > 0
-                  ? "text-emerald-500 dark:text-emerald-400"
-                  : teamStandings.gd == 0
-                    ? "dark:text-gray-200"
-                    : "text-red-500 dark:text-red-400"
-              }`}
-            >
-              {teamStandings.gd > 0 ? "+" : ""}
-              {teamStandings.gd}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center gap-2 mt-3">
-          <div className="text-center flex-1">
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
-              xG
-            </div>
-            <div className="text-base font-semibold dark:text-gray-200">
-              {xgTotal.toFixed(2)}
-            </div>
-          </div>
-
-          <div className="flex-1" />
-
-          <div className="text-center flex-1">
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
-              GF − xG
-            </div>
-            <div
-              className={`text-base font-bold ${
-                goalsMinusXg > 0
-                  ? "text-emerald-500 dark:text-emerald-400"
-                  : goalsMinusXg == 0
-                    ? "dark:text-gray-200"
-                    : "text-red-500 dark:text-red-400"
-              }`}
-            >
-              {goalsMinusXg > 0 ? "+" : ""}
-              {goalsMinusXg.toFixed(2)}
-            </div>
-          </div>
+      {/* Goals against xG, then the season's results */}
+      <div className="mt-4 space-y-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+        <h4 className="text-sm text-gray-700 dark:text-gray-200">
+          Goals vs expected
+        </h4>
+        <XgBar
+          heading="Finishing"
+          actualLabel="Goals"
+          actual={teamStandings.gf}
+          expectedLabel="xG"
+          expected={teamStandings.xg}
+          max={barMax}
+          higherIsBetter
+        />
+        <XgBar
+          heading="Defending"
+          actualLabel="Conceded"
+          actual={teamStandings.ga}
+          expectedLabel="xGA"
+          expected={teamStandings.xga}
+          max={barMax}
+          higherIsBetter={false}
+        />
+        <div className="grid grid-cols-4 gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
+          <MiniStat label="PPG" value={pointsPerGame.toFixed(2)} />
+          <MiniStat
+            label="GD"
+            value={signed(teamStandings.gd)}
+            tone={toneOf(teamStandings.gd)}
+          />
+          <MiniStat label="Clean sheets" value={teamStandings.cleanSheets} />
+          <MiniStat label="Blanks" value={teamStandings.failedToScore} />
         </div>
       </div>
     </div>

@@ -8,113 +8,100 @@ import {
 } from "../matches/matches.service";
 import { MatchStats, Standing, TeamStatsPair } from "@epl/shared";
 
-// Helper to calculate aggregate stats
+function sumMatchStats(team: string, matches: MatchStats[]) {
+  const totals = {
+    shots: 0,
+    shotsOnTarget: 0,
+    oppShots: 0,
+    oppShotsOnTarget: 0,
+    corners: 0,
+    yellows: 0,
+    reds: 0,
+    xg: 0,
+    xga: 0,
+    cleanSheets: 0,
+    failedToScore: 0,
+    possession: 0,
+  };
+
+  for (const match of matches) {
+    const isHome = match.homeTeam === team;
+
+    totals.shots += (isHome ? match.hs : match.as) ?? 0;
+    totals.shotsOnTarget += (isHome ? match.hst : match.ast) ?? 0;
+    totals.oppShots += (isHome ? match.as : match.hs) ?? 0;
+    totals.oppShotsOnTarget += (isHome ? match.ast : match.hst) ?? 0;
+    totals.corners += (isHome ? match.hc : match.ac) ?? 0;
+    totals.yellows += (isHome ? match.hy : match.ay) ?? 0;
+    totals.reds += (isHome ? match.hr : match.ar) ?? 0;
+    totals.xg += (isHome ? match.hxg : match.axg) ?? 0;
+    totals.xga += (isHome ? match.axg : match.hxg) ?? 0;
+    totals.possession += (isHome ? match.hposs : match.aposs) ?? 0;
+
+    const scored = isHome ? match.fthg : match.ftag;
+    const conceded = isHome ? match.ftag : match.fthg;
+    if (conceded === 0) totals.cleanSheets++;
+    if (scored === 0) totals.failedToScore++;
+  }
+
+  return totals;
+}
+
 const calculateStats = (
   team: string,
   matches: MatchStats[],
   standing?: Standing,
-) => {
-  let shots = 0;
-  let shotsOnTarget = 0;
-  let corners = 0;
-  let yellows = 0;
-  let reds = 0;
-  let xg = 0;
-
-  for (const match of matches) {
-    const isHome = match.homeTeam === team;
-    corners += isHome ? (match.hc ?? 0) : (match.ac ?? 0);
-    yellows += isHome ? (match.hy ?? 0) : (match.ay ?? 0);
-    reds += isHome ? (match.hr ?? 0) : (match.ar ?? 0);
-    xg += isHome ? (match.hxg ?? 0) : (match.axg ?? 0);
-
-    if (isHome) {
-      shots += match.hs ?? 0;
-      shotsOnTarget += match.hst ?? 0;
-    } else if (match.awayTeam === team) {
-      shots += match.as ?? 0;
-      shotsOnTarget += match.ast ?? 0;
-    }
-  }
-
-  const result = {
-    name: standing?.name ?? team,
-    won: standing?.won ?? 0,
-    draw: standing?.draw ?? 0,
-    lost: standing?.lost ?? 0,
-    gf: standing?.goalsFor ?? 0,
-    ga: standing?.goalsAgainst ?? 0,
-    gd: standing?.goalDifference ?? 0,
-    xg,
-    shots,
-    shotsOnTarget,
-    corners,
-    yellows,
-    reds,
-    form: standing?.form ?? "",
-    played: standing?.played ?? matches.length,
-  };
-
-  return result;
-};
+) => ({
+  name: standing?.name ?? team,
+  won: standing?.won ?? 0,
+  draw: standing?.draw ?? 0,
+  lost: standing?.lost ?? 0,
+  gf: standing?.goalsFor ?? 0,
+  ga: standing?.goalsAgainst ?? 0,
+  gd: standing?.goalDifference ?? 0,
+  form: standing?.form ?? "",
+  played: standing?.played ?? matches.length,
+  ...sumMatchStats(team, matches),
+});
 
 const calculateLast5Stats = (team: string, matches: MatchStats[]) => {
-  let wins = 0;
-  let draws = 0;
-  let losses = 0;
+  let won = 0;
+  let draw = 0;
+  let lost = 0;
   let gf = 0;
   let ga = 0;
-  let shots = 0;
-  let shotsOnTarget = 0;
-  let corners = 0;
-  let yellows = 0;
-  let reds = 0;
-  let xg = 0;
+  const form: string[] = [];
 
   for (const match of matches) {
     const isHome = match.homeTeam === team;
+    const scored = (isHome ? match.fthg : match.ftag) ?? 0;
+    const conceded = (isHome ? match.ftag : match.fthg) ?? 0;
+    gf += scored;
+    ga += conceded;
 
-    gf += isHome ? (match.fthg ?? 0) : (match.ftag ?? 0);
-    ga += isHome ? (match.ftag ?? 0) : (match.fthg ?? 0);
-    yellows += isHome ? (match.hy ?? 0) : (match.ay ?? 0);
-    reds += isHome ? (match.hr ?? 0) : (match.ar ?? 0);
-    corners += isHome ? (match.hc ?? 0) : (match.ac ?? 0);
-    xg += isHome ? (match.hxg ?? 0) : (match.axg ?? 0);
-
-    if (match.ftr === "H" && isHome) wins++;
-    else if (match.ftr === "A" && !isHome) wins++;
-    else if (match.ftr === "D") draws++;
-    else losses++;
-
-    shots += isHome ? (match.hs ?? 0) : (match.as ?? 0);
-    shotsOnTarget += isHome ? (match.hst ?? 0) : (match.ast ?? 0);
+    if (scored > conceded) {
+      won++;
+      form.push("W");
+    } else if (scored === conceded) {
+      draw++;
+      form.push("D");
+    } else {
+      lost++;
+      form.push("L");
+    }
   }
 
   return {
     name: team,
-    won: wins,
-    draw: draws,
-    lost: losses,
+    won,
+    draw,
+    lost,
     gf,
     ga,
     gd: gf - ga,
-    xg,
-    shots,
-    shotsOnTarget,
-    corners,
-    reds,
-    yellows,
     played: matches.length,
-    form: matches
-      .map((m) => {
-        const isHome = m.homeTeam === team;
-        if (m.ftr === "H" && isHome) return "W";
-        if (m.ftr === "A" && !isHome) return "W";
-        if (m.ftr === "D") return "D";
-        return "L";
-      })
-      .reverse()
-      .join(""),
+    form: form.reverse().join(""),
+    ...sumMatchStats(team, matches),
   };
 };
 
