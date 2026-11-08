@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import {
+  Barlow,
+  DM_Sans,
+  Geist,
+  Geist_Mono,
+  Inter,
+  Manrope,
+} from "next/font/google";
 import "./globals.css";
 import Providers from "./providers";
 
@@ -12,6 +19,23 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  preload: false,
+});
+
+const FONTS = {
+  inter: "--font-inter",
+};
+
+// ← Change this to try another font
+const ACTIVE_FONT: keyof typeof FONTS = "inter";
+
+const fontVariables = [geistSans, geistMono, inter]
+  .map((font) => font.variable)
+  .join(" ");
 
 export const metadata: Metadata = {
   title: {
@@ -29,7 +53,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased dark:bg-gray-900`}
+        className={`${fontVariables} font-sans antialiased dark:bg-gray-900`}
+        style={
+          {
+            "--font-active": `var(${FONTS[ACTIVE_FONT]})`,
+          } as React.CSSProperties
+        }
       >
         <Providers>{children}</Providers>
       </body>
