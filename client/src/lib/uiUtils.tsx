@@ -195,7 +195,7 @@ function TeamStatsRow({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex justify-between items-baseline">
-        <div className="text-sm text-gray-500 dark:text-gray-400">{label}</div>
+        <div className="text-sm text-gray-500 dark:text-gray-300">{label}</div>
         <div
           className={`text-xl font-semibold ${
             isPositive
@@ -467,86 +467,91 @@ export function TeamStatsCard({
         </div>
       )}
 
-      <div className="flex flex-col gap-3">
-        <TeamStatsRow
-          label="Goals (per game)"
-          value={avgGpg}
-          percentage={goalsScoredPercentage}
-          isPositive={avgGpg > oppAvgGpg}
-          isEqual={avgGpg === oppAvgGpg}
-        />
+      <div className="mt-2 space-y-3">
+        <h4 className="text-sm text-gray-700 dark:text-gray-200">
+          Stats (per game)
+        </h4>
+        <div className="flex flex-col gap-3">
+          <TeamStatsRow
+            label="Goals"
+            value={avgGpg}
+            percentage={goalsScoredPercentage}
+            isPositive={avgGpg > oppAvgGpg}
+            isEqual={avgGpg === oppAvgGpg}
+          />
 
-        <TeamStatsRow
-          label="xG"
-          value={avgXgPg}
-          percentage={xgPercentage}
-          isPositive={avgXgPg > oppAvgXgPg}
-          isEqual={avgXgPg === oppAvgXgPg}
-        />
+          <TeamStatsRow
+            label="xG"
+            value={avgXgPg}
+            percentage={xgPercentage}
+            isPositive={avgXgPg > oppAvgXgPg}
+            isEqual={avgXgPg === oppAvgXgPg}
+          />
 
-        <TeamStatsRow
-          label="Possession"
-          value={avgPossessionPg}
-          percentage={possessionPercentage}
-          isPositive={avgPossessionPg > oppAvgPossessionPg}
-          isEqual={avgPossessionPg === oppAvgPossessionPg}
-        />
+          <TeamStatsRow
+            label="Possession"
+            value={avgPossessionPg}
+            percentage={possessionPercentage}
+            isPositive={avgPossessionPg > oppAvgPossessionPg}
+            isEqual={avgPossessionPg === oppAvgPossessionPg}
+          />
 
-        <TeamStatsRow
-          label="Shots"
-          value={avgShotsPg}
-          percentage={shotsPercentage}
-          isPositive={avgShotsPg > oppAvgShotsPg}
-          isEqual={avgShotsPg === oppAvgShotsPg}
-        />
+          <TeamStatsRow
+            label="Shots"
+            value={avgShotsPg}
+            percentage={shotsPercentage}
+            isPositive={avgShotsPg > oppAvgShotsPg}
+            isEqual={avgShotsPg === oppAvgShotsPg}
+          />
 
-        <TeamStatsRow
-          label="Shots on target"
-          value={avgShotsOnTargetPg}
-          percentage={shotsOnTargetPercentage}
-          isPositive={avgShotsOnTargetPg > oppAvgShotsOnTargetPg}
-          isEqual={avgShotsOnTargetPg === oppAvgShotsOnTargetPg}
-        />
+          <TeamStatsRow
+            label="Shots on target"
+            value={avgShotsOnTargetPg}
+            percentage={shotsOnTargetPercentage}
+            isPositive={avgShotsOnTargetPg > oppAvgShotsOnTargetPg}
+            isEqual={avgShotsOnTargetPg === oppAvgShotsOnTargetPg}
+          />
 
-        <TeamStatsRow
-          label="Shots Allowed"
-          value={avgOppShotsPg}
-          percentage={oppShotsPercentage}
-          isPositive={avgOppShotsPg < oppAvgOppShotsPg}
-          isEqual={avgOppShotsPg === oppAvgOppShotsPg}
-        />
+          <TeamStatsRow
+            label="Shots Allowed"
+            value={avgOppShotsPg}
+            percentage={oppShotsPercentage}
+            isPositive={avgOppShotsPg < oppAvgOppShotsPg}
+            isEqual={avgOppShotsPg === oppAvgOppShotsPg}
+          />
 
-        <TeamStatsRow
-          label="Shots on target Allowed"
-          value={avgOppShotsOnTargetPg}
-          percentage={oppShotsOnTargetPercentage}
-          isPositive={avgOppShotsOnTargetPg < oppAvgOppShotsOnTargetPg}
-          isEqual={avgOppShotsOnTargetPg === oppAvgOppShotsOnTargetPg}
-        />
+          <TeamStatsRow
+            label="Shots on target Allowed"
+            value={avgOppShotsOnTargetPg}
+            percentage={oppShotsOnTargetPercentage}
+            isPositive={avgOppShotsOnTargetPg < oppAvgOppShotsOnTargetPg}
+            isEqual={avgOppShotsOnTargetPg === oppAvgOppShotsOnTargetPg}
+          />
 
-        <TeamStatsRow
-          label="Goals Conceded"
-          value={avgGaPg}
-          percentage={goalsConcededPercentage}
-          isPositive={avgGaPg < oppAvgGaPg}
-          isEqual={avgGaPg === oppAvgGaPg}
-        />
+          <TeamStatsRow
+            label="Goals Conceded"
+            value={avgGaPg}
+            percentage={goalsConcededPercentage}
+            isPositive={avgGaPg < oppAvgGaPg}
+            isEqual={avgGaPg === oppAvgGaPg}
+          />
 
-        <TeamStatsRow
-          label="Corners"
-          value={avgCornerPg}
-          percentage={cornersPercentage}
-          isPositive={avgCornerPg > oppAvgCornersPg}
-          isEqual={avgCornerPg === oppAvgCornersPg}
-        />
+          <TeamStatsRow
+            label="Corners"
+            value={avgCornerPg}
+            percentage={cornersPercentage}
+            isPositive={avgCornerPg > oppAvgCornersPg}
+            isEqual={avgCornerPg === oppAvgCornersPg}
+          />
 
-        <TeamStatsRow
-          label="Yellow Cards"
-          value={avgYellowsPg}
-          percentage={yellowsPercentage}
-          isPositive={avgYellowsPg < oppAvgYellowsPg}
-          isEqual={avgYellowsPg === oppAvgYellowsPg}
-        />
+          <TeamStatsRow
+            label="Yellow Cards"
+            value={avgYellowsPg}
+            percentage={yellowsPercentage}
+            isPositive={avgYellowsPg < oppAvgYellowsPg}
+            isEqual={avgYellowsPg === oppAvgYellowsPg}
+          />
+        </div>
       </div>
 
       {/* Goals against xG, then the season's results */}
