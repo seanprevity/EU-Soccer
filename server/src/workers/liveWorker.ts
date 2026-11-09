@@ -25,9 +25,16 @@ import client from "../lib/db";
 import { isRunning, sleepUntilStopped, stopOnSignals } from "./lifecycle";
 import { updateStandingsService } from "../modules/management/management.service";
 import { curSeason } from "../config/map";
+import {
+  liveLastTick,
+  liveMatchCount,
+  liveTickDuration,
+  startMetrics,
+} from "../lib/metrics";
 
 type TickResult = {
   liveGames: boolean;
+  liveCount: number;
   nextKickoff: number | null;
   nextLineupCheck: number | null;
 };
@@ -169,6 +176,7 @@ async function tick(): Promise<TickResult> {
   const day = new Date().toISOString().slice(0, 10).replace(/-/g, ""); // 20261021
   let nextKickoff: number | null = null;
   let liveGames = false;
+  let liveCount = 0;
   const awaitingLineups = await getUpcomingAwaitingLineups();
   let nextLineupCheck: number | null = null;
 
@@ -217,6 +225,7 @@ async function tick(): Promise<TickResult> {
       await finishMatches(Leagues[i], espn_leagues[i], finishedMatches);
 
     if (liveMatches.length > 0) liveGames = true;
+    liveCount += liveMatches.length;
     for (const match of matches) {
       if (match.state !== "pre" || match.date == null) continue;
 
@@ -242,10 +251,12 @@ async function tick(): Promise<TickResult> {
     }
   }
 
-  return { liveGames, nextKickoff, nextLineupCheck };
+  return { liveGames, liveCount, nextKickoff, nextLineupCheck };
 }
 
 async function main() {
+  startMetrics("live");
+
   stopOnSignals();
 
   const stale = await deleteStaleLiveMatches();
@@ -253,10 +264,15 @@ async function main() {
 
   while (isRunning()) {
     let result: TickResult | null = null;
+    const stopTimer = liveTickDuration.startTimer();
     try {
       result = await tick();
+      liveMatchCount.set(result.liveCount);
+      liveLastTick.setToCurrentTime();
     } catch (error) {
       console.error("[live] tick failed:", error);
+    } finally {
+      stopTimer();
     }
     if (!isRunning()) break;
 

@@ -23,11 +23,8 @@ import {
   inArray,
 } from "drizzle-orm";
 import { db } from "../../lib/db";
-import csv from "csv-parser";
-import { Readable } from "stream";
 import axios from "axios";
 import {
-  normalize_name,
   toInt,
   map_team,
   map_team_name,
@@ -52,117 +49,6 @@ const espn = axios.create({
 const TOP_N = 10;
 
 // NOTE: RUN UPDATEMATCHSERVICE FIRST THEN UPDATESTANDINGSSERVICE
-
-// updates the matchStats table with the finished matches stats - uses football-data.co.uk csv
-export const updateMatchStatsService = async (url: string, league: string) => {
-  try {
-    const response = await axios.get(url, {
-      responseType: "stream",
-    });
-    const results: any[] = [];
-    await new Promise<void>((resolve, reject) => {
-      (response.data as Readable)
-        .pipe(csv())
-        .on("data", (row: any) => results.push(row))
-        .on("end", () => resolve())
-        .on("error", reject);
-    });
-
-    for (const row of results) {
-      const homeTeamName = normalize_name(row["HomeTeam"].trim());
-      const awayTeamName = normalize_name(row["AwayTeam"].trim());
-      const [dayStr, monthStr, yearStrRaw] = row["Date"].split("/");
-      const [hourStr, minuteStr] = (row["Time"] || "00:00").split(":");
-      const day = parseInt(dayStr, 10);
-      const month = parseInt(monthStr, 10) - 1;
-      let yearNum = parseInt(yearStrRaw, 10);
-
-      // Handle both YY and YYYY formats
-      const fullYear =
-        yearNum < 100
-          ? yearNum < 50
-            ? 2000 + yearNum
-            : 1900 + yearNum
-          : yearNum;
-
-      const matchDate = new Date(
-        Date.UTC(
-          fullYear,
-          month,
-          day,
-          parseInt(hourStr, 10),
-          parseInt(minuteStr, 10),
-        ),
-      );
-
-      if (isNaN(matchDate.getTime())) {
-        console.warn(
-          `⚠️ Invalid match date parsed — raw: "${row["Date"]}", time: "${
-            row["Time"]
-          }" → fullYear=${fullYear}, month=${month + 1}, day=${day}`,
-        );
-        console.warn("Full row:", row);
-        continue; // Skip bad rows
-      }
-
-      // Ensure both teams exist in `teams` table
-      for (const teamName of [homeTeamName, awayTeamName]) {
-        const existingTeam = await db.query.teams.findFirst({
-          where: eq(teams.teamName, teamName),
-        });
-        if (!existingTeam) {
-          await db.insert(teams).values({
-            teamName: teamName,
-          });
-        }
-      }
-
-      // Skip if this match (or flipped) already exists
-      const existingMatch = await db.query.matchStats.findFirst({
-        where: sql`(
-          ("HomeTeam" = ${homeTeamName} AND "AwayTeam" = ${awayTeamName})
-          OR ("HomeTeam" = ${awayTeamName} AND "AwayTeam" = ${homeTeamName})
-        )
-        AND "MatchDate" = ${matchDate.toISOString()}`,
-      });
-
-      if (existingMatch) {
-        console.log(
-          `⏩ Skipped duplicate: ${homeTeamName} vs ${awayTeamName} (${matchDate.toISOString()})`,
-        );
-        continue;
-      }
-
-      await db.insert(matchStats).values({
-        homeTeam: homeTeamName,
-        awayTeam: awayTeamName,
-        matchDate: matchDate.toISOString(),
-        fthg: parseInt(row["FTHG"]),
-        ftag: parseInt(row["FTAG"]),
-        ftr: row["FTR"] || null,
-        hs: toInt(row["HS"]),
-        as: toInt(row["AS"]),
-        hst: toInt(row["HST"]),
-        ast: toInt(row["AST"]),
-        hc: toInt(row["HC"]),
-        ac: toInt(row["AC"]),
-        hy: toInt(row["HY"]),
-        ay: toInt(row["AY"]),
-        hr: toInt(row["HR"]),
-        ar: toInt(row["AR"]),
-        hf: toInt(row["HF"]),
-        af: toInt(row["AF"]),
-        hxg: parseFloat(row["HxG"]),
-        axg: parseFloat(row["AxG"]),
-        league: league,
-      });
-    }
-    return { count: results.length };
-  } catch (err) {
-    console.error("Error updating match stats:", err);
-    throw err;
-  }
-};
 
 // adds next 10 days of upcoming matches to table
 export const updateFutureMatchesService = async (

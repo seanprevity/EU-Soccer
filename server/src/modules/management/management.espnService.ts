@@ -17,12 +17,31 @@ import {
   NewLiveMatch,
   TeamLineup,
 } from "@epl/shared";
+import { recordEspnRequest } from "../../lib/metrics";
 
 // Site API: scoreboards and match summaries. Also used by the squad sync.
 export const espn = axios.create({
   baseURL: "https://site.web.api.espn.com/apis/site/v2/sports/soccer",
   validateStatus: (status) => status < 500,
 });
+
+// Count every ESPN request by endpoint and outcome
+espn.interceptors.response.use(
+  (response) => {
+    recordEspnRequest(
+      `${response.config.baseURL ?? ""}${response.config.url ?? ""}`,
+      "ok",
+    );
+    return response;
+  },
+  (error) => {
+    recordEspnRequest(
+      `${error.config?.baseURL ?? ""}${error.config?.url ?? ""}`,
+      "error",
+    );
+    return Promise.reject(error);
+  },
+);
 
 // Core API: detailed team statistics for one match, including xG
 const ESPN_CORE_URL =
