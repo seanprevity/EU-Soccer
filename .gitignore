@@ -21,3 +21,10 @@ package-lock.json
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
