@@ -19,6 +19,12 @@
   "type": "commonjs",
   "dependencies": {
     "@epl/shared": "workspace:*",
+    "@opentelemetry/api": "^1.10.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.83.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.301.1",
+    "@opentelemetry/instrumentation-express": "^0.73.0",
+    "@opentelemetry/sdk-node": "^0.301.1",
+    "@opentelemetry/sdk-trace-base": "^2.12.0",
     "@prometheus-io/client": "^0.16.1",
     "axios": "^1.21.0",
     "bcryptjs": "^3.0.2",

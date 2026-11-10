@@ -20,6 +20,7 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
+  TRACING: z.enum(["console", "otlp"]).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

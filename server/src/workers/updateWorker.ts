@@ -1,3 +1,4 @@
+import "../tracing/update";
 import "dotenv/config";
 import { isRunning, sleepUntilStopped, stopOnSignals } from "./lifecycle";
 import {
