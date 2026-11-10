@@ -1,3 +1,4 @@
+import "../tracing/live";
 import "dotenv/config";
 import {
   CoreStats,
