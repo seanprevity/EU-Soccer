@@ -1,0 +1,50 @@
+name: Terraform (Grafana)
+
+on:
+  pull_request:
+    paths:
+      - "infra/grafana/**"
+      - ".github/workflows/terraform-grafana.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-grafana-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/grafana
+        shell: bash # turns on "pipefail", so a failing plan isn't hidden by the pipe into tee
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.17.1"
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_wrapper: false
+
+      - name: Format
+        run: terraform fmt -check -recursive
+
+      - name: Init
+        run: terraform init -input=false
+
+      - name: Validate
+        run: terraform validate -no-color
+
+      - name: Plan
+        run: |
+          terraform plan -input=false -no-color | tee plan.txt
+
+          # The end of the plan on the run's summary page, so you don't have to dig through logs
+          {
+            echo "### Terraform plan (Grafana)"
+            tail -n 40 plan.txt
+          } >> "$GITHUB_STEP_SUMMARY"

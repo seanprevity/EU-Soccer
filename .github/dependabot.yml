@@ -15,7 +15,10 @@ updates:
         update-types: ["minor", "patch"]
     commit-message:
       prefix: "chore(deps)"
-  # Updates GitHub Actions, e.g. checkout@v5 -> checkout@v6
+  - package-ecosystem: "terraform"
+    directory: "/infra/grafana"
+    schedule:
+      interval: "monthly"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule: 
