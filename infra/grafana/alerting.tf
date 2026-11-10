@@ -1,5 +1,5 @@
 resource "grafana_contact_point" "email" {
-  name = "email"
+  name               = "email"
   disable_provenance = true
 
   email {
@@ -9,9 +9,9 @@ resource "grafana_contact_point" "email" {
 }
 
 resource "grafana_rule_group" "epl" {
-  name             = "epl"
-  folder_uid       = grafana_folder.epl.uid
-  interval_seconds = 60
+  name               = "epl"
+  folder_uid         = grafana_folder.epl.uid
+  interval_seconds   = 60
   disable_provenance = true
 
   rule {
