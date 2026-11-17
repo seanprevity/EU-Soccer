@@ -2,7 +2,6 @@
   "name": "server",
   "version": "1.0.1",
   "description": "",
-  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon --exec ts-node src/index.ts",
@@ -28,12 +27,10 @@
     "@prometheus-io/client": "^0.16.1",
     "axios": "^1.21.1",
     "cors": "^2.8.5",
-    "csv-parser": "^3.2.0",
     "dotenv": "^18.0.10",
     "drizzle-orm": "^0.45.4",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "postgres": "^3.4.7",
     "zod": "^4.6.7"
@@ -41,7 +38,6 @@
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
-    "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^24.19.2",
     "@types/pg": "^8.15.4",
