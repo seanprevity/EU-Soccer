@@ -12,6 +12,7 @@ import {
   updateStandingsService,
 } from "./management.service";
 import { importEspnMatchesService } from "./management.espnService";
+import { withSpan } from "../../lib/span";
 
 // The parallel arrays in config/arrays
 export const LEAGUE_CONFIG = Leagues.map((name, i) => ({
@@ -80,7 +81,7 @@ export const runStep = async (
 
   // run step
   try {
-    await fn();
+    await withSpan(`update.step ${step}`, { "update.step": step }, () => fn());
     results.push({
       step,
       league,
