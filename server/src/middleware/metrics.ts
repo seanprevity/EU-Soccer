@@ -55,7 +55,7 @@ export function recordRequestMetrics(
     if (traceId) {
       // The library types exemplar labels as the metric's own labels (method/route/status_code),
       // but exemplars use their own label set
-      const exemplarLabels = { trace_id: traceId } as LabelValues<string>;
+      const exemplarLabels = { traceID: traceId } as LabelValues<string>;
       httpRequestDuration.observe({
         labels,
         value: seconds,
