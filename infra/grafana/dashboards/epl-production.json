@@ -112,7 +112,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "13.4.0-41983029144",
+      "pluginVersion": "13.4.0-44038910387",
       "targets": [
         {
           "datasource": {
@@ -205,7 +205,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "13.4.0-41983029144",
+      "pluginVersion": "13.4.0-44038910387",
       "targets": [
         {
           "datasource": {
@@ -213,6 +213,7 @@
             "uid": "grafanacloud-prom"
           },
           "editorMode": "code",
+          "exemplar": true,
           "expr": "histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket[$__rate_interval])))",
           "legendFormat": "{{route}}",
           "range": true,
@@ -327,7 +328,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "13.4.0-41983029144",
+      "pluginVersion": "13.4.0-44038910387",
       "targets": [
         {
           "datasource": {
@@ -424,7 +425,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "13.4.0-41983029144",
+      "pluginVersion": "13.4.0-44038910387",
       "targets": [
         {
           "datasource": {
@@ -432,6 +433,7 @@
             "uid": "grafanacloud-prom"
           },
           "editorMode": "code",
+          "exemplar": true,
           "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{route!=\"/matches/live\", status_code!=\"304\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "range": true,
@@ -443,6 +445,7 @@
             "uid": "grafanacloud-prom"
           },
           "editorMode": "code",
+          "exemplar": true,
           "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{route!=\"/matches/live\", status_code!=\"304\"}[$__rate_interval])))",
           "instant": false,
           "legendFormat": "p95",
@@ -455,6 +458,7 @@
             "uid": "grafanacloud-prom"
           },
           "editorMode": "code",
+          "exemplar": true,
           "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{route!=\"/matches/live\", status_code!=\"304\"}[$__rate_interval])))",
           "instant": false,
           "legendFormat": "p99",
@@ -873,7 +877,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "13.4.0-41983029144",
+          "pluginVersion": "13.4.0-42565191035",
           "targets": [
             {
               "datasource": {
@@ -969,7 +973,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "13.4.0-41983029144",
+          "pluginVersion": "13.4.0-42565191035",
           "targets": [
             {
               "datasource": {
@@ -1092,7 +1096,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "13.4.0-41983029144",
+          "pluginVersion": "13.4.0-42565191035",
           "targets": [
             {
               "datasource": {
@@ -1203,7 +1207,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "13.4.0-41983029144",
+          "pluginVersion": "13.4.0-42565191035",
           "targets": [
             {
               "datasource": {
@@ -1300,7 +1304,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "13.4.0-41983029144",
+          "pluginVersion": "13.4.0-42565191035",
           "targets": [
             {
               "datasource": {
@@ -1358,7 +1362,7 @@
             "unwrappedColumns": false,
             "wrapLogMessage": true
           },
-          "pluginVersion": "13.4.0-41983029144",
+          "pluginVersion": "13.4.0-42565191035",
           "targets": [
             {
               "datasource": {
@@ -1404,7 +1408,7 @@
             "unwrappedColumns": false,
             "wrapLogMessage": true
           },
-          "pluginVersion": "13.4.0-41983029144",
+          "pluginVersion": "13.4.0-42565191035",
           "targets": [
             {
               "datasource": {
@@ -1451,7 +1455,7 @@
   },
   "timezone": "browser",
   "title": "EPL production",
-  "version": 32,
+  "version": 35,
   "uid": "se2trn4",
   "id": 3127431145345024
 }
