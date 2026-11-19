@@ -10,15 +10,17 @@ const METRICS_PORTS: Record<ServiceName, number> = {
   update: 9466,
 };
 
-export const registry = new client.Registry();
+export const registry = new client.Registry(
+  client.Registry.OPENMETRICS_CONTENT_TYPE,
+);
 
 // How long each API request takes. Its _count also gives the request rate and, by status, the error rate
 export const httpRequestDuration = new client.Histogram({
   name: "http_request_duration_seconds",
   help: "API request duration in seconds, by route and status",
   labelNames: ["method", "route", "status_code"] as const,
-  // mostly 100–250 ms
   buckets: [0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+  enableExemplars: true,
   registers: [registry],
 });
 
