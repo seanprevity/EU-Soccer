@@ -13,6 +13,7 @@ import {
   updateRunDuration,
   updateStepFailures,
 } from "../lib/metrics";
+import { withSpan } from "../lib/span";
 
 function utcDay(date: Date): string {
   return date.toISOString().slice(0, 10); // "2026-10-31"
@@ -25,7 +26,11 @@ async function runAndRecord(
 ) {
   const stopTimer = updateRunDuration.startTimer({ kind });
   try {
-    const results = await run();
+    const results = await withSpan(
+      `update.${kind}`,
+      { "update.kind": kind },
+      () => run(),
+    );
     const failed = results.filter((r) => r.status === "failed").length;
     updateStepFailures.inc({ kind }, failed);
     if (failed === 0) updateLastSuccess.setToCurrentTime({ kind });

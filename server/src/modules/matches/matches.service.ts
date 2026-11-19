@@ -47,6 +47,7 @@ import {
   getHeadToHeadBias,
   poissonRandom,
 } from "../../config/simulation";
+import { withDbSpan, withSpan } from "../../lib/span";
 
 export const PAGE_SIZE = 5;
 
@@ -90,15 +91,23 @@ export const getUpcomingMatchesService = async (): Promise<UpcomingMatch[]> => {
     .orderBy(asc(upcomingMatches.matchDate), asc(upcomingMatches.homeTeam));
 };
 
-export const getPastMatchesService = (): Promise<MatchPreview[]> => {
-  const since = new Date();
-  since.setDate(since.getDate() - 7);
-  since.setHours(0, 0, 0, 0);
-  return db
-    .select(previewColumns)
-    .from(matchStats)
-    .where(gt(matchStats.matchDate, since.toISOString()))
-    .orderBy(asc(matchStats.matchDate), asc(matchStats.homeTeam));
+export const getPastMatchesService = async (): Promise<MatchPreview[]> => {
+  return await withSpan("matches.getPastMatches", {}, async (span) => {
+    const since = new Date();
+    since.setDate(since.getDate() - 7);
+    since.setHours(0, 0, 0, 0);
+    span.setAttribute("matches.since", since.toISOString());
+
+    return await withDbSpan("match_stats", async (dbSpan) => {
+      const result = await db
+        .select(previewColumns)
+        .from(matchStats)
+        .where(gt(matchStats.matchDate, since.toISOString()))
+        .orderBy(asc(matchStats.matchDate), asc(matchStats.homeTeam));
+      dbSpan.setAttribute("db.response.returned_rows", result.length);
+      return result;
+    });
+  });
 };
 
 export const getOddsService = async (matchId: number): Promise<Odds[]> => {

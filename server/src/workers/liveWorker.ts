@@ -32,6 +32,7 @@ import {
   liveTickDuration,
   startMetrics,
 } from "../lib/metrics";
+import { withSpan } from "../lib/span";
 
 type TickResult = {
   liveGames: boolean;
@@ -267,7 +268,7 @@ async function main() {
     let result: TickResult | null = null;
     const stopTimer = liveTickDuration.startTimer();
     try {
-      result = await tick();
+      result = await withSpan("live.tick", {}, () => tick());
       liveMatchCount.set(result.liveCount);
       liveLastTick.setToCurrentTime();
     } catch (error) {
