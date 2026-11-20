@@ -24,6 +24,30 @@ import type {
   MatchResult,
 } from "@epl/shared";
 
+// Every table: anyone can read, only the service role can write.
+// (The server connects as the database owner, which bypasses RLS entirely;
+//  these only govern access through Supabase's API keys.)
+const isServiceRole = sql`(auth.role() = 'service_role'::text)`;
+
+function publicReadPolicy() {
+  return pgPolicy("Allow public read", {
+    as: "permissive",
+    for: "select",
+    to: ["public"],
+    using: sql`true`,
+  });
+}
+
+function serviceRoleWritePolicy() {
+  return pgPolicy("Service role full write", {
+    as: "permissive",
+    for: "all",
+    to: ["public"],
+    using: isServiceRole,
+    withCheck: isServiceRole,
+  });
+}
+
 export const odds = pgTable(
   "odds",
   {
@@ -45,17 +69,8 @@ export const odds = pgTable(
       .onUpdate("cascade")
       .onDelete("cascade"),
     unique("odds_bookmaker_match_unique").on(table.bookmaker, table.match),
-    pgPolicy("Allow public read", {
-      as: "permissive",
-      for: "select",
-      to: ["public"],
-      using: sql`true`,
-    }),
-    pgPolicy("Service role full write", {
-      as: "permissive",
-      for: "all",
-      to: ["public"],
-    }),
+    publicReadPolicy(),
+    serviceRoleWritePolicy(),
   ],
 );
 
@@ -67,17 +82,8 @@ export const teams = pgTable(
   },
   (table) => [
     unique("teams_team_name_key1").on(table.teamName),
-    pgPolicy("Allow public read", {
-      as: "permissive",
-      for: "select",
-      to: ["public"],
-      using: sql`true`,
-    }),
-    pgPolicy("Service role full write", {
-      as: "permissive",
-      for: "all",
-      to: ["public"],
-    }),
+    publicReadPolicy(),
+    serviceRoleWritePolicy(),
   ],
 );
 
@@ -89,17 +95,8 @@ export const leagues = pgTable(
   },
   (table) => [
     unique("leagues_name_key").on(table.name),
-    pgPolicy("Allow public read", {
-      as: "permissive",
-      for: "select",
-      to: ["public"],
-      using: sql`true`,
-    }),
-    pgPolicy("Service role full write", {
-      as: "permissive",
-      for: "all",
-      to: ["public"],
-    }),
+    publicReadPolicy(),
+    serviceRoleWritePolicy(),
   ],
 );
 
@@ -113,20 +110,7 @@ export const players = pgTable(
       mode: "string",
     }),
   },
-  (table) => [
-    pgPolicy("Service role full write", {
-      as: "permissive",
-      for: "all",
-      to: ["public"],
-      using: sql`(auth.role() = 'service_role'::text)`,
-      withCheck: sql`(auth.role() = 'service_role'::text)`,
-    }),
-    pgPolicy("Allow public read", {
-      as: "permissive",
-      for: "select",
-      to: ["public"],
-    }),
-  ],
+  (table) => [publicReadPolicy(), serviceRoleWritePolicy()],
 );
 
 export const upcomingMatches = pgTable(
@@ -164,17 +148,8 @@ export const upcomingMatches = pgTable(
       name: "upcoming_matches_League_fkey",
     }).onUpdate("cascade"),
     unique("upcomingMatches_teams_key").on(table.homeTeam, table.awayTeam),
-    pgPolicy("Allow public read", {
-      as: "permissive",
-      for: "select",
-      to: ["public"],
-      using: sql`true`,
-    }),
-    pgPolicy("Service role full write", {
-      as: "permissive",
-      for: "all",
-      to: ["public"],
-    }),
+    publicReadPolicy(),
+    serviceRoleWritePolicy(),
   ],
 );
 
@@ -238,18 +213,19 @@ export const matchStats = pgTable(
       foreignColumns: [leagues.name],
       name: "match_stats_League_fkey",
     }).onUpdate("cascade"),
-    pgPolicy("Allow public read", {
-      as: "permissive",
-      for: "select",
-      to: ["public"],
-      using: sql`true`,
-    }),
-    pgPolicy("Service role full write", {
-      as: "permissive",
-      for: "all",
-      to: ["public"],
-    }),
+    publicReadPolicy(),
+    serviceRoleWritePolicy(),
     uniqueIndex("match_stats_espn_id_unique").on(table.espnId),
+    index("matchStats_HomeTeam_MatchDate_idx").on(
+      table.homeTeam,
+      table.matchDate,
+    ),
+    index("matchStats_AwayTeam_MatchDate_idx").on(
+      table.awayTeam,
+      table.matchDate,
+    ),
+    index("matchStats_League_MatchDate_idx").on(table.league, table.matchDate),
+    index("matchStats_MatchDate_idx").on(table.matchDate),
   ],
 );
 
@@ -302,17 +278,8 @@ export const standings = pgTable(
       table.season,
       table.type,
     ),
-    pgPolicy("Allow public read", {
-      as: "permissive",
-      for: "select",
-      to: ["public"],
-      using: sql`true`,
-    }),
-    pgPolicy("Service role full write", {
-      as: "permissive",
-      for: "all",
-      to: ["public"],
-    }),
+    publicReadPolicy(),
+    serviceRoleWritePolicy(),
   ],
 );
 
@@ -350,18 +317,8 @@ export const topPlayers = pgTable(
       table.category,
       table.player,
     ),
-    pgPolicy("Service role full write", {
-      as: "permissive",
-      for: "all",
-      to: ["public"],
-      using: sql`(auth.role() = 'service_role'::text)`,
-      withCheck: sql`(auth.role() = 'service_role'::text)`,
-    }),
-    pgPolicy("Allow public read", {
-      as: "permissive",
-      for: "select",
-      to: ["public"],
-    }),
+    publicReadPolicy(),
+    serviceRoleWritePolicy(),
   ],
 );
 
@@ -420,17 +377,8 @@ export const squad = pgTable(
     }).onUpdate("cascade"),
     unique("squad_team_player_unique").on(table.player, table.team),
     index("squad_espn_id_idx").on(table.espnId),
-    pgPolicy("Allow public read", {
-      as: "permissive",
-      for: "select",
-      to: ["public"],
-      using: sql`true`,
-    }),
-    pgPolicy("Service role full write", {
-      as: "permissive",
-      for: "all",
-      to: ["public"],
-    }),
+    publicReadPolicy(),
+    serviceRoleWritePolicy(),
   ],
 );
 
@@ -464,17 +412,8 @@ export const head2Head = pgTable(
       name: "head_to_head_pkey",
     }),
     unique("unique_teams").on(table.team1, table.team2),
-    pgPolicy("Allow public read", {
-      as: "permissive",
-      for: "select",
-      to: ["public"],
-      using: sql`true`,
-    }),
-    pgPolicy("Service role full write", {
-      as: "permissive",
-      for: "all",
-      to: ["public"],
-    }),
+    publicReadPolicy(),
+    serviceRoleWritePolicy(),
   ],
 );
 
