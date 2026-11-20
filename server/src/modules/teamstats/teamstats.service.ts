@@ -173,12 +173,12 @@ export const getLast5TeamStatsService = async (
         getLast5MatchStatsService(team2),
       ]);
 
-      span.setAttribute("teamstats.team_1_matches", last5Team1.matches.length);
-      span.setAttribute("teamstats.team_2_matches", last5Team2.matches.length);
+      span.setAttribute("teamstats.team_1_matches", last5Team1.length);
+      span.setAttribute("teamstats.team_2_matches", last5Team2.length);
 
       return [
-        calculateLast5Stats(team1, last5Team1.matches),
-        calculateLast5Stats(team2, last5Team2.matches),
+        calculateLast5Stats(team1, last5Team1),
+        calculateLast5Stats(team2, last5Team2),
       ];
     },
   );
