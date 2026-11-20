@@ -1,5 +1,5 @@
 import { head2Head, matchStats } from "../../../drizzle/schema";
-import { eq, and, or, desc, inArray } from "drizzle-orm";
+import { eq, and, or, desc, inArray, getTableColumns } from "drizzle-orm";
 import { db } from "../../lib/db";
 import { upcomingMatches } from "../../../drizzle/schema";
 import { PAGE_SIZE } from "../matches/matches.service";
@@ -88,49 +88,40 @@ export const getUpcomingH2HService = async (
     "h2h.getUpcomingH2H",
     { "h2h.match_count": matchIds.length },
     async (span) => {
-      const matches = await withDbSpan("upcomingMatches", async (dbSpan) => {
-        const rows = await db
+      const rows = await withDbSpan("upcomingMatches", async (dbSpan) => {
+        const result = await db
           .select({
-            id: upcomingMatches.id,
-            homeTeam: upcomingMatches.homeTeam,
-            awayTeam: upcomingMatches.awayTeam,
+            matchId: upcomingMatches.id,
+            h2h: getTableColumns(head2Head),
           })
           .from(upcomingMatches)
-          .where(inArray(upcomingMatches.id, matchIds));
-        dbSpan.setAttribute("db.response.returned_rows", rows.length);
-        return rows;
-      });
-
-      if (matches.length === 0) return [];
-
-      const pairs = matches.map((m) => pairOf(m.homeTeam, m.awayTeam));
-
-      const records = await withDbSpan("head2head", async (dbSpan) => {
-        const result = await db
-          .select()
-          .from(head2Head)
-          .where(
+          .innerJoin(
+            head2Head,
             or(
-              ...pairs.map(([team1, team2]) =>
-                and(eq(head2Head.team1, team1), eq(head2Head.team2, team2)),
+              and(
+                eq(head2Head.team1, upcomingMatches.homeTeam),
+                eq(head2Head.team2, upcomingMatches.awayTeam),
+              ),
+              and(
+                eq(head2Head.team1, upcomingMatches.awayTeam),
+                eq(head2Head.team2, upcomingMatches.homeTeam),
               ),
             ),
-          );
+          )
+          .where(inArray(upcomingMatches.id, matchIds));
         dbSpan.setAttribute("db.response.returned_rows", result.length);
         return result;
       });
 
       // Put the results back in the order the ids were asked for
-      const recordByPair = new Map(
-        records.map((r) => [`${r.team1}|${r.team2}`, r]),
-      );
-      const pairByMatchId = new Map(
-        matches.map((m) => [m.id, pairOf(m.homeTeam, m.awayTeam).join("|")]),
+      const recordByMatchId = new Map(
+        rows.map((row) => [row.matchId, row.h2h]),
       );
       const result = matchIds.flatMap((id) => {
-        const record = recordByPair.get(pairByMatchId.get(id) ?? "");
+        const record = recordByMatchId.get(id);
         return record ? [record] : [];
       });
+
       span.setAttribute("h2h.records_found", result.length);
       return result;
     },
