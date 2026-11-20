@@ -41,36 +41,6 @@ odds, squads, and player images on a schedule.
 
 ---
 
-## Architecture
-
-```mermaid
-flowchart LR
-  USER[Browser] --> WEB[Next.js app<br/>Vercel]
-  WEB --> GW[AWS API Gateway]
-  GW --> API[Express API<br/>EC2]
-  subgraph EC2
-    API
-    LIVE[Live worker]
-    UPD[Update worker]
-  end
-  API --> DB[(PostgreSQL<br/>Supabase)]
-  LIVE --> DB
-  UPD --> DB
-  LIVE --> ESPN[ESPN]
-  UPD --> ESPN
-  UPD --> FD[football-data.org]
-  UPD --> ODDS[The Odds API]
-  UPD --> SDB[TheSportsDB]
-```
-
-- **Live worker:** polls ESPN every 30 seconds while matches are in play, and stores scores,
-  events, lineups, and stats.
-- **Update worker:** runs a quick update every few hours (results, standings, upcoming
-  fixtures) and a full daily update (odds, squads, top players, player images).
-- All three services run under systemd as a dedicated non-root user.
-
----
-
 ## Observability
 
 The API and both workers are fully instrumented. Grafana Alloy on the instance collects
@@ -105,12 +75,32 @@ flowchart LR
 | **Traces** (Tempo, via OpenTelemetry) | Every API request and worker run, with hand-written spans for each service function and database query                                |
 | **Alerts**                            | Service down, live worker stalled, quick update overdue, API error rate above 5%                                                      |
 
+### Service overview
+
+All three services, the API error rate, time since the last scheduled update, and live
+matches in progress.
+
+![Service overview](docs/images/overview.png)
+
+### Production dashboard
+
+Traffic, latency by route, and response codes. Server-side p95 stays around 25 ms under load.
+
+![Production dashboard](docs/images/dashboard.png)
+
+### Exemplars
+
 Latency panels use **exemplars**: each dot on the chart is a real request, and clicking it
 opens that request's trace.
 
-![Service overview](docs/images/overview.png)
-![Production dashboard](docs/images/dashboard.png)
 ![Exemplar linking a latency point to its trace](docs/images/exemplar.png)
+
+### Request trace
+
+One match simulation request. The three data lookups run in parallel, then the gap at the
+end is the 10,000-run Monte Carlo simulation itself.
+
+![Trace of a match simulation request](docs/images/trace.png)
 
 ### Infrastructure as code
 
@@ -120,8 +110,9 @@ touching that folder runs `terraform fmt`, `validate`, and `plan` in GitHub Acti
 
 ### Load test
 
-A [k6](load-test/api.js) script ramps to 20 concurrent users across the home and team pages:
-**p95 74 ms, 0% errors** over 2,800 requests.
+A [k6](load-test/api.js) script simulates users browsing the home page, a match preview, and
+a team page, with random leagues, seasons, teams, and real fixture IDs taken from the API's own
+responses: **p95 77 ms, 0% errors** over 3,400 requests at up to 20 concurrent users.
 
 ---
 
