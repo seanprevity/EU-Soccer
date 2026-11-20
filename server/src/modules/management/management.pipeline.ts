@@ -1,3 +1,4 @@
+import { trace } from "@opentelemetry/api";
 import {
   competition_codes,
   espn_leagues,
@@ -66,6 +67,12 @@ export const runStep = async (
     console.warn(
       `[${step}] ${league} skipped (${blocker.step} ${blocker.status})`,
     );
+    // Nothing ran, so no span: a marker on the run's span records the skip and why
+    trace.getActiveSpan()?.addEvent("update.step_skipped", {
+      "update.step": step,
+      "update.league": league,
+      "update.blocked_by": blocker.step,
+    });
     results.push({
       step,
       league,
@@ -81,7 +88,11 @@ export const runStep = async (
 
   // run step
   try {
-    await withSpan(`update.step ${step}`, { "update.step": step }, () => fn());
+    await withSpan(
+      `update.step ${step}`,
+      { "update.step": step, "update.league": league },
+      () => fn(),
+    );
     results.push({
       step,
       league,

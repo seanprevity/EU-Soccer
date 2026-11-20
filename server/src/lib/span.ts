@@ -45,7 +45,7 @@ export function withDbSpan<T>(
 ): Promise<T> {
   const attributes: Attributes = {
     "db.system.name": "postgresql",
-    "db.operation.name": "SELECT",
+    "db.operation.name": operation,
     "db.collection.name": table,
   };
   return withSpan(`db.${operation.toLowerCase()} ${table}`, attributes, work);
