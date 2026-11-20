@@ -402,7 +402,7 @@ export const getTeamMatchStatsService = async (
 export const getLast5MatchStatsService = async (
   team: string,
   page = 0,
-): Promise<{ matches: MatchStats[]; total: number }> => {
+): Promise<MatchStats[]> => {
   return await withSpan(
     "matches.getLast5MatchStats",
     {
@@ -410,31 +410,18 @@ export const getLast5MatchStatsService = async (
       "matches.page": page,
       "matches.page_size": PAGE_SIZE,
     },
-    async (span) => {
-      const [matches, [totalRow]] = await Promise.all([
-        withDbSpan("matchStats", async (dbSpan) => {
-          const result = await db
-            .select()
-            .from(matchStats)
-            .where(involves(team))
-            .orderBy(desc(matchStats.matchDate))
-            .limit(PAGE_SIZE)
-            .offset(page * PAGE_SIZE);
-          dbSpan.setAttribute("db.response.returned_rows", result.length);
-          return result;
-        }),
-        withDbSpan("matchStats", async (dbSpan) => {
-          const result = await db
-            .select({ total: count() })
-            .from(matchStats)
-            .where(involves(team));
-          dbSpan.setAttribute("db.response.returned_rows", result.length);
-          return result;
-        }),
-      ]);
-
-      span.setAttribute("matches.total_count", totalRow?.total ?? 0);
-      return { matches, total: totalRow?.total ?? 0 };
+    async () => {
+      return await withDbSpan("matchStats", async (dbSpan) => {
+        const result = await db
+          .select()
+          .from(matchStats)
+          .where(involves(team))
+          .orderBy(desc(matchStats.matchDate))
+          .limit(PAGE_SIZE)
+          .offset(page * PAGE_SIZE);
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
     },
   );
 };

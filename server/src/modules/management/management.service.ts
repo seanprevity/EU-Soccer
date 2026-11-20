@@ -327,7 +327,13 @@ export const updateStandingsService = async (
       // Fetch all matches for this league + season
       const seasonMatches = await withDbSpan("matchStats", async (dbSpan) => {
         const result = await db
-          .select()
+          .select({
+            homeTeam: matchStats.homeTeam,
+            awayTeam: matchStats.awayTeam,
+            fthg: matchStats.fthg,
+            ftag: matchStats.ftag,
+            matchDate: matchStats.matchDate,
+          })
           .from(matchStats)
           .where(
             and(
