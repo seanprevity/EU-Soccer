@@ -7,6 +7,7 @@ import {
   getTeamMatchStatsService,
 } from "../matches/matches.service";
 import { MatchStats, Standing, TeamStatsPair } from "@epl/shared";
+import { withDbSpan, withSpan } from "../../lib/span";
 
 function sumMatchStats(team: string, matches: MatchStats[]) {
   const totals = {
@@ -109,46 +110,76 @@ export const getSeasonTeamStatsService = async (
   team1: string,
   team2: string,
 ): Promise<TeamStatsPair> => {
-  const [teamStandings, team1Matches, team2Matches] = await Promise.all([
-    db
-      .select()
-      .from(standings)
-      .where(
-        and(
-          eq(standings.season, curSeason),
-          eq(standings.type, "TOTAL"),
-          inArray(standings.name, [team1, team2]),
-        ),
-      ),
-    getTeamMatchStatsService(team1),
-    getTeamMatchStatsService(team2),
-  ]);
+  return await withSpan(
+    "teamstats.getSeasonTeamStats",
+    {
+      "teamstats.team_1": team1,
+      "teamstats.team_2": team2,
+      "teamstats.season": curSeason,
+    },
+    async (span) => {
+      const [teamStandings, team1Matches, team2Matches] = await Promise.all([
+        withDbSpan("standings", async (dbSpan) => {
+          const result = await db
+            .select()
+            .from(standings)
+            .where(
+              and(
+                eq(standings.season, curSeason),
+                eq(standings.type, "TOTAL"),
+                inArray(standings.name, [team1, team2]),
+              ),
+            );
+          dbSpan.setAttribute("db.response.returned_rows", result.length);
+          return result;
+        }),
+        getTeamMatchStatsService(team1),
+        getTeamMatchStatsService(team2),
+      ]);
 
-  return [
-    calculateStats(
-      team1,
-      team1Matches,
-      teamStandings.find((s) => s.name === team1),
-    ),
-    calculateStats(
-      team2,
-      team2Matches,
-      teamStandings.find((s) => s.name === team2),
-    ),
-  ];
+      span.setAttribute("teamstats.team_1_matches", team1Matches.length);
+      span.setAttribute("teamstats.team_2_matches", team2Matches.length);
+      span.setAttribute("teamstats.standings_found", teamStandings.length);
+
+      return [
+        calculateStats(
+          team1,
+          team1Matches,
+          teamStandings.find((s) => s.name === team1),
+        ),
+        calculateStats(
+          team2,
+          team2Matches,
+          teamStandings.find((s) => s.name === team2),
+        ),
+      ];
+    },
+  );
 };
 
 export const getLast5TeamStatsService = async (
   team1: string,
   team2: string,
 ): Promise<TeamStatsPair> => {
-  const [last5Team1, last5Team2] = await Promise.all([
-    getLast5MatchStatsService(team1),
-    getLast5MatchStatsService(team2),
-  ]);
+  return await withSpan(
+    "teamstats.getLast5TeamStats",
+    {
+      "teamstats.team_1": team1,
+      "teamstats.team_2": team2,
+    },
+    async (span) => {
+      const [last5Team1, last5Team2] = await Promise.all([
+        getLast5MatchStatsService(team1),
+        getLast5MatchStatsService(team2),
+      ]);
 
-  return [
-    calculateLast5Stats(team1, last5Team1.matches),
-    calculateLast5Stats(team2, last5Team2.matches),
-  ];
+      span.setAttribute("teamstats.team_1_matches", last5Team1.matches.length);
+      span.setAttribute("teamstats.team_2_matches", last5Team2.matches.length);
+
+      return [
+        calculateLast5Stats(team1, last5Team1.matches),
+        calculateLast5Stats(team2, last5Team2.matches),
+      ];
+    },
+  );
 };

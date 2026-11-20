@@ -2,6 +2,7 @@ import { and, eq, gte, or } from "drizzle-orm";
 import { head2Head, matchStats, standings } from "../../drizzle/schema";
 import { db } from "../lib/db";
 import { curSeason } from "./map";
+import { withDbSpan, withSpan } from "../lib/span";
 
 type MatchRow = typeof matchStats.$inferSelect;
 
@@ -34,21 +35,34 @@ export const get_team_data = async (
   homeTeam: string,
   awayTeam: string,
 ): Promise<MatchRow[]> => {
-  const seasonStart = new Date(Date.UTC(parseInt(curSeason), 7, 1, 0, 0, 0));
-  return await db
-    .select()
-    .from(matchStats)
-    .where(
-      and(
-        gte(matchStats.matchDate, seasonStart.toISOString()),
-        or(
-          eq(matchStats.homeTeam, homeTeam),
-          eq(matchStats.awayTeam, homeTeam),
-          eq(matchStats.homeTeam, awayTeam),
-          eq(matchStats.awayTeam, awayTeam),
-        ),
-      ),
-    );
+  return await withSpan(
+    "simulation.get_team_data",
+    { "simulation.home_team": homeTeam, "simulation.away_team": awayTeam },
+    async (span) => {
+      const seasonStart = new Date(
+        Date.UTC(parseInt(curSeason), 7, 1, 0, 0, 0),
+      );
+      span.setAttribute("simulation.season_start", seasonStart.toISOString());
+      return await withDbSpan("matchStats", async (dbSpan) => {
+        const result = await db
+          .select()
+          .from(matchStats)
+          .where(
+            and(
+              gte(matchStats.matchDate, seasonStart.toISOString()),
+              or(
+                eq(matchStats.homeTeam, homeTeam),
+                eq(matchStats.awayTeam, homeTeam),
+                eq(matchStats.homeTeam, awayTeam),
+                eq(matchStats.awayTeam, awayTeam),
+              ),
+            ),
+          );
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+    },
+  );
 };
 
 export const computeTeamStats = (matches: MatchRow[]): TeamStats => {
@@ -108,17 +122,31 @@ export const computeTeamStats = (matches: MatchRow[]): TeamStats => {
 export const get_standings = async (
   homeTeam: string,
   awayTeam: string,
-  season: string,
+  season: string = curSeason,
 ) => {
-  return await db
-    .select()
-    .from(standings)
-    .where(
-      and(
-        eq(standings.season, curSeason),
-        or(eq(standings.name, homeTeam), eq(standings.name, awayTeam)),
-      ),
-    );
+  return await withSpan(
+    "simulation.get_standings",
+    {
+      "simulation.home_team": homeTeam,
+      "simulation.away_team": awayTeam,
+      "simulation.season": season,
+    },
+    async () => {
+      return await withDbSpan("standings", async (dbSpan) => {
+        const result = await db
+          .select()
+          .from(standings)
+          .where(
+            and(
+              eq(standings.season, season),
+              or(eq(standings.name, homeTeam), eq(standings.name, awayTeam)),
+            ),
+          );
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+    },
+  );
 };
 
 // Compute recent form score (last 5 matches W/D/L)
@@ -131,21 +159,16 @@ export const computeFormScore = (form: string | null | undefined): number => {
   return scores.reduce((a, b) => a + b, 0) / 15;
 };
 
-// Compute mild historical head-to-head bias
-export const getHeadToHeadBias = async (
+type H2HRow = typeof head2Head.$inferSelect;
+
+// Positive favours the home team; scaled to a mild ±20% maximum
+function biasFrom(
+  h2h: H2HRow | undefined,
   homeTeam: string,
-  awayTeam: string,
-): Promise<number> => {
-  const [team1, team2] = [homeTeam, awayTeam].sort();
+  team1: string,
+): number {
+  if (!h2h) return 0;
 
-  const rows = await db
-    .select()
-    .from(head2Head)
-    .where(and(eq(head2Head.team1, team1), eq(head2Head.team2, team2)));
-
-  if (rows.length === 0) return 0;
-
-  const h2h = rows[0];
   const team1Wins = h2h.team1Wins ?? 0;
   const team2Wins = h2h.team2Wins ?? 0;
   const draws = h2h.draws ?? 0;
@@ -158,7 +181,36 @@ export const getHeadToHeadBias = async (
   } else {
     bias = (team2Wins - team1Wins) / total;
   }
-
-  // Mild scaling to 20% max influence
   return Math.max(Math.min(bias * 0.2, 0.2), -0.2);
+}
+
+// Compute mild historical head-to-head bias
+export const getHeadToHeadBias = async (
+  homeTeam: string,
+  awayTeam: string,
+): Promise<number> => {
+  return await withSpan(
+    "simulation.getHeadToHeadBias",
+    {
+      "simulation.home_team": homeTeam,
+      "simulation.away_team": awayTeam,
+    },
+    async (span) => {
+      const [team1, team2] = [homeTeam, awayTeam].sort();
+
+      const rows = await withDbSpan("head2head", async (dbSpan) => {
+        const result = await db
+          .select()
+          .from(head2Head)
+          .where(and(eq(head2Head.team1, team1), eq(head2Head.team2, team2)));
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+
+      const bias = biasFrom(rows[0], homeTeam, team1);
+      span.setAttribute("simulation.h2h_found", rows.length > 0);
+      span.setAttribute("simulation.h2h_bias", bias);
+      return bias;
+    },
+  );
 };

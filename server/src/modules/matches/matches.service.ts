@@ -71,24 +71,45 @@ const involves = (team: string) =>
 export const getMatchStatsService = async (
   ids: number[],
 ): Promise<MatchStats[]> => {
-  const rows = await db
-    .select()
-    .from(matchStats)
-    .where(inArray(matchStats.id, ids));
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  return ids.flatMap((id) => {
-    const row = byId.get(id);
-    return row ? [row] : [];
-  });
+  return await withSpan(
+    "matches.getMatchStats",
+    {
+      "matches.id_count": ids.length,
+    },
+    async () => {
+      const rows = await withDbSpan("matchStats", async (dbSpan) => {
+        const result = await db
+          .select()
+          .from(matchStats)
+          .where(inArray(matchStats.id, ids));
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      return ids.flatMap((id) => {
+        const row = byId.get(id);
+        return row ? [row] : [];
+      });
+    },
+  );
 };
 
 export const getUpcomingMatchesService = async (): Promise<UpcomingMatch[]> => {
-  const now = new Date().toISOString();
-  return await db
-    .select()
-    .from(upcomingMatches)
-    .where(gt(upcomingMatches.matchDate, now))
-    .orderBy(asc(upcomingMatches.matchDate), asc(upcomingMatches.homeTeam));
+  return await withSpan("matches.getUpcomingMatches", {}, async (span) => {
+    const now = new Date().toISOString();
+    span.setAttribute("matches.since", now);
+
+    return await withDbSpan("upcomingMatches", async (dbSpan) => {
+      const result = await db
+        .select()
+        .from(upcomingMatches)
+        .where(gt(upcomingMatches.matchDate, now))
+        .orderBy(asc(upcomingMatches.matchDate), asc(upcomingMatches.homeTeam));
+      dbSpan.setAttribute("db.response.returned_rows", result.length);
+      return result;
+    });
+  });
 };
 
 export const getPastMatchesService = async (): Promise<MatchPreview[]> => {
@@ -98,7 +119,7 @@ export const getPastMatchesService = async (): Promise<MatchPreview[]> => {
     since.setHours(0, 0, 0, 0);
     span.setAttribute("matches.since", since.toISOString());
 
-    return await withDbSpan("match_stats", async (dbSpan) => {
+    return await withDbSpan("matchStats", async (dbSpan) => {
       const result = await db
         .select(previewColumns)
         .from(matchStats)
@@ -111,18 +132,42 @@ export const getPastMatchesService = async (): Promise<MatchPreview[]> => {
 };
 
 export const getOddsService = async (matchId: number): Promise<Odds[]> => {
-  return await db.select().from(odds).where(eq(odds.match, matchId));
+  return await withSpan(
+    "matches.getOdds",
+    { "matches.match_id": matchId },
+    async () => {
+      return await withDbSpan("odds", async (dbSpan) => {
+        const result = await db
+          .select()
+          .from(odds)
+          .where(eq(odds.match, matchId));
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+    },
+  );
 };
 
 export const getUpcomingMatchByIdService = async (
   id: number,
 ): Promise<UpcomingMatch | null> => {
-  const [row] = await db
-    .select()
-    .from(upcomingMatches)
-    .where(eq(upcomingMatches.id, id))
-    .limit(1);
-  return row ?? null;
+  return await withSpan(
+    "matches.getUpcomingMatchById",
+    { "matches.id": id },
+    async (span) => {
+      const [row] = await withDbSpan("upcomingMatches", async (dbSpan) => {
+        const result = await db
+          .select()
+          .from(upcomingMatches)
+          .where(eq(upcomingMatches.id, id))
+          .limit(1);
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+      span.setAttribute("matches.found", row !== undefined);
+      return row ?? null;
+    },
+  );
 };
 
 // Matches involving the team, newest first, from `offset` onwards - used for any paginated match history (team, upcoming page)
@@ -132,19 +177,44 @@ export const getRecentMatchesService = async (
   limit: number,
   filters: MatchFilters = {},
 ): Promise<PaginatedMatches> => {
-  const where = and(...matchConditions(team, filters));
-  const [matches, [totalRow]] = await Promise.all([
-    db
-      .select(previewColumns)
-      .from(matchStats)
-      .where(where)
-      .orderBy(desc(matchStats.matchDate), desc(matchStats.id))
-      .limit(limit)
-      .offset(offset),
-    db.select({ total: count() }).from(matchStats).where(where),
-  ]);
+  return await withSpan(
+    "matches.getRecentMatches",
+    {
+      "matches.team": team,
+      "matches.offset": offset,
+      "matches.limit": limit,
+      "matches.filters": JSON.stringify(filters),
+      "matches.filter_count": Object.keys(filters).length,
+    },
+    async (span) => {
+      const where = and(...matchConditions(team, filters));
+      const [matches, [totalRow]] = await Promise.all([
+        withDbSpan("matchStats", async (dbSpan) => {
+          const result = await db
+            .select(previewColumns)
+            .from(matchStats)
+            .where(where)
+            .orderBy(desc(matchStats.matchDate), desc(matchStats.id))
+            .limit(limit)
+            .offset(offset);
+          dbSpan.setAttribute("db.response.returned_rows", result.length);
+          return result;
+        }),
+        withDbSpan("matchStats", async (dbSpan) => {
+          const result = await db
+            .select({ total: count() })
+            .from(matchStats)
+            .where(where);
+          dbSpan.setAttribute("db.response.returned_rows", result.length);
+          return result;
+        }),
+      ]);
 
-  return { matches, total: totalRow?.total ?? 0 };
+      span.setAttribute("matches.total_count", totalRow?.total ?? 0);
+
+      return { matches, total: totalRow?.total ?? 0 };
+    },
+  );
 };
 
 // Filter functions
@@ -240,78 +310,133 @@ function matchConditions(
 export const getMatchFilterOptionsService = async (
   team: string,
 ): Promise<MatchFilterOptions> => {
-  const [seasonRows, opponents, scorelines] = await Promise.all([
-    db
-      .selectDistinct({ season: seasonOf })
-      .from(matchStats)
-      .where(involves(team))
-      .orderBy(desc(seasonOf)),
+  return await withSpan(
+    "matches.getMatchFilterOptions",
+    { "matches.team": team },
+    async () => {
+      const [seasonRows, opponents, scorelines] = await Promise.all([
+        withDbSpan("matchStats", async (dbSpan) => {
+          const result = await db
+            .selectDistinct({ season: seasonOf })
+            .from(matchStats)
+            .where(involves(team))
+            .orderBy(desc(seasonOf));
+          dbSpan.setAttribute("db.response.returned_rows", result.length);
+          return result;
+        }),
 
-    // "group by 1" groups by first selected column.
-    db
-      .select({ team: opponentOf(team), count: count() })
-      .from(matchStats)
-      .where(involves(team))
-      .groupBy(sql`1`)
-      .orderBy(sql`1`),
+        // "group by 1" groups by first selected column.
+        withDbSpan("matchStats", async (dbSpan) => {
+          const result = await db
+            .select({ team: opponentOf(team), count: count() })
+            .from(matchStats)
+            .where(involves(team))
+            .groupBy(sql`1`)
+            .orderBy(sql`1`);
+          dbSpan.setAttribute("db.response.returned_rows", result.length);
+          return result;
+        }),
 
-    db
-      .select({
-        goalsFor: teamGoals(team),
-        goalsAgainst: opponentGoals(team),
-        count: count(),
-      })
-      .from(matchStats)
-      .where(
-        and(
-          involves(team),
-          isNotNull(matchStats.fthg),
-          isNotNull(matchStats.ftag),
-        ),
-      )
-      .groupBy(sql`1, 2`)
-      .orderBy(desc(count())),
-  ]);
+        withDbSpan("matchStats", async (dbSpan) => {
+          const result = await db
+            .select({
+              goalsFor: teamGoals(team),
+              goalsAgainst: opponentGoals(team),
+              count: count(),
+            })
+            .from(matchStats)
+            .where(
+              and(
+                involves(team),
+                isNotNull(matchStats.fthg),
+                isNotNull(matchStats.ftag),
+              ),
+            )
+            .groupBy(sql`1, 2`)
+            .orderBy(desc(count()));
+          dbSpan.setAttribute("db.response.returned_rows", result.length);
+          return result;
+        }),
+      ]);
 
-  return {
-    seasons: seasonRows.map((row) => row.season),
-    opponents,
-    scorelines,
-  };
+      return {
+        seasons: seasonRows.map((row) => row.season),
+        opponents,
+        scorelines,
+      };
+    },
+  );
 };
 
-export const getTeamMatchStatsService = (
+export const getTeamMatchStatsService = async (
   team: string,
 ): Promise<MatchStats[]> => {
   const start = new Date(Date.UTC(Number(curSeason), 7, 1));
   const end = new Date(Date.UTC(Number(curSeason) + 1, 6, 1));
-  return db
-    .select()
-    .from(matchStats)
-    .where(
-      and(
-        gt(matchStats.matchDate, start.toISOString()),
-        lt(matchStats.matchDate, end.toISOString()),
-        involves(team),
-      ),
-    );
+  return await withSpan(
+    "matches.getTeamMatchStats",
+    {
+      "matches.team": team,
+      "matches.season_start": start.toISOString(),
+      "matches.season_end": end.toISOString(),
+    },
+    async () => {
+      return await withDbSpan("matchStats", async (dbSpan) => {
+        const result = await db
+          .select()
+          .from(matchStats)
+          .where(
+            and(
+              gt(matchStats.matchDate, start.toISOString()),
+              lt(matchStats.matchDate, end.toISOString()),
+              involves(team),
+            ),
+          );
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+    },
+  );
 };
 
 export const getLast5MatchStatsService = async (
   team: string,
   page = 0,
 ): Promise<{ matches: MatchStats[]; total: number }> => {
-  const [matches, [totalRow]] = await Promise.all([
-    db
-      .select()
-      .from(matchStats)
-      .where(involves(team))
-      .orderBy(desc(matchStats.matchDate))
-      .limit(PAGE_SIZE)
-      .offset(page * PAGE_SIZE),
-    db.select({ total: count() }).from(matchStats).where(involves(team)),
-  ]);
-  return { matches, total: totalRow?.total ?? 0 };
+  return await withSpan(
+    "matches.getLast5MatchStats",
+    {
+      "matches.team": team,
+      "matches.page": page,
+      "matches.page_size": PAGE_SIZE,
+    },
+    async (span) => {
+      const [matches, [totalRow]] = await Promise.all([
+        withDbSpan("matchStats", async (dbSpan) => {
+          const result = await db
+            .select()
+            .from(matchStats)
+            .where(involves(team))
+            .orderBy(desc(matchStats.matchDate))
+            .limit(PAGE_SIZE)
+            .offset(page * PAGE_SIZE);
+          dbSpan.setAttribute("db.response.returned_rows", result.length);
+          return result;
+        }),
+        withDbSpan("matchStats", async (dbSpan) => {
+          const result = await db
+            .select({ total: count() })
+            .from(matchStats)
+            .where(involves(team));
+          dbSpan.setAttribute("db.response.returned_rows", result.length);
+          return result;
+        }),
+      ]);
+
+      span.setAttribute("matches.total_count", totalRow?.total ?? 0);
+      return { matches, total: totalRow?.total ?? 0 };
+    },
+  );
 };
 
 export const getSimulationService = async (
@@ -320,167 +445,266 @@ export const getSimulationService = async (
   season: string = curSeason,
   nSimulations = 10000,
 ): Promise<SimulationResult | null> => {
-  const [matches, standingsRows, h2hBias] = await Promise.all([
-    get_team_data(homeTeam, awayTeam),
-    get_standings(homeTeam, awayTeam, season),
-    getHeadToHeadBias(homeTeam, awayTeam),
-  ]);
-  const teamStats = computeTeamStats(matches);
+  return await withSpan(
+    "matches.getSimulation",
+    {
+      "matches.home_team": homeTeam,
+      "matches.away_team": awayTeam,
+      "matches.season": season,
+      "matches.simulations": nSimulations,
+    },
+    async (span) => {
+      const [matches, standingsRows, h2hBias] = await Promise.all([
+        get_team_data(homeTeam, awayTeam),
+        get_standings(homeTeam, awayTeam, season),
+        getHeadToHeadBias(homeTeam, awayTeam),
+      ]);
+      const teamStats = computeTeamStats(matches);
 
-  // By team name; if get_standings returns several rows per team, the last one wins, as before
-  const standingByTeam = new Map(standingsRows.map((r) => [r.name, r]));
-  const home = standingByTeam.get(homeTeam);
-  const away = standingByTeam.get(awayTeam);
-  const homeStats = teamStats[homeTeam];
-  const awayStats = teamStats[awayTeam];
-  if (!home || !away || !homeStats || !awayStats) return null;
+      // By team name; if get_standings returns several rows per team, the last one wins, as before
+      const standingByTeam = new Map(standingsRows.map((r) => [r.name, r]));
+      const home = standingByTeam.get(homeTeam);
+      const away = standingByTeam.get(awayTeam);
+      const homeStats = teamStats[homeTeam];
+      const awayStats = teamStats[awayTeam];
+      if (!home || !away || !homeStats || !awayStats) {
+        span.setAttribute("matches.simulated", false);
+        return null;
+      }
 
-  const maxPoints = Math.max(...standingsRows.map((r) => r.points ?? 0), 1);
-  const homePoints = (home.points ?? 0) / maxPoints;
-  const awayPoints = (away.points ?? 0) / maxPoints;
-  const homeFormScore = computeFormScore(home.form);
-  const awayFormScore = computeFormScore(away.form);
+      const maxPoints = Math.max(...standingsRows.map((r) => r.points ?? 0), 1);
+      const homePoints = (home.points ?? 0) / maxPoints;
+      const awayPoints = (away.points ?? 0) / maxPoints;
+      const homeFormScore = computeFormScore(home.form);
+      const awayFormScore = computeFormScore(away.form);
 
-  // Expected scoring rates
-  let lamHome = (homeStats.avg_scored_home + awayStats.avg_conceded_away) / 2;
-  let lamAway = (awayStats.avg_scored_away + homeStats.avg_conceded_home) / 2;
+      // Expected scoring rates
+      let lamHome =
+        (homeStats.avg_scored_home + awayStats.avg_conceded_away) / 2;
+      let lamAway =
+        (awayStats.avg_scored_away + homeStats.avg_conceded_home) / 2;
 
-  // Adjust by points
-  lamHome *= 1 + (homePoints - awayPoints) * 0.2;
-  lamAway *= 1 + (awayPoints - homePoints) * 0.2;
+      // Adjust by points
+      lamHome *= 1 + (homePoints - awayPoints) * 0.2;
+      lamAway *= 1 + (awayPoints - homePoints) * 0.2;
 
-  // Adjust by points per game
-  lamHome *= 1 + ((home.points ?? 0) / ((home.played || 1) * 3) - 0.5) * 0.2;
-  lamAway *= 1 + ((away.points ?? 0) / ((away.played || 1) * 3) - 0.5) * 0.2;
+      // Adjust by points per game
+      lamHome *=
+        1 + ((home.points ?? 0) / ((home.played || 1) * 3) - 0.5) * 0.2;
+      lamAway *=
+        1 + ((away.points ?? 0) / ((away.played || 1) * 3) - 0.5) * 0.2;
 
-  // Adjust by recent form
-  lamHome *= 1 + (homeFormScore - awayFormScore) * 0.2;
-  lamAway *= 1 + (awayFormScore - homeFormScore) * 0.2;
+      // Adjust by recent form
+      lamHome *= 1 + (homeFormScore - awayFormScore) * 0.2;
+      lamAway *= 1 + (awayFormScore - homeFormScore) * 0.2;
 
-  // Head-to-head bias
-  lamHome *= 1 + h2hBias;
-  lamAway *= 1 - h2hBias;
+      // Head-to-head bias
+      lamHome *= 1 + h2hBias;
+      lamAway *= 1 - h2hBias;
 
-  // Run the simulations, counting results and scores as we go
-  let homeWins = 0;
-  let draws = 0;
-  let totalHome = 0;
-  let totalAway = 0;
-  const scoreCounts = new Map<string, number>();
-  for (let i = 0; i < nSimulations; i++) {
-    const h = poissonRandom(lamHome);
-    const a = poissonRandom(lamAway);
-    if (h > a) homeWins++;
-    else if (h === a) draws++;
-    totalHome += h;
-    totalAway += a;
-    const key = `${h}-${a}`;
-    scoreCounts.set(key, (scoreCounts.get(key) ?? 0) + 1);
-  }
+      span.setAttribute("matches.simulated", true);
+      span.setAttribute("matches.lambda_home", lamHome);
+      span.setAttribute("matches.lambda_away", lamAway);
 
-  let mostLikelyScore = "0-0";
-  let mostLikelyCount = 0;
-  for (const [score, n] of scoreCounts) {
-    if (n > mostLikelyCount) [mostLikelyScore, mostLikelyCount] = [score, n];
-  }
+      // Run the simulations, counting results and scores as we go
+      let homeWins = 0;
+      let draws = 0;
+      let totalHome = 0;
+      let totalAway = 0;
+      const scoreCounts = new Map<string, number>();
+      for (let i = 0; i < nSimulations; i++) {
+        const h = poissonRandom(lamHome);
+        const a = poissonRandom(lamAway);
+        if (h > a) homeWins++;
+        else if (h === a) draws++;
+        totalHome += h;
+        totalAway += a;
+        const key = `${h}-${a}`;
+        scoreCounts.set(key, (scoreCounts.get(key) ?? 0) + 1);
+      }
 
-  return {
-    home_team: homeTeam,
-    away_team: awayTeam,
-    home_win_prob: homeWins / nSimulations,
-    draw_prob: draws / nSimulations,
-    away_win_prob: (nSimulations - homeWins - draws) / nSimulations,
-    avg_goals_home: totalHome / nSimulations,
-    avg_goals_away: totalAway / nSimulations,
-    lambda_home: lamHome,
-    lambda_away: lamAway,
-    most_likely_score: mostLikelyScore,
-    most_likely_score_prob: mostLikelyCount / nSimulations,
-  };
+      let mostLikelyScore = "0-0";
+      let mostLikelyCount = 0;
+      for (const [score, n] of scoreCounts) {
+        if (n > mostLikelyCount)
+          [mostLikelyScore, mostLikelyCount] = [score, n];
+      }
+
+      return {
+        home_team: homeTeam,
+        away_team: awayTeam,
+        home_win_prob: homeWins / nSimulations,
+        draw_prob: draws / nSimulations,
+        away_win_prob: (nSimulations - homeWins - draws) / nSimulations,
+        avg_goals_home: totalHome / nSimulations,
+        avg_goals_away: totalAway / nSimulations,
+        lambda_home: lamHome,
+        lambda_away: lamAway,
+        most_likely_score: mostLikelyScore,
+        most_likely_score_prob: mostLikelyCount / nSimulations,
+      };
+    },
+  );
 };
 
 export const getHomeAwayMatchesService = async (
   homeTeam: string,
   awayTeam: string,
 ): Promise<HomeAwayMatches> => {
-  const teams = [homeTeam, awayTeam];
-  const rows = await db
-    .select({
-      id: matchStats.id,
-      homeTeam: matchStats.homeTeam,
-      awayTeam: matchStats.awayTeam,
-      hst: matchStats.hst,
-      ast: matchStats.ast,
-      hxg: matchStats.hxg,
-      axg: matchStats.axg,
-      hposs: matchStats.hposs,
-      aposs: matchStats.aposs,
-    })
-    .from(matchStats)
-    .where(
-      and(
-        gte(matchStats.matchDate, `${curSeason}-07`),
-        or(
-          inArray(matchStats.homeTeam, teams),
-          inArray(matchStats.awayTeam, teams),
-        ),
-      ),
-    );
+  return await withSpan(
+    "matches.getHomeAwayMatches",
+    {
+      "matches.home_team": homeTeam,
+      "matches.away_team": awayTeam,
+      "matches.season": curSeason,
+    },
+    async () => {
+      const teams = [homeTeam, awayTeam];
+      const rows = await withDbSpan("matchStats", async (dbSpan) => {
+        const result = await db
+          .select({
+            id: matchStats.id,
+            homeTeam: matchStats.homeTeam,
+            awayTeam: matchStats.awayTeam,
+            hst: matchStats.hst,
+            ast: matchStats.ast,
+            hxg: matchStats.hxg,
+            axg: matchStats.axg,
+            hposs: matchStats.hposs,
+            aposs: matchStats.aposs,
+          })
+          .from(matchStats)
+          .where(
+            and(
+              gte(matchStats.matchDate, `${curSeason}-07`),
+              or(
+                inArray(matchStats.homeTeam, teams),
+                inArray(matchStats.awayTeam, teams),
+              ),
+            ),
+          );
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
 
-  return {
-    homeHome: rows.filter((r) => r.homeTeam === homeTeam),
-    homeAway: rows.filter((r) => r.awayTeam === homeTeam),
-    awayHome: rows.filter((r) => r.homeTeam === awayTeam),
-    awayAway: rows.filter((r) => r.awayTeam === awayTeam),
-  };
+      return {
+        homeHome: rows.filter((r) => r.homeTeam === homeTeam),
+        homeAway: rows.filter((r) => r.awayTeam === homeTeam),
+        awayHome: rows.filter((r) => r.homeTeam === awayTeam),
+        awayAway: rows.filter((r) => r.awayTeam === awayTeam),
+      };
+    },
+  );
 };
 
 export const deleteLiveMatch = async (espnId: string): Promise<boolean> => {
-  const deleted = await db
-    .delete(liveMatches)
-    .where(eq(liveMatches.espnId, espnId));
-  return deleted.length > 0;
+  return await withSpan(
+    "matches.deleteLiveMatch",
+    { "matches.espn_id": espnId },
+    async (span) => {
+      const deleted = await withDbSpan(
+        "liveMatches",
+        async () => {
+          return await db
+            .delete(liveMatches)
+            .where(eq(liveMatches.espnId, espnId))
+            .returning({ espnId: liveMatches.espnId });
+        },
+        "DELETE",
+      );
+
+      span.setAttribute("matches.deleted_count", deleted.length);
+      return deleted.length > 0;
+    },
+  );
 };
 
 export const getLiveMatchIds = async (): Promise<Set<string>> => {
-  const rows = await db.select({ id: liveMatches.espnId }).from(liveMatches);
-  return new Set(rows.map((r) => r.id));
+  return await withSpan("matches.getLiveMatchIds", {}, async () => {
+    const rows = await withDbSpan("liveMatches", async (dbSpan) => {
+      const result = await db
+        .select({ id: liveMatches.espnId })
+        .from(liveMatches);
+      dbSpan.setAttribute("db.response.returned_rows", result.length);
+      return result;
+    });
+    return new Set(rows.map((r) => r.id));
+  });
 };
 
 export async function deleteStaleLiveMatches(): Promise<number> {
-  const sixHoursAgo = new Date(Date.now() - 21_600_000).toISOString();
-  const deleted = await db
-    .delete(liveMatches)
-    .where(lt(liveMatches.kickoff, sixHoursAgo))
-    .returning({ espnId: liveMatches.espnId });
-  return deleted.length;
+  return await withSpan("matches.deleteStaleLiveMatches", {}, async (span) => {
+    const sixHoursAgo = new Date(Date.now() - 21_600_000).toISOString();
+    const deleted = await withDbSpan(
+      "liveMatches",
+      async () => {
+        return await db
+          .delete(liveMatches)
+          .where(lt(liveMatches.kickoff, sixHoursAgo))
+          .returning({ espnId: liveMatches.espnId });
+      },
+      "DELETE",
+    );
+
+    span.setAttribute("matches.deleted_count", deleted.length);
+    return deleted.length;
+  });
 }
 
 export async function getLiveMatchesService(): Promise<LiveMatch[]> {
-  return await db
-    .select()
-    .from(liveMatches)
-    .orderBy(asc(liveMatches.kickoff), asc(liveMatches.homeTeam));
+  return await withSpan("matches.getLiveMatches", {}, async () => {
+    return await withDbSpan("liveMatches", async (dbSpan) => {
+      const result = await db
+        .select()
+        .from(liveMatches)
+        .orderBy(asc(liveMatches.kickoff), asc(liveMatches.homeTeam));
+      dbSpan.setAttribute("db.response.returned_rows", result.length);
+      return result;
+    });
+  });
 }
 
 export async function getLiveMatchService(
   espnId: string,
 ): Promise<LiveMatch | null> {
-  const [row] = await db
-    .select()
-    .from(liveMatches)
-    .where(eq(liveMatches.espnId, espnId));
-  return row;
+  return await withSpan(
+    "matches.getLiveMatch",
+    { "matches.espn_id": espnId },
+    async (span) => {
+      const [row] = await withDbSpan("liveMatches", async (dbSpan) => {
+        const result = await db
+          .select()
+          .from(liveMatches)
+          .where(eq(liveMatches.espnId, espnId));
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+
+      span.setAttribute("matches.live_match_found", row !== undefined);
+      return row ?? null;
+    },
+  );
 }
 
 export async function getMatchIdByEspnIdService(
   espnId: string,
 ): Promise<number | null> {
-  const [row] = await db
-    .select({ id: matchStats.id })
-    .from(matchStats)
-    .where(eq(matchStats.espnId, espnId));
-  return row?.id ?? null;
+  return await withSpan(
+    "matches.getMatchIdByEspnId",
+    { "matches.espn_id": espnId },
+    async (span) => {
+      const [row] = await withDbSpan("matchStats", async (dbSpan) => {
+        const result = await db
+          .select({ id: matchStats.id })
+          .from(matchStats)
+          .where(eq(matchStats.espnId, espnId));
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+      span.setAttribute("matches.found", row !== undefined);
+      return row?.id ?? null;
+    },
+  );
 }
 
 type LineupRow = {
@@ -505,24 +729,36 @@ function toPreviousLineup(team: string, row: LineupRow): PreviousLineup | null {
 
 // The team's most recent match with lineups, from any season
 async function lastLineupFor(team: string): Promise<PreviousLineup | null> {
-  const [row] = await db
-    .select({
-      id: matchStats.id,
-      homeTeam: matchStats.homeTeam,
-      awayTeam: matchStats.awayTeam,
-      matchDate: matchStats.matchDate,
-      lineups: matchStats.lineups,
-    })
-    .from(matchStats)
-    .where(
-      and(
-        or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)),
-        isNotNull(matchStats.lineups),
-      ),
-    )
-    .orderBy(desc(matchStats.matchDate))
-    .limit(1);
-  return row ? toPreviousLineup(team, row) : null;
+  return await withSpan(
+    "matches.lastLineupFor",
+    { "matches.team": team },
+    async (span) => {
+      const [row] = await withDbSpan("matchStats", async (dbSpan) => {
+        const result = await db
+          .select({
+            id: matchStats.id,
+            homeTeam: matchStats.homeTeam,
+            awayTeam: matchStats.awayTeam,
+            matchDate: matchStats.matchDate,
+            lineups: matchStats.lineups,
+          })
+          .from(matchStats)
+          .where(
+            and(
+              or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)),
+              isNotNull(matchStats.lineups),
+            ),
+          )
+          .orderBy(desc(matchStats.matchDate))
+          .limit(1);
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+
+      span.setAttribute("matches.lineup_found", row !== undefined);
+      return row ? toPreviousLineup(team, row) : null;
+    },
+  );
 }
 
 function increment(counts: Map<string, number>, name: string): void {
@@ -542,145 +778,188 @@ function sortedCounts(
 }
 
 async function teamPreviewFor(team: string): Promise<TeamPreview> {
-  const seasonStart = `${curSeason}-07-01T00:00:00.000Z`;
+  return await withSpan(
+    "matches.teamPreviewFor",
+    { "matches.team": team, "matches.season": curSeason },
+    async (span) => {
+      const seasonStart = `${curSeason}-07-01T00:00:00.000Z`;
 
-  const rows = await db
-    .select({
-      id: matchStats.id,
-      homeTeam: matchStats.homeTeam,
-      awayTeam: matchStats.awayTeam,
-      matchDate: matchStats.matchDate,
-      lineups: matchStats.lineups,
-      events: matchStats.events,
-    })
-    .from(matchStats)
-    .where(
-      and(
-        or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)),
-        gte(matchStats.matchDate, seasonStart),
-      ),
-    )
-    .orderBy(desc(matchStats.matchDate));
+      const rows = await withDbSpan("matchStats", async (dbSpan) => {
+        const result = await db
+          .select({
+            id: matchStats.id,
+            homeTeam: matchStats.homeTeam,
+            awayTeam: matchStats.awayTeam,
+            matchDate: matchStats.matchDate,
+            lineups: matchStats.lineups,
+            events: matchStats.events,
+          })
+          .from(matchStats)
+          .where(
+            and(
+              or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)),
+              gte(matchStats.matchDate, seasonStart),
+            ),
+          )
+          .orderBy(desc(matchStats.matchDate));
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
 
-  const formations = new Map<string, number>();
-  const jerseys = new Map<string, string | null>();
-  const goals = new Map<string, number>();
-  const assists = new Map<string, number>();
-  const yellows = new Map<string, number>();
-  const reds = new Map<string, number>();
-  let lineupMatches = 0;
+      const formations = new Map<string, number>();
+      const jerseys = new Map<string, string | null>();
+      const goals = new Map<string, number>();
+      const assists = new Map<string, number>();
+      const yellows = new Map<string, number>();
+      const reds = new Map<string, number>();
+      let lineupMatches = 0;
 
-  for (const row of rows) {
-    const side = row.homeTeam === team ? "home" : "away";
+      for (const row of rows) {
+        const side = row.homeTeam === team ? "home" : "away";
 
-    const lineup = row.lineups?.[side];
-    if (lineup) {
-      lineupMatches++;
-      if (lineup.formation) increment(formations, lineup.formation);
-      for (const player of lineup.players) {
-        if (!jerseys.has(player.name))
-          jerseys.set(player.name, player.jersey ?? null);
+        const lineup = row.lineups?.[side];
+        if (lineup) {
+          lineupMatches++;
+          if (lineup.formation) increment(formations, lineup.formation);
+          for (const player of lineup.players) {
+            if (!jerseys.has(player.name))
+              jerseys.set(player.name, player.jersey ?? null);
+          }
+        }
+
+        for (const event of row.events ?? []) {
+          if (event.side !== side || !event.player) continue;
+
+          // Own goals are credited to this side but scored by an opponent, so they're skipped
+          if (
+            (event.kind === "goal" || event.kind === "penalty") &&
+            event.player
+          ) {
+            increment(goals, event.player);
+          }
+          if (event.kind === "goal" && event.assist)
+            increment(assists, event.assist);
+
+          if (event.kind === "yellow") {
+            increment(yellows, event.player);
+          }
+          if (event.kind === "red" || event.kind === "second_yellow")
+            increment(reds, event.player);
+        }
       }
-    }
 
-    for (const event of row.events ?? []) {
-      if (event.side !== side || !event.player) continue;
+      const latest = rows.find((row) => row.lineups);
+      const previous = latest
+        ? toPreviousLineup(team, latest)
+        : await lastLineupFor(team);
 
-      // Own goals are credited to this side but scored by an opponent, so they're skipped
-      if ((event.kind === "goal" || event.kind === "penalty") && event.player) {
-        increment(goals, event.player);
-      }
-      if (event.kind === "goal" && event.assist)
-        increment(assists, event.assist);
+      const formationList = sortedCounts(formations, new Map()).map(
+        ({ name, count }) => ({
+          name,
+          count,
+        }),
+      );
 
-      if (event.kind === "yellow") {
-        increment(yellows, event.player);
-      }
-      if (event.kind === "red" || event.kind === "second_yellow")
-        increment(yellows, event.player);
-    }
-  }
+      span.setAttribute("matches.lineup_matches", lineupMatches);
 
-  const latest = rows.find((row) => row.lineups);
-  const previous = latest
-    ? toPreviousLineup(team, latest)
-    : await lastLineupFor(team);
-
-  const formationList = sortedCounts(formations, new Map()).map(
-    ({ name, count }) => ({
-      name,
-      count,
-    }),
+      return {
+        team,
+        previous,
+        lineupMatches,
+        formations: formationList,
+        scorers: sortedCounts(goals, jerseys),
+        assisters: sortedCounts(assists, jerseys),
+        yellowCards: sortedCounts(yellows, jerseys),
+        redCards: sortedCounts(reds, jerseys),
+      };
+    },
   );
-
-  return {
-    team,
-    previous,
-    lineupMatches,
-    formations: formationList,
-    scorers: sortedCounts(goals, jerseys),
-    assisters: sortedCounts(assists, jerseys),
-    yellowCards: sortedCounts(yellows, jerseys),
-    redCards: sortedCounts(reds, jerseys),
-  };
 }
 
 export async function getUpcomingLineupsService(
   upcomingId: number,
 ): Promise<UpcomingLineups | null> {
-  const [fixture] = await db
-    .select({
-      homeTeam: upcomingMatches.homeTeam,
-      awayTeam: upcomingMatches.awayTeam,
-      lineups: upcomingMatches.lineups,
-    })
-    .from(upcomingMatches)
-    .where(eq(upcomingMatches.id, upcomingId))
-    .limit(1);
+  return await withSpan(
+    "matches.getUpcomingLineups",
+    { "matches.upcoming_id": upcomingId },
+    async () => {
+      const [fixture] = await withDbSpan("upcomingMatches", async (dbSpan) => {
+        const result = await db
+          .select({
+            homeTeam: upcomingMatches.homeTeam,
+            awayTeam: upcomingMatches.awayTeam,
+            lineups: upcomingMatches.lineups,
+          })
+          .from(upcomingMatches)
+          .where(eq(upcomingMatches.id, upcomingId))
+          .limit(1);
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
 
-  if (!fixture) return null;
+      if (!fixture) return null;
 
-  const [home, away] = await Promise.all([
-    teamPreviewFor(fixture.homeTeam),
-    teamPreviewFor(fixture.awayTeam),
-  ]);
-  return { confirmed: fixture.lineups ?? null, home, away };
+      const [home, away] = await Promise.all([
+        teamPreviewFor(fixture.homeTeam),
+        teamPreviewFor(fixture.awayTeam),
+      ]);
+      return { confirmed: fixture.lineups ?? null, home, away };
+    },
+  );
 }
 
 // Matches that don't have a lineup and start today
 export async function getUpcomingAwaitingLineups(): Promise<
   Map<string, number>
 > {
-  const now = new Date();
-  const dayAhead = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  return await withSpan("matches.getUpcomingAwaitingLineups", {}, async () => {
+    const now = new Date();
+    const dayAhead = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-  const rows = await db
-    .select({
-      id: upcomingMatches.id,
-      homeTeam: upcomingMatches.homeTeam,
-      awayTeam: upcomingMatches.awayTeam,
-    })
-    .from(upcomingMatches)
-    .where(
-      and(
-        isNull(upcomingMatches.lineups),
-        gt(upcomingMatches.matchDate, now.toISOString()),
-        lt(upcomingMatches.matchDate, dayAhead.toISOString()),
-      ),
-    );
+    const rows = await withDbSpan("upcomingMatches", async (dbSpan) => {
+      const result = await db
+        .select({
+          id: upcomingMatches.id,
+          homeTeam: upcomingMatches.homeTeam,
+          awayTeam: upcomingMatches.awayTeam,
+        })
+        .from(upcomingMatches)
+        .where(
+          and(
+            isNull(upcomingMatches.lineups),
+            gt(upcomingMatches.matchDate, now.toISOString()),
+            lt(upcomingMatches.matchDate, dayAhead.toISOString()),
+          ),
+        );
+      dbSpan.setAttribute("db.response.returned_rows", result.length);
+      return result;
+    });
 
-  const idByFixture = new Map<string, number>();
-  for (const row of rows)
-    idByFixture.set(`${row.homeTeam}|${row.awayTeam}`, row.id);
-  return idByFixture;
+    const idByFixture = new Map<string, number>();
+    for (const row of rows)
+      idByFixture.set(`${row.homeTeam}|${row.awayTeam}`, row.id);
+    return idByFixture;
+  });
 }
 
 export async function saveUpcomingLineups(
   id: number,
   lineups: MatchLineups,
 ): Promise<void> {
-  await db
-    .update(upcomingMatches)
-    .set({ lineups })
-    .where(eq(upcomingMatches.id, id));
+  return await withSpan(
+    "matches.saveUpcomingLineups",
+    { "matches.id": id },
+    async () => {
+      return await withDbSpan(
+        "upcomingMatches",
+        async () => {
+          await db
+            .update(upcomingMatches)
+            .set({ lineups })
+            .where(eq(upcomingMatches.id, id));
+        },
+        "UPDATE",
+      );
+    },
+  );
 }

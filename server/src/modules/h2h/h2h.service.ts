@@ -17,11 +17,11 @@ export const getH2HService = async (
 ): Promise<H2H | null> => {
   return await withSpan(
     "h2h.getH2H",
-    { "team.a": teamA, "team.b": teamB },
+    { "h2h.team_a": teamA, "h2h.team_b": teamB },
     async (span) => {
       const [team1, team2] = pairOf(teamA, teamB);
 
-      const rows = await withDbSpan("head_2_head", async (dbSpan) => {
+      const rows = await withDbSpan("head2head", async (dbSpan) => {
         const result = await db
           .select()
           .from(head2Head)
@@ -45,8 +45,8 @@ export const get5H2HMatchesService = async (
   page = 0,
 ): Promise<MatchPreview[]> => {
   return await withSpan(
-    "h2h.getMatches",
-    { "team.a": teamA, "team.b": teamB, "h2h.page": page },
+    "h2h.get5H2HMatches",
+    { "h2h.team_a": teamA, "h2h.team_b": teamB, "h2h.page": page },
     async () => {
       const [team1, team2] = pairOf(teamA, teamB);
       const where = or(
@@ -54,7 +54,7 @@ export const get5H2HMatchesService = async (
         and(eq(matchStats.homeTeam, team2), eq(matchStats.awayTeam, team1)),
       );
 
-      return await withDbSpan("match_stats", async (dbSpan) => {
+      return await withDbSpan("matchStats", async (dbSpan) => {
         const matches = await db
           .select({
             id: matchStats.id,
@@ -88,7 +88,7 @@ export const getUpcomingH2HService = async (
     "h2h.getUpcomingH2H",
     { "h2h.match_count": matchIds.length },
     async (span) => {
-      const matches = await withDbSpan("upcoming_matches", async (dbSpan) => {
+      const matches = await withDbSpan("upcomingMatches", async (dbSpan) => {
         const rows = await db
           .select({
             id: upcomingMatches.id,
@@ -105,7 +105,7 @@ export const getUpcomingH2HService = async (
 
       const pairs = matches.map((m) => pairOf(m.homeTeam, m.awayTeam));
 
-      const records = await withDbSpan("head_2_head", async (dbSpan) => {
+      const records = await withDbSpan("head2head", async (dbSpan) => {
         const result = await db
           .select()
           .from(head2Head)

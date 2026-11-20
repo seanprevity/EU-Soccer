@@ -37,6 +37,7 @@ import { updatePlayerImagesService } from "./management.imageService";
 import { ESPN_DELAY_MS, sleep } from "./management.espnService";
 import { env } from "../../config/env";
 import { TOP_PLAYER_CATEGORIES, TopPlayerCategory } from "@epl/shared";
+import { withDbSpan, withSpan } from "../../lib/span";
 
 const football_api_key = env.FOOTBALL_DATA_API_KEY;
 const odds_api_key = env.ODDS_API_KEY;
@@ -55,247 +56,345 @@ export const updateFutureMatchesService = async (
   competition: string,
   league: string,
 ) => {
-  try {
-    const today = new Date();
-    const dateTo = new Date();
-    dateTo.setDate(today.getDate() + 10);
-    const dateFromStr = today.toISOString().split("T")[0];
-    const dateToStr = dateTo.toISOString().split("T")[0];
-
-    const url = `${football_url}/competitions/${competition}/matches`;
-    const res = await axios.get(url, {
-      headers,
-      params: {
-        status: "SCHEDULED",
-        dateFrom: dateFromStr,
-        dateTo: dateToStr,
-      },
-    });
-    const data = res.data;
-
-    await db
-      .delete(upcomingMatches)
-      .where(lt(upcomingMatches.matchDate, new Date().toISOString()));
-
-    const listed = new Set<string>();
-    // Insert upcoming matches
-    for (const match of data["matches"]) {
-      const home = map_team(match["homeTeam"]["shortName"]);
-      const away = map_team(match["awayTeam"]["shortName"]);
-      const date = new Date(match["utcDate"]);
-      if (!home || !away || !date) continue;
-      listed.add(`${home}|${away}`);
-      await db
-        .insert(upcomingMatches)
-        .values({
-          homeTeam: home,
-          awayTeam: away,
-          matchDate: date.toISOString(),
-          league: league,
-        })
-        .onConflictDoUpdate({
-          target: [upcomingMatches.homeTeam, upcomingMatches.awayTeam],
-          set: { matchDate: date.toISOString() },
+  return await withSpan(
+    "management.updateFutureMatches",
+    { "management.competition": competition, "management.league": league },
+    async (span) => {
+      try {
+        const today = new Date();
+        const dateTo = new Date();
+        dateTo.setDate(today.getDate() + 10);
+        const dateFromStr = today.toISOString().split("T")[0];
+        const dateToStr = dateTo.toISOString().split("T")[0];
+        span.setAttributes({
+          "management.date_from": dateFromStr,
+          "management.date_to": dateToStr,
         });
-      await updateH2HService(home, away);
-    }
 
-    if (listed.size > 0) {
-      const stored = await db
-        .select({
-          id: upcomingMatches.id,
-          homeTeam: upcomingMatches.homeTeam,
-          awayTeam: upcomingMatches.awayTeam,
-        })
-        .from(upcomingMatches)
-        .where(eq(upcomingMatches.league, league));
+        const url = `${football_url}/competitions/${competition}/matches`;
+        const res = await axios.get(url, {
+          headers,
+          params: {
+            status: "SCHEDULED",
+            dateFrom: dateFromStr,
+            dateTo: dateToStr,
+          },
+        });
+        const data = res.data;
 
-      const staleIds: number[] = [];
-      for (const row of stored) {
-        if (!listed.has(`${row.homeTeam}|${row.awayTeam}`))
-          staleIds.push(row.id);
-      }
-      if (staleIds.length > 0) {
-        await db
-          .delete(upcomingMatches)
-          .where(inArray(upcomingMatches.id, staleIds));
-        console.log(
-          `[upcoming] removed ${staleIds.length} fixtures no longer listed for ${league}`,
+        await withDbSpan(
+          "upcomingMatches",
+          async () => {
+            await db
+              .delete(upcomingMatches)
+              .where(lt(upcomingMatches.matchDate, new Date().toISOString()));
+          },
+          "DELETE",
         );
-      }
-    }
 
-    return { success: true, count: data["matches"].length };
-  } catch (err: any) {
-    console.error("Match API error:", err.message);
-    throw new Error(err.message);
-  }
+        const listed = new Set<string>();
+        let unmapped = 0;
+        // Insert upcoming matches
+        for (const match of data["matches"]) {
+          const home = map_team(match["homeTeam"]["shortName"]);
+          const away = map_team(match["awayTeam"]["shortName"]);
+          const date = new Date(match["utcDate"]);
+          if (!home || !away || !date) {
+            unmapped++;
+            continue;
+          }
+          listed.add(`${home}|${away}`);
+          await withDbSpan(
+            "upcomingMatches",
+            async () => {
+              await db
+                .insert(upcomingMatches)
+                .values({
+                  homeTeam: home,
+                  awayTeam: away,
+                  matchDate: date.toISOString(),
+                  league: league,
+                })
+                .onConflictDoUpdate({
+                  target: [upcomingMatches.homeTeam, upcomingMatches.awayTeam],
+                  set: { matchDate: date.toISOString() },
+                });
+            },
+            "INSERT",
+          );
+          await updateH2HService(home, away);
+        }
+
+        let staleRemoved = 0;
+        if (listed.size > 0) {
+          const stored = await withDbSpan("upcomingMatches", async (dbSpan) => {
+            const result = await db
+              .select({
+                id: upcomingMatches.id,
+                homeTeam: upcomingMatches.homeTeam,
+                awayTeam: upcomingMatches.awayTeam,
+              })
+              .from(upcomingMatches)
+              .where(eq(upcomingMatches.league, league));
+            dbSpan.setAttribute("db.response.returned_rows", result.length);
+            return result;
+          });
+
+          const staleIds: number[] = [];
+          for (const row of stored) {
+            if (!listed.has(`${row.homeTeam}|${row.awayTeam}`))
+              staleIds.push(row.id);
+          }
+          if (staleIds.length > 0) {
+            await withDbSpan(
+              "upcomingMatches",
+              async () => {
+                await db
+                  .delete(upcomingMatches)
+                  .where(inArray(upcomingMatches.id, staleIds));
+              },
+              "DELETE",
+            );
+            staleRemoved = staleIds.length;
+            console.log(
+              `[upcoming] removed ${staleIds.length} fixtures no longer listed for ${league}`,
+            );
+          }
+        }
+
+        span.setAttribute("management.fixtures", data["matches"].length);
+        span.setAttribute("management.fixtures_unmapped", unmapped);
+        span.setAttribute("management.stale_removed", staleRemoved);
+
+        return { success: true, count: data["matches"].length };
+      } catch (err: any) {
+        console.error("Match API error:", err.message);
+        throw new Error(err.message);
+      }
+    },
+  );
 };
 
 // I want 10 future days available on the home page - update H2H for those matches as they come in
 export const updateH2HService = async (teamA: string, teamB: string) => {
-  try {
-    // normalizes teams so they will be in lexicographical order, not home vs away order
-    const [team1, team2] = [teamA, teamB].sort();
-    // Get all previous matches between team1 and team2 (both home/away swapped)
-    const h2hMatches = await db
-      .select({
-        id: matchStats.id,
-        HomeTeam: matchStats.homeTeam,
-        AwayTeam: matchStats.awayTeam,
-        FTHG: matchStats.fthg,
-        FTAG: matchStats.ftag,
-        MatchDate: matchStats.matchDate,
-      })
-      .from(matchStats)
-      .where(
-        or(
-          and(eq(matchStats.homeTeam, team1), eq(matchStats.awayTeam, team2)),
-          and(eq(matchStats.homeTeam, team2), eq(matchStats.awayTeam, team1)),
-        ),
-      )
-      .orderBy(desc(matchStats.matchDate));
+  return await withSpan(
+    "management.updateH2H",
+    { "management.team_a": teamA, "management.team_b": teamB },
+    async (span) => {
+      try {
+        // normalizes teams so they will be in lexicographical order, not home vs away order
+        const [team1, team2] = [teamA, teamB].sort();
+        // Get all previous matches between team1 and team2 (both home/away swapped)
+        const h2hMatches = await withDbSpan("matchStats", async (dbSpan) => {
+          const result = await db
+            .select({
+              id: matchStats.id,
+              HomeTeam: matchStats.homeTeam,
+              AwayTeam: matchStats.awayTeam,
+              FTHG: matchStats.fthg,
+              FTAG: matchStats.ftag,
+              MatchDate: matchStats.matchDate,
+            })
+            .from(matchStats)
+            .where(
+              or(
+                and(
+                  eq(matchStats.homeTeam, team1),
+                  eq(matchStats.awayTeam, team2),
+                ),
+                and(
+                  eq(matchStats.homeTeam, team2),
+                  eq(matchStats.awayTeam, team1),
+                ),
+              ),
+            )
+            .orderBy(desc(matchStats.matchDate));
+          dbSpan.setAttribute("db.response.returned_rows", result.length);
+          return result;
+        });
+        span.setAttribute("management.h2h_matches", h2hMatches.length);
 
-    if (h2hMatches.length === 0) {
-      console.log(`No H2H matches found between ${team1} and ${team2}`);
-      await db
-        .insert(head2Head)
-        .values({
-          team1: team1,
-          team2: team2,
-          mp: 0,
-          team1Wins: 0,
-          team2Wins: 0,
-          draws: 0,
-          last5: [],
-        })
-        .onConflictDoNothing();
-      return;
-    }
-    // console.log(h2hMatches);
-    let team1Wins = 0;
-    let team2Wins = 0;
-    let draws = 0;
+        if (h2hMatches.length === 0) {
+          console.log(`No H2H matches found between ${team1} and ${team2}`);
+          await withDbSpan(
+            "head2head",
+            async () => {
+              await db
+                .insert(head2Head)
+                .values({
+                  team1: team1,
+                  team2: team2,
+                  mp: 0,
+                  team1Wins: 0,
+                  team2Wins: 0,
+                  draws: 0,
+                  last5: [],
+                })
+                .onConflictDoNothing();
+            },
+            "INSERT",
+          );
+          return;
+        }
+        // console.log(h2hMatches);
+        let team1Wins = 0;
+        let team2Wins = 0;
+        let draws = 0;
 
-    // Go through each match and count results
-    for (const match of h2hMatches) {
-      const { HomeTeam, AwayTeam, FTHG, FTAG } = match;
-      if (FTHG === null || FTAG === null) continue;
-      if (FTHG === FTAG) {
-        draws++;
-      } else if (
-        (HomeTeam === team1 && FTHG > FTAG) ||
-        (AwayTeam === team1 && FTAG > FTHG)
-      ) {
-        team1Wins++;
-      } else {
-        team2Wins++;
+        // Go through each match and count results
+        for (const match of h2hMatches) {
+          const { HomeTeam, AwayTeam, FTHG, FTAG } = match;
+          if (FTHG === null || FTAG === null) continue;
+          if (FTHG === FTAG) {
+            draws++;
+          } else if (
+            (HomeTeam === team1 && FTHG > FTAG) ||
+            (AwayTeam === team1 && FTAG > FTHG)
+          ) {
+            team1Wins++;
+          } else {
+            team2Wins++;
+          }
+        }
+
+        // Prepare H2H summary
+        const matchesPlayed = h2hMatches.length;
+        const last5 = h2hMatches.slice(0, 5).map((m) => m.id); // last 5 match IDs
+
+        // Upsert
+        await withDbSpan(
+          "head2head",
+          async () => {
+            await db
+              .insert(head2Head)
+              .values({
+                team1: team1,
+                team2: team2,
+                mp: matchesPlayed,
+                team1Wins: team1Wins,
+                team2Wins: team2Wins,
+                draws: draws,
+                last5: last5,
+              })
+              .onConflictDoUpdate({
+                target: [head2Head.team1, head2Head.team2],
+                set: {
+                  mp: matchesPlayed,
+                  team1Wins: team1Wins,
+                  team2Wins: team2Wins,
+                  draws: draws,
+                  last5: last5,
+                },
+              });
+          },
+          "INSERT",
+        );
+        console.log(`Updated H2H for ${team1} vs ${team2}`);
+        return { success: true };
+      } catch (err) {
+        console.error("Error updating H2H:", err);
+        throw err;
       }
-    }
-
-    // Prepare H2H summary
-    const matchesPlayed = h2hMatches.length;
-    const last5 = h2hMatches.slice(0, 5).map((m) => m.id); // last 5 match IDs
-
-    // Upsert
-    await db
-      .insert(head2Head)
-      .values({
-        team1: team1,
-        team2: team2,
-        mp: matchesPlayed,
-        team1Wins: team1Wins,
-        team2Wins: team2Wins,
-        draws: draws,
-        last5: last5,
-      })
-      .onConflictDoUpdate({
-        target: [head2Head.team1, head2Head.team2],
-        set: {
-          mp: matchesPlayed,
-          team1Wins: team1Wins,
-          team2Wins: team2Wins,
-          draws: draws,
-          last5: last5,
-        },
-      });
-    console.log(`Updated H2H for ${team1} vs ${team2}`);
-    return { success: true };
-  } catch (err) {
-    console.error("Error updating H2H:", err);
-    throw err;
-  }
+    },
+  );
 };
 
 // update recent form from last 5 away/home/total matches using matchStats db
 export const updateRecentFormService = async (team: string, season: number) => {
-  // get season matches from a team - update recent_gf, recent_ga, form in standings table
-  try {
-    const startDate = new Date(Date.UTC(season, 7, 1)); // aug 1
-    const endDate = new Date(Date.UTC(season + 1, 6, 1)); // july 1
-    const matches = await db
-      .select({
-        HomeTeam: matchStats.homeTeam,
-        AwayTeam: matchStats.awayTeam,
-        FTHG: matchStats.fthg,
-        FTAG: matchStats.ftag,
-        MatchDate: matchStats.matchDate,
-      })
-      .from(matchStats)
-      .where(
-        and(
-          or(eq(matchStats.homeTeam, team), eq(matchStats.awayTeam, team)),
-          gt(matchStats.matchDate, startDate.toISOString()),
-          lt(matchStats.matchDate, endDate.toISOString()),
-        ),
-      )
-      .orderBy(desc(matchStats.matchDate));
-    if (!matches.length) return;
+  return await withSpan(
+    "management.updateRecentForm",
+    { "management.team": team, "management.season": season },
+    async (span) => {
+      // get season matches from a team - update recent_gf, recent_ga, form in standings table
+      try {
+        const startDate = new Date(Date.UTC(season, 7, 1)); // aug 1
+        const endDate = new Date(Date.UTC(season + 1, 6, 1)); // july 1
+        const matches = await withDbSpan("matchStats", async (dbSpan) => {
+          const result = await db
+            .select({
+              HomeTeam: matchStats.homeTeam,
+              AwayTeam: matchStats.awayTeam,
+              FTHG: matchStats.fthg,
+              FTAG: matchStats.ftag,
+              MatchDate: matchStats.matchDate,
+            })
+            .from(matchStats)
+            .where(
+              and(
+                or(
+                  eq(matchStats.homeTeam, team),
+                  eq(matchStats.awayTeam, team),
+                ),
+                gt(matchStats.matchDate, startDate.toISOString()),
+                lt(matchStats.matchDate, endDate.toISOString()),
+              ),
+            )
+            .orderBy(desc(matchStats.matchDate));
+          dbSpan.setAttribute("db.response.returned_rows", result.length);
+          return result;
+        });
+        span.setAttribute("management.matches", matches.length);
+        if (!matches.length) return;
 
-    const homeMatches = matches.filter((m) => m.HomeTeam === team).slice(0, 5);
-    const awayMatches = matches.filter((m) => m.AwayTeam === team).slice(0, 5);
-    const totalMatches = matches.slice(0, 5);
+        const homeMatches = matches
+          .filter((m) => m.HomeTeam === team)
+          .slice(0, 5);
+        const awayMatches = matches
+          .filter((m) => m.AwayTeam === team)
+          .slice(0, 5);
+        const totalMatches = matches.slice(0, 5);
 
-    const calcForm = async (games: typeof matches, type: string) => {
-      if (!games.length) return;
-      let gf = 0,
-        ga = 0,
-        form = "";
-      for (const m of games) {
-        if (m.FTHG == null || m.FTAG == null) continue;
-        const isHome = m.HomeTeam === team;
-        gf += isHome ? m.FTHG : m.FTAG;
-        ga += isHome ? m.FTAG : m.FTHG;
-        if (m.FTHG === m.FTAG) form += "D";
-        else if ((isHome && m.FTHG > m.FTAG) || (!isHome && m.FTAG > m.FTHG))
-          form += "W";
-        else form += "L";
+        const calcForm = async (games: typeof matches, type: string) => {
+          if (!games.length) return;
+          let gf = 0,
+            ga = 0,
+            form = "";
+          for (const m of games) {
+            if (m.FTHG == null || m.FTAG == null) continue;
+            const isHome = m.HomeTeam === team;
+            gf += isHome ? m.FTHG : m.FTAG;
+            ga += isHome ? m.FTAG : m.FTHG;
+            if (m.FTHG === m.FTAG) form += "D";
+            else if (
+              (isHome && m.FTHG > m.FTAG) ||
+              (!isHome && m.FTAG > m.FTHG)
+            )
+              form += "W";
+            else form += "L";
+          }
+          await withDbSpan(
+            "standings",
+            async () => {
+              await db
+                .update(standings)
+                .set({
+                  recentGf: gf,
+                  recentGa: ga,
+                  form: form.split("").reverse().join(""),
+                })
+                .where(
+                  and(
+                    eq(standings.name, team),
+                    eq(standings.season, String(season)),
+                    eq(standings.type, type),
+                  ),
+                );
+            },
+            "UPDATE",
+          );
+        };
+
+        await calcForm(totalMatches, "TOTAL");
+        await calcForm(homeMatches, "HOME");
+        await calcForm(awayMatches, "AWAY");
+
+        console.log(`Updated recent form for ${team}`);
+      } catch (err: any) {
+        console.log(`Error updating recent form for ${team}, `, err);
+        throw err;
       }
-      await db
-        .update(standings)
-        .set({
-          recentGf: gf,
-          recentGa: ga,
-          form: form.split("").reverse().join(""),
-        })
-        .where(
-          and(
-            eq(standings.name, team),
-            eq(standings.season, String(season)),
-            eq(standings.type, type),
-          ),
-        );
-    };
-
-    await calcForm(totalMatches, "TOTAL");
-    await calcForm(homeMatches, "HOME");
-    await calcForm(awayMatches, "AWAY");
-
-    console.log(`Updated recent form for ${team}`);
-  } catch (err: any) {
-    console.log(`Error updating recent form for ${team}, `, err);
-    throw err;
-  }
+    },
+  );
 };
 
 // updates standings for a league/season, gives home standings, away standings, total standings
@@ -306,345 +405,457 @@ export const updateStandingsService = async (
   // Fetch all matches for this league + season
   const startDate = new Date(Date.UTC(Number(season), 7, 1)); // aug 1
   const endDate = new Date(Date.UTC(Number(season) + 1, 6, 1)); // july 1
-  const seasonMatches = await db
-    .select()
-    .from(matchStats)
-    .where(
-      and(
-        eq(matchStats.league, league),
-        gt(matchStats.matchDate, startDate.toISOString()),
-        lt(matchStats.matchDate, endDate.toISOString()),
-      ),
-    );
 
-  // Initialize table per team
-  const table: Record<
-    string, // team name
+  return await withSpan(
+    "management.updateStandings",
     {
-      HOME: StandingsStats;
-      AWAY: StandingsStats;
-      TOTAL: StandingsStats;
-    }
-  > = {};
+      "management.league": league,
+      "management.season": season,
+      "management.season_start": startDate.toISOString(),
+      "management.season_end": endDate.toISOString(),
+    },
+    async (span) => {
+      const seasonMatches = await withDbSpan("matchStats", async (dbSpan) => {
+        const result = await db
+          .select()
+          .from(matchStats)
+          .where(
+            and(
+              eq(matchStats.league, league),
+              gt(matchStats.matchDate, startDate.toISOString()),
+              lt(matchStats.matchDate, endDate.toISOString()),
+            ),
+          );
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
 
-  for (const match of seasonMatches) {
-    for (const team of [match.homeTeam, match.awayTeam]) {
-      if (!table[team]) {
-        table[team] = {
-          HOME: {
-            played: 0,
-            won: 0,
-            draw: 0,
-            lost: 0,
-            goalsFor: 0,
-            goalsAgainst: 0,
-            points: 0,
-          },
-          AWAY: {
-            played: 0,
-            won: 0,
-            draw: 0,
-            lost: 0,
-            goalsFor: 0,
-            goalsAgainst: 0,
-            points: 0,
-          },
-          TOTAL: {
-            played: 0,
-            won: 0,
-            draw: 0,
-            lost: 0,
-            goalsFor: 0,
-            goalsAgainst: 0,
-            points: 0,
-          },
-        };
+      // Initialize table per team
+      const table: Record<
+        string, // team name
+        {
+          HOME: StandingsStats;
+          AWAY: StandingsStats;
+          TOTAL: StandingsStats;
+        }
+      > = {};
+
+      for (const match of seasonMatches) {
+        for (const team of [match.homeTeam, match.awayTeam]) {
+          if (!table[team]) {
+            table[team] = {
+              HOME: {
+                played: 0,
+                won: 0,
+                draw: 0,
+                lost: 0,
+                goalsFor: 0,
+                goalsAgainst: 0,
+                points: 0,
+              },
+              AWAY: {
+                played: 0,
+                won: 0,
+                draw: 0,
+                lost: 0,
+                goalsFor: 0,
+                goalsAgainst: 0,
+                points: 0,
+              },
+              TOTAL: {
+                played: 0,
+                won: 0,
+                draw: 0,
+                lost: 0,
+                goalsFor: 0,
+                goalsAgainst: 0,
+                points: 0,
+              },
+            };
+          }
+        }
       }
-    }
-  }
 
-  // Compute stats
-  for (const match of seasonMatches) {
-    const home = table[match.homeTeam];
-    const away = table[match.awayTeam];
+      // Compute stats
+      for (const match of seasonMatches) {
+        const home = table[match.homeTeam];
+        const away = table[match.awayTeam];
 
-    // Update HOME stats
-    home.HOME.played += 1;
-    home.HOME.goalsFor += match.fthg ?? 0;
-    home.HOME.goalsAgainst += match.ftag ?? 0;
+        // Update HOME stats
+        home.HOME.played += 1;
+        home.HOME.goalsFor += match.fthg ?? 0;
+        home.HOME.goalsAgainst += match.ftag ?? 0;
 
-    // Update AWAY stats
-    away.AWAY.played += 1;
-    away.AWAY.goalsFor += match.ftag ?? 0;
-    away.AWAY.goalsAgainst += match.fthg ?? 0;
+        // Update AWAY stats
+        away.AWAY.played += 1;
+        away.AWAY.goalsFor += match.ftag ?? 0;
+        away.AWAY.goalsAgainst += match.fthg ?? 0;
 
-    // Update TOTAL stats
-    home.TOTAL.played += 1;
-    home.TOTAL.goalsFor += match.fthg ?? 0;
-    home.TOTAL.goalsAgainst += match.ftag ?? 0;
+        // Update TOTAL stats
+        home.TOTAL.played += 1;
+        home.TOTAL.goalsFor += match.fthg ?? 0;
+        home.TOTAL.goalsAgainst += match.ftag ?? 0;
 
-    away.TOTAL.played += 1;
-    away.TOTAL.goalsFor += match.ftag ?? 0;
-    away.TOTAL.goalsAgainst += match.fthg ?? 0;
+        away.TOTAL.played += 1;
+        away.TOTAL.goalsFor += match.ftag ?? 0;
+        away.TOTAL.goalsAgainst += match.fthg ?? 0;
 
-    // Determine result
-    if ((match.fthg ?? 0) > (match.ftag ?? 0)) {
-      home.HOME.won += 1;
-      home.HOME.points += 3;
-      away.AWAY.lost += 1;
+        // Determine result
+        if ((match.fthg ?? 0) > (match.ftag ?? 0)) {
+          home.HOME.won += 1;
+          home.HOME.points += 3;
+          away.AWAY.lost += 1;
 
-      home.TOTAL.won += 1;
-      home.TOTAL.points += 3;
-      away.TOTAL.lost += 1;
-    } else if ((match.fthg ?? 0) < (match.ftag ?? 0)) {
-      away.AWAY.won += 1;
-      away.AWAY.points += 3;
-      home.HOME.lost += 1;
+          home.TOTAL.won += 1;
+          home.TOTAL.points += 3;
+          away.TOTAL.lost += 1;
+        } else if ((match.fthg ?? 0) < (match.ftag ?? 0)) {
+          away.AWAY.won += 1;
+          away.AWAY.points += 3;
+          home.HOME.lost += 1;
 
-      away.TOTAL.won += 1;
-      away.TOTAL.points += 3;
-      home.TOTAL.lost += 1;
-    } else {
-      home.HOME.draw += 1;
-      away.AWAY.draw += 1;
-      home.HOME.points += 1;
-      away.AWAY.points += 1;
+          away.TOTAL.won += 1;
+          away.TOTAL.points += 3;
+          home.TOTAL.lost += 1;
+        } else {
+          home.HOME.draw += 1;
+          away.AWAY.draw += 1;
+          home.HOME.points += 1;
+          away.AWAY.points += 1;
 
-      home.TOTAL.draw += 1;
-      away.TOTAL.draw += 1;
-      home.TOTAL.points += 1;
-      away.TOTAL.points += 1;
-    }
-  }
+          home.TOTAL.draw += 1;
+          away.TOTAL.draw += 1;
+          home.TOTAL.points += 1;
+          away.TOTAL.points += 1;
+        }
+      }
 
-  // Insert into DB per type
-  for (const [team, stats] of Object.entries(table)) {
-    for (const type of ["HOME", "AWAY", "TOTAL"] as const) {
-      const row = stats[type];
-      await db
-        .insert(standings)
-        .values({
-          name: team,
-          league: league,
-          season: season,
-          type: type,
-          position: 0, // temp val
-          played: row.played,
-          won: row.won,
-          draw: row.draw,
-          lost: row.lost,
-          goalsFor: row.goalsFor,
-          goalsAgainst: row.goalsAgainst,
-          goalDifference: row.goalsFor - row.goalsAgainst,
-          points: row.points,
-        })
-        .onConflictDoUpdate({
-          target: [standings.name, standings.season, standings.type],
-          set: {
-            played: row.played,
-            won: row.won,
-            draw: row.draw,
-            lost: row.lost,
-            goalsFor: row.goalsFor,
-            goalsAgainst: row.goalsAgainst,
-            goalDifference: row.goalsFor - row.goalsAgainst,
-            points: row.points,
-          },
+      span.setAttribute("management.matches", seasonMatches.length);
+      span.setAttribute("management.teams", Object.keys(table).length);
+
+      // Insert into DB per type (one statement per row, so one batch span for the loop)
+      await withDbSpan(
+        "standings",
+        async (dbSpan) => {
+          let statements = 0;
+          for (const [team, stats] of Object.entries(table)) {
+            for (const type of ["HOME", "AWAY", "TOTAL"] as const) {
+              const row = stats[type];
+              await db
+                .insert(standings)
+                .values({
+                  name: team,
+                  league: league,
+                  season: season,
+                  type: type,
+                  position: 0, // temp val
+                  played: row.played,
+                  won: row.won,
+                  draw: row.draw,
+                  lost: row.lost,
+                  goalsFor: row.goalsFor,
+                  goalsAgainst: row.goalsAgainst,
+                  goalDifference: row.goalsFor - row.goalsAgainst,
+                  points: row.points,
+                })
+                .onConflictDoUpdate({
+                  target: [standings.name, standings.season, standings.type],
+                  set: {
+                    played: row.played,
+                    won: row.won,
+                    draw: row.draw,
+                    lost: row.lost,
+                    goalsFor: row.goalsFor,
+                    goalsAgainst: row.goalsAgainst,
+                    goalDifference: row.goalsFor - row.goalsAgainst,
+                    points: row.points,
+                  },
+                });
+              statements++;
+            }
+          }
+          dbSpan.setAttribute("db.operation.batch.size", statements);
+        },
+        "INSERT",
+      );
+
+      for (const type of ["TOTAL", "AWAY", "HOME"]) {
+        const standingsRows = await withDbSpan("standings", async (dbSpan) => {
+          const result = await db
+            .select()
+            .from(standings)
+            .where(
+              and(
+                eq(standings.league, league),
+                eq(standings.season, season),
+                eq(standings.type, type),
+              ),
+            );
+          dbSpan.setAttribute("db.response.returned_rows", result.length);
+          return result;
         });
-    }
-  }
+        // Sort and update positions
+        standingsRows.sort((a, b) => {
+          if (b.points !== a.points) return b.points - a.points;
+          if (b.goalDifference !== a.goalDifference)
+            return b.goalDifference - a.goalDifference;
+          return b.goalsFor - a.goalsFor;
+        });
 
-  for (const type of ["TOTAL", "AWAY", "HOME"]) {
-    const standingsRows = await db
-      .select()
-      .from(standings)
-      .where(
-        and(
-          eq(standings.league, league),
-          eq(standings.season, season),
-          eq(standings.type, type),
+        await withDbSpan(
+          "standings",
+          async (dbSpan) => {
+            dbSpan.setAttribute(
+              "db.operation.batch.size",
+              standingsRows.length,
+            );
+            await Promise.all(
+              standingsRows.map((row, i) =>
+                db
+                  .update(standings)
+                  .set({ position: i + 1 })
+                  .where(eq(standings.id, row.id)),
+              ),
+            );
+          },
+          "UPDATE",
+        );
+      }
+
+      // update every teams recent form
+      await Promise.all(
+        Object.keys(table).map((team) =>
+          updateRecentFormService(team, Number(season)),
         ),
       );
-    // Sort and update positions
-    standingsRows.sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.goalDifference !== a.goalDifference)
-        return b.goalDifference - a.goalDifference;
-      return b.goalsFor - a.goalsFor;
-    });
-
-    await Promise.all(
-      standingsRows.map((row, i) =>
-        db
-          .update(standings)
-          .set({ position: i + 1 })
-          .where(eq(standings.id, row.id)),
-      ),
-    );
-  }
-
-  // update every teams recent form
-  await Promise.all(
-    Object.keys(table).map((team) =>
-      updateRecentFormService(team, Number(season)),
-    ),
+      return { success: true };
+    },
   );
-  return { success: true };
 };
 
 // Current-season leaderboards for one league, built from the squad table.
 // called after leagueSquadService finishes
 export const updateTopPlayersService = async (league: string) => {
-  const rows = await db
-    .select({
-      player: squad.player,
-      team: squad.team,
-      appearances: squad.appearances,
-      goals: squad.goals,
-      assists: squad.assists,
-      saves: squad.saves,
-      yellowCards: squad.yellowCards,
-      redCards: squad.redCards,
-    })
-    .from(squad)
-    .where(and(eq(squad.league, league), eq(squad.statsSeason, curSeason)));
-
-  // No current-season squad data means the sync hasn't run or failed: keep what's stored
-  if (!rows.length) {
-    console.warn(
-      `Top players: no ${curSeason} squad stats for ${league}, left unchanged`,
-    );
-    return { league, season: curSeason, rows: 0 };
-  }
-
-  const entries: (typeof topPlayers.$inferInsert)[] = [];
-
-  for (const [category, column] of Object.entries(TOP_PLAYER_CATEGORIES) as [
-    TopPlayerCategory,
-    (typeof TOP_PLAYER_CATEGORIES)[TopPlayerCategory],
-  ][]) {
-    // A player listed at two clubs in the same league keeps his higher figure
-    const best = new Map<string, (typeof rows)[number]>();
-    for (const r of rows) {
-      if (!r.player || !r.team || !r[column]) continue; // skips null and 0
-      const prev = best.get(r.player);
-      if (!prev || r[column]! > prev[column]!) best.set(r.player, r);
-    }
-
-    const ranked = [...best.values()].sort((a, b) => b[column]! - a[column]!);
-    // Top 10, plus anyone tied with 10th place
-    const cutoff = ranked[TOP_N - 1]?.[column];
-    const top =
-      cutoff == null ? ranked : ranked.filter((r) => r[column]! >= cutoff);
-
-    for (const r of top)
-      entries.push({
-        player: r.player!,
-        team: r.team!,
-        league,
-        season: curSeason,
-        category,
-        value: r[column]!,
-        appearances: r.appearances,
+  return await withSpan(
+    "management.updateTopPlayers",
+    { "management.league": league, "management.season": curSeason },
+    async (span) => {
+      const rows = await withDbSpan("squad", async (dbSpan) => {
+        const result = await db
+          .select({
+            player: squad.player,
+            team: squad.team,
+            appearances: squad.appearances,
+            goals: squad.goals,
+            assists: squad.assists,
+            saves: squad.saves,
+            yellowCards: squad.yellowCards,
+            redCards: squad.redCards,
+          })
+          .from(squad)
+          .where(
+            and(eq(squad.league, league), eq(squad.statsSeason, curSeason)),
+          );
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
       });
-  }
 
-  await db.transaction(async (tx) => {
-    await tx
-      .delete(topPlayers)
-      .where(
-        and(eq(topPlayers.league, league), eq(topPlayers.season, curSeason)),
+      // No current-season squad data means the sync hasn't run or failed: keep what's stored
+      if (!rows.length) {
+        console.warn(
+          `Top players: no ${curSeason} squad stats for ${league}, left unchanged`,
+        );
+        span.setAttribute("management.entries", 0);
+        return { league, season: curSeason, rows: 0 };
+      }
+
+      const entries: (typeof topPlayers.$inferInsert)[] = [];
+
+      for (const [category, column] of Object.entries(
+        TOP_PLAYER_CATEGORIES,
+      ) as [
+        TopPlayerCategory,
+        (typeof TOP_PLAYER_CATEGORIES)[TopPlayerCategory],
+      ][]) {
+        // A player listed at two clubs in the same league keeps his higher figure
+        const best = new Map<string, (typeof rows)[number]>();
+        for (const r of rows) {
+          if (!r.player || !r.team || !r[column]) continue; // skips null and 0
+          const prev = best.get(r.player);
+          if (!prev || r[column]! > prev[column]!) best.set(r.player, r);
+        }
+
+        const ranked = [...best.values()].sort(
+          (a, b) => b[column]! - a[column]!,
+        );
+        // Top 10, plus anyone tied with 10th place
+        const cutoff = ranked[TOP_N - 1]?.[column];
+        const top =
+          cutoff == null ? ranked : ranked.filter((r) => r[column]! >= cutoff);
+
+        for (const r of top)
+          entries.push({
+            player: r.player!,
+            team: r.team!,
+            league,
+            season: curSeason,
+            category,
+            value: r[column]!,
+            appearances: r.appearances,
+          });
+      }
+
+      await db.transaction(async (tx) => {
+        await withDbSpan(
+          "topPlayers",
+          async () => {
+            await tx
+              .delete(topPlayers)
+              .where(
+                and(
+                  eq(topPlayers.league, league),
+                  eq(topPlayers.season, curSeason),
+                ),
+              );
+          },
+          "DELETE",
+        );
+        if (entries.length) {
+          await withDbSpan(
+            "topPlayers",
+            async () => {
+              await tx.insert(topPlayers).values(entries);
+            },
+            "INSERT",
+          );
+        }
+      });
+
+      span.setAttribute("management.entries", entries.length);
+      console.log(
+        `Top players: ${entries.length} rows for ${league} ${curSeason}`,
       );
-    if (entries.length) await tx.insert(topPlayers).values(entries);
-  });
-
-  console.log(`Top players: ${entries.length} rows for ${league} ${curSeason}`);
-  return { league, season: curSeason, rows: entries.length };
+      return { league, season: curSeason, rows: entries.length };
+    },
+  );
 };
 
 // Service to fetch and store odds
 export const updateOddsService = async (sport: string) => {
-  const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds`;
-  try {
-    const res = await axios.get(url, {
-      params: {
-        regions: "uk,us",
-        markets: "h2h",
-        apiKey: odds_api_key,
-        oddsFormat: "decimal",
-      },
-    });
-    const data = res.data;
+  return await withSpan(
+    "management.updateOdds",
+    { "management.sport": sport },
+    async (span) => {
+      const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds`;
+      try {
+        const res = await axios.get(url, {
+          params: {
+            regions: "uk,us",
+            markets: "h2h",
+            apiKey: odds_api_key,
+            oddsFormat: "decimal",
+          },
+        });
+        const data = res.data;
 
-    for (const item of data) {
-      // normalize names to db names
-      const normalizedHome = map_team_name(
-        ODDS_MAP.get(item["home_team"]) ?? item["home_team"],
-      );
-      const normalizedAway = map_team_name(
-        ODDS_MAP.get(item["away_team"]) ?? item["away_team"],
-      );
+        let unmatched = 0;
+        let stored = 0;
+        let writeFailures = 0;
 
-      // Step 2: find corresponding match in DB
-      const match = await db.query.upcomingMatches.findFirst({
-        where: and(
-          eq(upcomingMatches.homeTeam, normalizedHome),
-          eq(upcomingMatches.awayTeam, normalizedAway),
-        ),
-        orderBy: (m: any) => m.matchDate,
-      });
-
-      const matchId = match?.id ?? null;
-      if (!matchId) {
-        console.warn(`No match found for ${normalizedHome}-${normalizedAway}`);
-        continue;
-      }
-
-      // Step 3: loop through bookmakers
-      for (const bk of item["bookmakers"] ?? []) {
-        if (!bookmakers.includes(bk["title"])) continue;
-
-        const h2hMarket = bk["markets"]?.find((m: any) => m["key"] === "h2h");
-        if (!h2hMarket) continue;
-
-        const outcomes = Object.fromEntries(
-          h2hMarket["outcomes"].map((o: any) => [o["name"], o["price"]]),
-        );
-
-        // Step 4: upsert odds into DB
-        try {
-          await db
-            .insert(odds)
-            .values({
-              match: matchId,
-              bookmaker: bk["title"],
-              marketType: "h2h",
-              oddsAway: outcomes[item["away_team"]],
-              oddsDraw: outcomes["Draw"],
-              oddsHome: outcomes[item["home_team"]],
-            })
-            .onConflictDoUpdate({
-              target: [odds.match, odds.bookmaker],
-              set: {
-                oddsHome: outcomes[item["home_team"]],
-                oddsDraw: outcomes["Draw"],
-                oddsAway: outcomes[item["away_team"]],
-                updatedAt: new Date().toISOString(),
-              },
-            });
-          console.log(
-            `Stored odds for ${normalizedHome}-${normalizedAway} (${bk["title"]})`,
+        for (const item of data) {
+          // normalize names to db names
+          const normalizedHome = map_team_name(
+            ODDS_MAP.get(item["home_team"]) ?? item["home_team"],
           );
-        } catch (err) {
-          console.error(`DB error on ${matchId} (${bk["title"]}):`, err);
+          const normalizedAway = map_team_name(
+            ODDS_MAP.get(item["away_team"]) ?? item["away_team"],
+          );
+
+          // Step 2: find corresponding match in DB
+          const match = await withDbSpan("upcomingMatches", async (dbSpan) => {
+            const result = await db.query.upcomingMatches.findFirst({
+              where: and(
+                eq(upcomingMatches.homeTeam, normalizedHome),
+                eq(upcomingMatches.awayTeam, normalizedAway),
+              ),
+              orderBy: (m: any) => m.matchDate,
+            });
+            dbSpan.setAttribute("db.response.returned_rows", result ? 1 : 0);
+            return result;
+          });
+
+          const matchId = match?.id ?? null;
+          if (!matchId) {
+            console.warn(
+              `No match found for ${normalizedHome}-${normalizedAway}`,
+            );
+            unmatched++;
+            continue;
+          }
+
+          // Step 3: loop through bookmakers
+          for (const bk of item["bookmakers"] ?? []) {
+            if (!bookmakers.includes(bk["title"])) continue;
+
+            const h2hMarket = bk["markets"]?.find(
+              (m: any) => m["key"] === "h2h",
+            );
+            if (!h2hMarket) continue;
+
+            const outcomes = Object.fromEntries(
+              h2hMarket["outcomes"].map((o: any) => [o["name"], o["price"]]),
+            );
+
+            // Step 4: upsert odds into DB
+            try {
+              await withDbSpan(
+                "odds",
+                async () => {
+                  await db
+                    .insert(odds)
+                    .values({
+                      match: matchId,
+                      bookmaker: bk["title"],
+                      marketType: "h2h",
+                      oddsAway: outcomes[item["away_team"]],
+                      oddsDraw: outcomes["Draw"],
+                      oddsHome: outcomes[item["home_team"]],
+                    })
+                    .onConflictDoUpdate({
+                      target: [odds.match, odds.bookmaker],
+                      set: {
+                        oddsHome: outcomes[item["home_team"]],
+                        oddsDraw: outcomes["Draw"],
+                        oddsAway: outcomes[item["away_team"]],
+                        updatedAt: new Date().toISOString(),
+                      },
+                    });
+                },
+                "INSERT",
+              );
+              stored++;
+              console.log(
+                `Stored odds for ${normalizedHome}-${normalizedAway} (${bk["title"]})`,
+              );
+            } catch (err) {
+              writeFailures++;
+              console.error(`DB error on ${matchId} (${bk["title"]}):`, err);
+            }
+          }
         }
+
+        span.setAttribute("management.events", data.length);
+        span.setAttribute("management.events_unmatched", unmatched);
+        span.setAttribute("management.odds_stored", stored);
+        span.setAttribute("management.odds_write_failures", writeFailures);
+
+        return { success: true };
+      } catch (err: any) {
+        console.error("Odds API error:", err.message);
+        throw new Error(err.message);
       }
-    }
-    return { success: true };
-  } catch (err: any) {
-    console.error("Odds API error:", err.message);
-    throw new Error(err.message);
-  }
+    },
+  );
 };
 
 const excluded = (column: string) => sql.raw(`excluded.${column}`);
@@ -682,108 +893,143 @@ export const updateSquadService = async (
   espnLeague: string,
   espnTeamId: string,
 ) => {
-  const res = await espn.get(`/${espnLeague}/teams/${espnTeamId}/roster`);
-  if (res.status !== 200)
-    throw new Error(`ESPN roster ${espnLeague}/${espnTeamId} → ${res.status}`);
+  return await withSpan(
+    "management.updateSquad",
+    {
+      "management.team": team,
+      "management.league": league,
+      "management.espn_league": espnLeague,
+      "management.espn_team_id": espnTeamId,
+    },
+    async (span) => {
+      const res = await espn.get(`/${espnLeague}/teams/${espnTeamId}/roster`);
+      if (res.status !== 200)
+        throw new Error(
+          `ESPN roster ${espnLeague}/${espnTeamId} → ${res.status}`,
+        );
 
-  const athletes: any[] = (res.data?.athletes ?? [])
-    .flatMap((a: any) => a.items ?? [a])
-    .filter((a: any) => a.displayName);
-  if (!athletes.length) {
-    console.warn(`ESPN: empty roster for ${team}, squad left unchanged`);
-    return { team, players: 0 };
-  }
+      const athletes: any[] = (res.data?.athletes ?? [])
+        .flatMap((a: any) => a.items ?? [a])
+        .filter((a: any) => a.displayName);
+      if (!athletes.length) {
+        console.warn(`ESPN: empty roster for ${team}, squad left unchanged`);
+        span.setAttribute("management.players", 0);
+        return { team, players: 0 };
+      }
 
-  const now = new Date().toISOString();
-  const statsSeason = String(res.data?.season?.year ?? curSeason);
+      const now = new Date().toISOString();
+      const statsSeason = String(res.data?.season?.year ?? curSeason);
 
-  // One row per name: a duplicate inside one upsert statement is a Postgres error
-  const byName = new Map<string, any>();
-  for (const a of athletes) byName.set(a.displayName, a);
+      // One row per name: a duplicate inside one upsert statement is a Postgres error
+      const byName = new Map<string, any>();
+      for (const a of athletes) byName.set(a.displayName, a);
 
-  const rows = [...byName.values()].map((a) => ({
-    player: a.displayName as string,
-    team,
-    league,
-    espnId: String(a.id),
-    position: a.position?.name ?? null,
-    number: toInt(a.jersey),
-    nationality: a.citizenship ?? null,
-    nationalityCode: a.citizenshipCountry?.abbreviation ?? null,
-    flagUrl: a.flag?.href ?? null,
-    dateOfBirth: a.dateOfBirth ? String(a.dateOfBirth).slice(0, 10) : null,
-    heightIn: toInt(a.height),
-    weightLbs: toInt(a.weight),
-    statsSeason,
-    ...rosterStats(a),
-    updatedAt: now,
-  }));
-  const names = rows.map((r) => r.player);
+      const rows = [...byName.values()].map((a) => ({
+        player: a.displayName as string,
+        team,
+        league,
+        espnId: String(a.id),
+        position: a.position?.name ?? null,
+        number: toInt(a.jersey),
+        nationality: a.citizenship ?? null,
+        nationalityCode: a.citizenshipCountry?.abbreviation ?? null,
+        flagUrl: a.flag?.href ?? null,
+        dateOfBirth: a.dateOfBirth ? String(a.dateOfBirth).slice(0, 10) : null,
+        heightIn: toInt(a.height),
+        weightLbs: toInt(a.weight),
+        statsSeason,
+        ...rosterStats(a),
+        updatedAt: now,
+      }));
+      const names = rows.map((r) => r.player);
 
-  await db.transaction(async (tx) => {
-    await tx
-      .insert(players)
-      .values(
-        rows.map((r) => ({
-          name: r.player,
-          imageUrl: byName.get(r.player)?.headshot?.href ?? null,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: players.name,
-        set: {
-          imageUrl: sql`coalesce(${players.imageUrl}, excluded.image_url)`,
-        },
+      span.setAttribute("management.players", rows.length);
+      span.setAttribute("management.stats_season", statsSeason);
+
+      await db.transaction(async (tx) => {
+        await withDbSpan(
+          "players",
+          async () => {
+            await tx
+              .insert(players)
+              .values(
+                rows.map((r) => ({
+                  name: r.player,
+                  imageUrl: byName.get(r.player)?.headshot?.href ?? null,
+                })),
+              )
+              .onConflictDoUpdate({
+                target: players.name,
+                set: {
+                  imageUrl: sql`coalesce(${players.imageUrl}, excluded.image_url)`,
+                },
+              });
+          },
+          "INSERT",
+        );
+
+        await withDbSpan(
+          "squad",
+          async () => {
+            await tx
+              .delete(squad)
+              .where(
+                and(
+                  eq(squad.team, team),
+                  or(isNull(squad.position), ne(squad.position, "Coach")),
+                  notInArray(squad.player, names),
+                ),
+              );
+          },
+          "DELETE",
+        );
+
+        await withDbSpan(
+          "squad",
+          async () => {
+            await tx
+              .insert(squad)
+              .values(rows)
+              .onConflictDoUpdate({
+                target: [squad.player, squad.team],
+                set: {
+                  league: excluded("league"),
+                  espnId: excluded("espn_id"),
+                  position: excluded("position"),
+                  number: excluded("number"),
+                  nationality: excluded("nationality"),
+                  nationalityCode: excluded("nationality_code"),
+                  flagUrl: excluded("flag_url"),
+                  dateOfBirth: excluded("date_of_birth"),
+                  heightIn: excluded("height_in"),
+                  weightLbs: excluded("weight_lbs"),
+                  statsSeason: excluded("stats_season"),
+                  appearances: excluded("appearances"),
+                  subIns: excluded("sub_ins"),
+                  goals: excluded("goals"),
+                  assists: excluded("assists"),
+                  ownGoals: excluded("own_goals"),
+                  shots: excluded("shots"),
+                  shotsOnTarget: excluded("shots_on_target"),
+                  yellowCards: excluded("yellow_cards"),
+                  redCards: excluded("red_cards"),
+                  foulsCommitted: excluded("fouls_committed"),
+                  foulsSuffered: excluded("fouls_suffered"),
+                  offsides: excluded("offsides"),
+                  saves: excluded("saves"),
+                  goalsConceded: excluded("goals_conceded"),
+                  updatedAt: excluded("updated_at"),
+                },
+              });
+          },
+          "INSERT",
+        );
       });
 
-    await tx
-      .delete(squad)
-      .where(
-        and(
-          eq(squad.team, team),
-          or(isNull(squad.position), ne(squad.position, "Coach")),
-          notInArray(squad.player, names),
-        ),
-      );
-
-    await tx
-      .insert(squad)
-      .values(rows)
-      .onConflictDoUpdate({
-        target: [squad.player, squad.team],
-        set: {
-          league: excluded("league"),
-          espnId: excluded("espn_id"),
-          position: excluded("position"),
-          number: excluded("number"),
-          nationality: excluded("nationality"),
-          nationalityCode: excluded("nationality_code"),
-          flagUrl: excluded("flag_url"),
-          dateOfBirth: excluded("date_of_birth"),
-          heightIn: excluded("height_in"),
-          weightLbs: excluded("weight_lbs"),
-          statsSeason: excluded("stats_season"),
-          appearances: excluded("appearances"),
-          subIns: excluded("sub_ins"),
-          goals: excluded("goals"),
-          assists: excluded("assists"),
-          ownGoals: excluded("own_goals"),
-          shots: excluded("shots"),
-          shotsOnTarget: excluded("shots_on_target"),
-          yellowCards: excluded("yellow_cards"),
-          redCards: excluded("red_cards"),
-          foulsCommitted: excluded("fouls_committed"),
-          foulsSuffered: excluded("fouls_suffered"),
-          offsides: excluded("offsides"),
-          saves: excluded("saves"),
-          goalsConceded: excluded("goals_conceded"),
-          updatedAt: excluded("updated_at"),
-        },
-      });
-  });
-
-  console.log(`Squad updated for ${team} (${rows.length} players)`);
-  return { team, players: rows.length };
+      console.log(`Squad updated for ${team} (${rows.length} players)`);
+      return { team, players: rows.length };
+    },
+  );
 };
 
 // Every team in a league: one teams request, then one roster request per team
@@ -791,42 +1037,63 @@ export const updateLeagueSquadsService = async (
   league: string,
   espnLeague: string,
 ) => {
-  const res = await espn.get(`/${espnLeague}/teams`);
-  if (res.status !== 200)
-    throw new Error(`ESPN teams ${espnLeague} → ${res.status}`);
-  const espnTeams: any[] =
-    res.data?.sports?.[0]?.leagues?.[0]?.teams?.map((t: any) => t.team) ?? [];
+  return await withSpan(
+    "management.updateLeagueSquads",
+    { "management.league": league, "management.espn_league": espnLeague },
+    async (span) => {
+      const res = await espn.get(`/${espnLeague}/teams`);
+      if (res.status !== 200)
+        throw new Error(`ESPN teams ${espnLeague} → ${res.status}`);
+      const espnTeams: any[] =
+        res.data?.sports?.[0]?.leagues?.[0]?.teams?.map((t: any) => t.team) ??
+        [];
 
-  const known = new Set(
-    (await db.select({ name: teams.teamName }).from(teams)).map((t) => t.name),
+      const teamRows = await withDbSpan("teams", async (dbSpan) => {
+        const result = await db.select({ name: teams.teamName }).from(teams);
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+      const known = new Set(teamRows.map((t) => t.name));
+
+      const results = [];
+      let unmapped = 0;
+      let failed = 0;
+      for (const t of espnTeams) {
+        const team = espnTeam(t.displayName);
+        if (!known.has(team)) {
+          console.warn(
+            `No DB team for "${t.displayName}" (mapped to "${team}"), skipped`,
+          );
+          unmapped++;
+          continue;
+        }
+        await sleep(ESPN_DELAY_MS);
+        try {
+          results.push(
+            await updateSquadService(team, league, espnLeague, String(t.id)),
+          );
+        } catch (err: any) {
+          console.warn(`Squad update failed for ${team}: ${err.message}`);
+          failed++;
+        }
+      }
+      await updateTopPlayersService(league);
+
+      // Images for new players
+      let images = null;
+      try {
+        images = await updatePlayerImagesService(league);
+      } catch (err: any) {
+        console.warn(`Player images failed for ${league}: ${err.message}`);
+      }
+
+      span.setAttribute("management.espn_teams", espnTeams.length);
+      span.setAttribute("management.squads_updated", results.length);
+      span.setAttribute("management.squads_failed", failed);
+      span.setAttribute("management.teams_unmapped", unmapped);
+      span.setAttribute("management.images_ran", images !== null);
+
+      return { teams: results, images };
+    },
   );
-
-  const results = [];
-  for (const t of espnTeams) {
-    const team = espnTeam(t.displayName);
-    if (!known.has(team)) {
-      console.warn(
-        `No DB team for "${t.displayName}" (mapped to "${team}"), skipped`,
-      );
-      continue;
-    }
-    await sleep(ESPN_DELAY_MS);
-    try {
-      results.push(
-        await updateSquadService(team, league, espnLeague, String(t.id)),
-      );
-    } catch (err: any) {
-      console.warn(`Squad update failed for ${team}: ${err.message}`);
-    }
-  }
-  await updateTopPlayersService(league);
-
-  // Images for new players
-  let images = null;
-  try {
-    images = await updatePlayerImagesService(league);
-  } catch (err: any) {
-    console.warn(`Player images failed for ${league}: ${err.message}`);
-  }
-  return { teams: results, images };
 };

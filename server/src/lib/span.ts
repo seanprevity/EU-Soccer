@@ -1,4 +1,11 @@
-import { trace, SpanStatusCode, type Attributes, type Span } from "@opentelemetry/api";
+import {
+  trace,
+  SpanStatusCode,
+  type Attributes,
+  type Span,
+} from "@opentelemetry/api";
+
+type DbOperation = "SELECT" | "INSERT" | "UPDATE" | "DELETE";
 
 const tracer = trace.getTracer("epl");
 
@@ -34,11 +41,12 @@ export async function withSpan<T>(
 export function withDbSpan<T>(
   table: string,
   work: (span: Span) => PromiseLike<T>,
+  operation: DbOperation = "SELECT",
 ): Promise<T> {
   const attributes: Attributes = {
     "db.system.name": "postgresql",
-    "db.operation.name": "SELECT",
+    "db.operation.name": operation,
     "db.collection.name": table,
   };
-  return withSpan(`db.select ${table}`, attributes, work);
+  return withSpan(`db.${operation.toLowerCase()} ${table}`, attributes, work);
 }

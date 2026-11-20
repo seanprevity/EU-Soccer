@@ -6,15 +6,31 @@ import {
   TopPlayerCategory,
   TopPlayerEntry,
 } from "@epl/shared";
+import { withDbSpan, withSpan } from "../../lib/span";
 
 export const getSquadService = async (
   team: string,
 ): Promise<SquadPlayerWithImage[]> => {
-  return await db
-    .select({ ...getTableColumns(squad), imageUrl: players.imageUrl })
-    .from(squad)
-    .leftJoin(players, eq(players.name, squad.player))
-    .where(eq(squad.team, team));
+  return await withSpan(
+    "squad.getSquad",
+    { "squad.team": team },
+    async (span) => {
+      const result = await withDbSpan("squad", async (dbSpan) => {
+        const result = await db
+          .select({ ...getTableColumns(squad), imageUrl: players.imageUrl })
+          .from(squad)
+          .leftJoin(players, eq(players.name, squad.player))
+          .where(eq(squad.team, team));
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+
+      const withoutImage = result.filter((p) => p.imageUrl === null).length;
+      span.setAttribute("squad.players_without_image", withoutImage);
+
+      return result;
+    },
+  );
 };
 
 export const getTopPlayersService = async (
@@ -22,29 +38,43 @@ export const getTopPlayersService = async (
   season: string,
   category: TopPlayerCategory,
 ): Promise<TopPlayerEntry[]> => {
-  return await db
-    .select({
-      player: topPlayers.player,
-      team: topPlayers.team,
-      value: topPlayers.value,
-      appearances: topPlayers.appearances,
-      imageUrl: sql<
-        string | null
-      >`coalesce(${players.imageUrl}, ${topPlayers.imageUrl})`,
-    })
-    .from(topPlayers)
-    .leftJoin(players, eq(players.name, topPlayers.player))
-    .where(
-      and(
-        eq(topPlayers.league, league),
-        eq(topPlayers.season, season),
-        eq(topPlayers.category, category),
-      ),
-    )
-    .orderBy(
-      desc(topPlayers.value),
-      asc(topPlayers.appearances),
-      asc(topPlayers.player),
-    )
-    .limit(10);
+  return await withSpan(
+    "squad.getTopPlayers",
+    {
+      "squad.league": league,
+      "squad.season": season,
+      "squad.category": category,
+    },
+    async () => {
+      return await withDbSpan("topPlayers", async (dbSpan) => {
+        const result = await db
+          .select({
+            player: topPlayers.player,
+            team: topPlayers.team,
+            value: topPlayers.value,
+            appearances: topPlayers.appearances,
+            imageUrl: sql<
+              string | null
+            >`coalesce(${players.imageUrl}, ${topPlayers.imageUrl})`,
+          })
+          .from(topPlayers)
+          .leftJoin(players, eq(players.name, topPlayers.player))
+          .where(
+            and(
+              eq(topPlayers.league, league),
+              eq(topPlayers.season, season),
+              eq(topPlayers.category, category),
+            ),
+          )
+          .orderBy(
+            desc(topPlayers.value),
+            asc(topPlayers.appearances),
+            asc(topPlayers.player),
+          )
+          .limit(10);
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+    },
+  );
 };

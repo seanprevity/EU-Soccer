@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosInstance } from "axios";
 import { and, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { db } from "../../lib/db";
 import {
@@ -18,34 +18,45 @@ import {
   TeamLineup,
 } from "@epl/shared";
 import { recordEspnRequest } from "../../lib/metrics";
+import { withDbSpan, withSpan } from "../../lib/span";
+
+// Count every ESPN request made through this instance, by endpoint and outcome
+function countEspnRequests(instance: AxiosInstance): AxiosInstance {
+  instance.interceptors.response.use(
+    (response) => {
+      recordEspnRequest(
+        `${response.config.baseURL ?? ""}${response.config.url ?? ""}`,
+        "ok",
+      );
+      return response;
+    },
+    (error) => {
+      recordEspnRequest(
+        `${error.config?.baseURL ?? ""}${error.config?.url ?? ""}`,
+        "error",
+      );
+      return Promise.reject(error);
+    },
+  );
+  return instance;
+}
 
 // Site API: scoreboards and match summaries. Also used by the squad sync.
-export const espn = axios.create({
-  baseURL: "https://site.web.api.espn.com/apis/site/v2/sports/soccer",
-  validateStatus: (status) => status < 500,
-});
-
-// Count every ESPN request by endpoint and outcome
-espn.interceptors.response.use(
-  (response) => {
-    recordEspnRequest(
-      `${response.config.baseURL ?? ""}${response.config.url ?? ""}`,
-      "ok",
-    );
-    return response;
-  },
-  (error) => {
-    recordEspnRequest(
-      `${error.config?.baseURL ?? ""}${error.config?.url ?? ""}`,
-      "error",
-    );
-    return Promise.reject(error);
-  },
+export const espn = countEspnRequests(
+  axios.create({
+    baseURL: "https://site.web.api.espn.com/apis/site/v2/sports/soccer",
+    validateStatus: (status) => status < 500,
+  }),
 );
 
 // Core API: detailed team statistics for one match, including xG
 const ESPN_CORE_URL =
   "https://sports.core.api.espn.com/v2/sports/soccer/leagues";
+
+// Its own instance so core requests are counted too
+const espnCore = countEspnRequests(
+  axios.create({ validateStatus: (status) => status < 500 }),
+);
 
 export const ESPN_DELAY_MS = 1000;
 
@@ -153,25 +164,33 @@ export async function fetchScoreboard(
   espnLeague: string,
   date: string,
 ): Promise<EspnMatch[] | null> {
-  const response = await espn.get(`/${espnLeague}/scoreboard`, {
-    params: { dates: date },
-  });
-  if (response.status !== 200) {
-    console.warn(
-      `ESPN scoreboard ${espnLeague} ${date} → ${response.status}`,
-      response.data,
-    );
-    return null;
-  }
+  return await withSpan(
+    "espn.fetchScoreboard",
+    { "espn.league": espnLeague, "espn.date": date },
+    async (span) => {
+      const response = await espn.get(`/${espnLeague}/scoreboard`, {
+        params: { dates: date },
+      });
+      span.setAttribute("espn.status_code", response.status);
+      if (response.status !== 200) {
+        console.warn(
+          `ESPN scoreboard ${espnLeague} ${date} → ${response.status}`,
+          response.data,
+        );
+        return null;
+      }
 
-  const matches: EspnMatch[] = [];
-  for (const event of response.data?.events ?? []) {
-    const match = parseEspnEvent(event);
-    if (match) {
-      matches.push(match);
-    }
-  }
-  return matches;
+      const matches: EspnMatch[] = [];
+      for (const event of response.data?.events ?? []) {
+        const match = parseEspnEvent(event);
+        if (match) {
+          matches.push(match);
+        }
+      }
+      span.setAttribute("espn.matches", matches.length);
+      return matches;
+    },
+  );
 }
 
 // One match's summary: lineups (rosters), substitutions and assists (keyEvents),
@@ -180,17 +199,24 @@ export async function fetchSummary(
   espnLeague: string,
   eventId: string,
 ): Promise<any | null> {
-  const response = await espn.get(`/${espnLeague}/summary`, {
-    params: { event: eventId },
-  });
-  if (response.status !== 200) {
-    console.warn(
-      `ESPN summary ${espnLeague} ${eventId} → ${response.status}`,
-      response.data,
-    );
-    return null;
-  }
-  return response.data;
+  return await withSpan(
+    "espn.fetchSummary",
+    { "espn.league": espnLeague, "espn.event_id": eventId },
+    async (span) => {
+      const response = await espn.get(`/${espnLeague}/summary`, {
+        params: { event: eventId },
+      });
+      span.setAttribute("espn.status_code", response.status);
+      if (response.status !== 200) {
+        console.warn(
+          `ESPN summary ${espnLeague} ${eventId} → ${response.status}`,
+          response.data,
+        );
+        return null;
+      }
+      return response.data;
+    },
+  );
 }
 
 // One team's statistics for one match from the core API. This is the only source of xG.
@@ -199,25 +225,37 @@ async function fetchCoreTeamStats(
   eventId: string,
   teamId: string,
 ): Promise<StatValues | null> {
-  const url = `${ESPN_CORE_URL}/${espnLeague}/events/${eventId}/competitions/${eventId}/competitors/${teamId}/statistics`;
-  const response = await axios.get(url, {
-    validateStatus: (status) => status < 500,
-  });
-  if (response.status !== 200) {
-    console.warn(`ESPN core stats ${eventId}/${teamId} → ${response.status}`);
-    return null;
-  }
-
-  // Stats are grouped into categories, flatten them
-  const stats: StatValues = {};
-  for (const category of response.data?.splits?.categories ?? []) {
-    for (const stat of category.stats ?? []) {
-      if (Number.isFinite(stat.value)) {
-        stats[stat.name] = stat.value;
+  return await withSpan(
+    "espn.fetchCoreTeamStats",
+    {
+      "espn.league": espnLeague,
+      "espn.event_id": eventId,
+      "espn.team_id": teamId,
+    },
+    async (span) => {
+      const url = `${ESPN_CORE_URL}/${espnLeague}/events/${eventId}/competitions/${eventId}/competitors/${teamId}/statistics`;
+      const response = await espnCore.get(url);
+      span.setAttribute("espn.status_code", response.status);
+      if (response.status !== 200) {
+        console.warn(
+          `ESPN core stats ${eventId}/${teamId} → ${response.status}`,
+        );
+        return null;
       }
-    }
-  }
-  return stats;
+
+      // Stats are grouped into categories, flatten them
+      const stats: StatValues = {};
+      for (const category of response.data?.splits?.categories ?? []) {
+        for (const stat of category.stats ?? []) {
+          if (Number.isFinite(stat.value)) {
+            stats[stat.name] = stat.value;
+          }
+        }
+      }
+      span.setAttribute("espn.has_xg", stats.expectedGoals != null);
+      return stats;
+    },
+  );
 }
 
 // Scoreboard parsing
@@ -422,22 +460,38 @@ export async function fetchConfirmedLineups(
   espnLeague: string,
   eventId: string,
 ): Promise<MatchLineups | null> {
-  const summary = await fetchSummary(espnLeague, eventId);
-  if (!summary) return null;
+  return await withSpan(
+    "espn.fetchConfirmedLineups",
+    { "espn.league": espnLeague, "espn.event_id": eventId },
+    async (span) => {
+      const summary = await fetchSummary(espnLeague, eventId);
+      if (!summary) {
+        span.setAttribute("espn.outcome", "no_summary");
+        return null;
+      }
 
-  const lineups = parseLineups(summary);
-  if (!lineups || !hasPlacedStarters(lineups)) return null;
+      const lineups = parseLineups(summary);
+      if (!lineups || !hasPlacedStarters(lineups)) {
+        span.setAttribute("espn.outcome", "not_published");
+        return null;
+      }
 
-  const homeStarters = lineups.home.players.filter(
-    (player) => player.starter,
-  ).length;
-  const awayStarters = lineups.away.players.filter(
-    (player) => player.starter,
-  ).length;
-  if (homeStarters < 11 || awayStarters < 11) return null;
+      const homeStarters = lineups.home.players.filter(
+        (player) => player.starter,
+      ).length;
+      const awayStarters = lineups.away.players.filter(
+        (player) => player.starter,
+      ).length;
+      if (homeStarters < 11 || awayStarters < 11) {
+        span.setAttribute("espn.outcome", "incomplete_starters");
+        return null;
+      }
 
-  await fillMissingHeadshots(lineups);
-  return lineups;
+      await fillMissingHeadshots(lineups);
+      span.setAttribute("espn.outcome", "confirmed");
+      return lineups;
+    },
+  );
 }
 
 // "Assisted by Bukayo Saka with a cross." == "Bukayo Saka"
@@ -502,21 +556,34 @@ async function fillMissingHeadshots(lineups: MatchLineups): Promise<void> {
     return;
   }
 
-  const rows = await db
-    .select({ name: players.name, imageUrl: players.imageUrl })
-    .from(players)
-    .where(inArray(players.name, namesWithoutHeadshot));
+  await withSpan(
+    "espn.fillMissingHeadshots",
+    { "espn.headshots_missing": namesWithoutHeadshot.length },
+    async (span) => {
+      const rows = await withDbSpan("players", async (dbSpan) => {
+        const result = await db
+          .select({ name: players.name, imageUrl: players.imageUrl })
+          .from(players)
+          .where(inArray(players.name, namesWithoutHeadshot));
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
 
-  const imageByName = new Map<string, string | null>();
-  for (const row of rows) {
-    imageByName.set(row.name, row.imageUrl);
-  }
+      const imageByName = new Map<string, string | null>();
+      for (const row of rows) {
+        imageByName.set(row.name, row.imageUrl);
+      }
 
-  for (const player of allPlayers) {
-    if (!player.headshot) {
-      player.headshot = imageByName.get(player.name) ?? null;
-    }
-  }
+      let filled = 0;
+      for (const player of allPlayers) {
+        if (!player.headshot) {
+          player.headshot = imageByName.get(player.name) ?? null;
+          if (player.headshot) filled++;
+        }
+      }
+      span.setAttribute("espn.headshots_filled", filled);
+    },
+  );
 }
 
 // Stat columns shared by matchStats and liveMatches
@@ -639,10 +706,19 @@ export function toLiveRow(
 
 // Inserts the row, or updates the existing row for the same ESPN match.
 export async function upsertLiveMatch(row: NewLiveMatch): Promise<void> {
-  await db
-    .insert(liveMatches)
-    .values(row)
-    .onConflictDoUpdate({ target: liveMatches.espnId, set: withoutNulls(row) });
+  await withDbSpan(
+    "liveMatches",
+    async () => {
+      await db
+        .insert(liveMatches)
+        .values(row)
+        .onConflictDoUpdate({
+          target: liveMatches.espnId,
+          set: withoutNulls(row),
+        });
+    },
+    "INSERT",
+  );
 }
 
 export async function copyFirstHalfToMatchStats(
@@ -650,18 +726,42 @@ export async function copyFirstHalfToMatchStats(
 ): Promise<void> {
   if (espnIds.length === 0) return;
 
-  const rows = await db
-    .select({ espnId: liveMatches.espnId, firstHalf: liveMatches.firstHalf })
-    .from(liveMatches)
-    .where(inArray(liveMatches.espnId, espnIds));
+  await withSpan(
+    "espn.copyFirstHalfToMatchStats",
+    { "espn.match_count": espnIds.length },
+    async (span) => {
+      const rows = await withDbSpan("liveMatches", async (dbSpan) => {
+        const result = await db
+          .select({
+            espnId: liveMatches.espnId,
+            firstHalf: liveMatches.firstHalf,
+          })
+          .from(liveMatches)
+          .where(inArray(liveMatches.espnId, espnIds));
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
 
-  for (const row of rows) {
-    if (!row.firstHalf) continue;
-    await db
-      .update(matchStats)
-      .set({ firstHalf: row.firstHalf })
-      .where(eq(matchStats.espnId, row.espnId));
-  }
+      // One statement per match, so one batch span for the loop
+      await withDbSpan(
+        "matchStats",
+        async (dbSpan) => {
+          let statements = 0;
+          for (const row of rows) {
+            if (!row.firstHalf) continue;
+            await db
+              .update(matchStats)
+              .set({ firstHalf: row.firstHalf })
+              .where(eq(matchStats.espnId, row.espnId));
+            statements++;
+          }
+          dbSpan.setAttribute("db.operation.batch.size", statements);
+          span.setAttribute("espn.first_halves_copied", statements);
+        },
+        "UPDATE",
+      );
+    },
+  );
 }
 
 // Finished matches (daily import)
@@ -696,53 +796,69 @@ async function findStoredMatch(
   kickoff: string,
 ) {
   const day = kickoff.slice(0, 10);
-  const [row] = await db
-    .select()
-    .from(matchStats)
-    .where(
-      or(
-        eq(matchStats.espnId, espnId),
-        and(
-          isNull(matchStats.espnId),
-          eq(matchStats.homeTeam, homeTeam),
-          eq(matchStats.awayTeam, awayTeam),
-          gte(matchStats.matchDate, `${day}T00:00:00.000Z`),
-          lt(matchStats.matchDate, `${day}T23:59:59.999Z`),
+  const [row] = await withDbSpan("matchStats", async (dbSpan) => {
+    const result = await db
+      .select()
+      .from(matchStats)
+      .where(
+        or(
+          eq(matchStats.espnId, espnId),
+          and(
+            isNull(matchStats.espnId),
+            eq(matchStats.homeTeam, homeTeam),
+            eq(matchStats.awayTeam, awayTeam),
+            gte(matchStats.matchDate, `${day}T00:00:00.000Z`),
+            lt(matchStats.matchDate, `${day}T23:59:59.999Z`),
+          ),
         ),
-      ),
-    )
-    .limit(1);
+      )
+      .limit(1);
+    dbSpan.setAttribute("db.response.returned_rows", result.length);
+    return result;
+  });
   return row;
 }
 
-// Completed matches between `since` and `to`: inserts new ones and fills in anything missing.
-// `refresh` re-fetches matches that are already complete.
-export async function importEspnMatchesService(
+// What happened to one scoreboard match during the import
+type ImportOutcome =
+  | "not_finished"
+  | "unknown_team"
+  | "missing_score"
+  | "already_complete"
+  | "inserted"
+  | "updated";
+
+const IMPORT_OUTCOMES: ImportOutcome[] = [
+  "not_finished",
+  "unknown_team",
+  "missing_score",
+  "already_complete",
+  "inserted",
+  "updated",
+];
+
+// Imports one scoreboard match (the body of the old import loop, unchanged apart from
+// `continue` becoming `return <outcome>`)
+async function importMatch(
   league: string,
   espnLeague: string,
-  since: Date,
-  options: { refresh?: boolean; to?: Date } = {},
-) {
-  const refresh = options.refresh ?? false;
-  const to = options.to ?? new Date();
-
-  const teamRows = await db.select({ name: teams.teamName }).from(teams);
-  const knownTeams = new Set(teamRows.map((row) => row.name));
-
-  let inserted = 0;
-  let updated = 0;
-
-  for (const date of utcDaysBetween(since, to)) {
-    const matches = await fetchScoreboard(espnLeague, date);
-    await sleep(ESPN_DELAY_MS);
-    if (!matches) {
-      continue;
-    }
-
-    for (const match of matches) {
+  match: EspnMatch,
+  knownTeams: Set<string>,
+  refresh: boolean,
+): Promise<ImportOutcome> {
+  return await withSpan(
+    "espn.importMatch",
+    {
+      "espn.event_id": match.id,
+      "espn.home_team": match.home,
+      "espn.away_team": match.away,
+      "espn.status": match.statusName,
+    },
+    async (span) => {
       // Only matches that finished with a result
       if (!match.completed || SKIP_STATUSES.has(match.statusName)) {
-        continue;
+        span.setAttribute("espn.outcome", "not_finished");
+        return "not_finished";
       }
 
       // Never create teams from ESPN names: an unmapped name would split one club into two
@@ -750,14 +866,18 @@ export async function importEspnMatchesService(
         console.warn(
           `ESPN import: unknown team in "${match.rawHome} vs ${match.rawAway}" (mapped to "${match.home}" / "${match.away}"), add it to ESPN_MAP`,
         );
-        continue;
+        span.setAttribute("espn.raw_home_team", match.rawHome);
+        span.setAttribute("espn.raw_away_team", match.rawAway);
+        span.setAttribute("espn.outcome", "unknown_team");
+        return "unknown_team";
       }
 
       if (match.homeScore == null || match.awayScore == null || !match.date) {
         console.warn(
           `ESPN import: ${match.home} vs ${match.away} has no score or date, skipped`,
         );
-        continue;
+        span.setAttribute("espn.outcome", "missing_score");
+        return "missing_score";
       }
 
       // Skip matches we already have in full, unless refreshing
@@ -775,7 +895,8 @@ export async function importEspnMatchesService(
         hasPlacedStarters(storedMatch.lineups) &&
         storedMatch.hxg != null;
       if (alreadyComplete && !refresh) {
-        continue;
+        span.setAttribute("espn.outcome", "already_complete");
+        return "already_complete";
       }
 
       // Fetch the details: summary for lineups, subs and assists; core stats for xG
@@ -853,19 +974,100 @@ export async function importEspnMatchesService(
         lineups,
       };
 
-      if (storedMatch) {
-        await db
-          .update(matchStats)
-          .set(withoutNulls(row))
-          .where(eq(matchStats.id, storedMatch.id));
-        updated++;
-      } else {
-        await db.insert(matchStats).values(row);
-        inserted++;
-      }
-    }
-  }
+      span.setAttribute("espn.has_summary", summary != null);
+      span.setAttribute("espn.has_lineups", lineups != null);
+      span.setAttribute("espn.has_xg", row.hxg != null && row.axg != null);
+      span.setAttribute("espn.timeline_complete", timelineIsComplete);
 
-  console.log(`ESPN import ${league}: ${inserted} new, ${updated} updated`);
-  return { inserted, updated };
+      if (storedMatch) {
+        await withDbSpan(
+          "matchStats",
+          async () => {
+            await db
+              .update(matchStats)
+              .set(withoutNulls(row))
+              .where(eq(matchStats.id, storedMatch.id));
+          },
+          "UPDATE",
+        );
+        span.setAttribute("espn.outcome", "updated");
+        return "updated";
+      }
+
+      await withDbSpan(
+        "matchStats",
+        async () => {
+          await db.insert(matchStats).values(row);
+        },
+        "INSERT",
+      );
+      span.setAttribute("espn.outcome", "inserted");
+      return "inserted";
+    },
+  );
+}
+
+// Completed matches between `since` and `to`: inserts new ones and fills in anything missing.
+// `refresh` re-fetches matches that are already complete.
+export async function importEspnMatchesService(
+  league: string,
+  espnLeague: string,
+  since: Date,
+  options: { refresh?: boolean; to?: Date } = {},
+) {
+  const refresh = options.refresh ?? false;
+  const to = options.to ?? new Date();
+  const days = utcDaysBetween(since, to);
+
+  return await withSpan(
+    "espn.importMatches",
+    {
+      "espn.league": league,
+      "espn.espn_league": espnLeague,
+      "espn.since": since.toISOString(),
+      "espn.to": to.toISOString(),
+      "espn.refresh": refresh,
+      "espn.days": days.length,
+    },
+    async (span) => {
+      const teamRows = await withDbSpan("teams", async (dbSpan) => {
+        const result = await db.select({ name: teams.teamName }).from(teams);
+        dbSpan.setAttribute("db.response.returned_rows", result.length);
+        return result;
+      });
+      const knownTeams = new Set(teamRows.map((row) => row.name));
+
+      // How many matches ended up in each outcome
+      const outcomes = new Map<ImportOutcome, number>();
+      for (const outcome of IMPORT_OUTCOMES) outcomes.set(outcome, 0);
+
+      for (const date of days) {
+        const matches = await fetchScoreboard(espnLeague, date);
+        await sleep(ESPN_DELAY_MS);
+        if (!matches) {
+          continue;
+        }
+
+        for (const match of matches) {
+          const outcome = await importMatch(
+            league,
+            espnLeague,
+            match,
+            knownTeams,
+            refresh,
+          );
+          outcomes.set(outcome, (outcomes.get(outcome) ?? 0) + 1);
+        }
+      }
+
+      for (const [outcome, count] of outcomes) {
+        span.setAttribute(`espn.matches_${outcome}`, count);
+      }
+
+      const inserted = outcomes.get("inserted") ?? 0;
+      const updated = outcomes.get("updated") ?? 0;
+      console.log(`ESPN import ${league}: ${inserted} new, ${updated} updated`);
+      return { inserted, updated };
+    },
+  );
 }
