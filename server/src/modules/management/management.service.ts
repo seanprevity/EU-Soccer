@@ -38,6 +38,7 @@ import { ESPN_DELAY_MS, sleep } from "./management.espnService";
 import { env } from "../../config/env";
 import { TOP_PLAYER_CATEGORIES, TopPlayerCategory } from "@epl/shared";
 import { withDbSpan, withSpan } from "../../lib/span";
+import { AnyPgColumn } from "drizzle-orm/pg-core";
 
 const football_api_key = env.FOOTBALL_DATA_API_KEY;
 const odds_api_key = env.ODDS_API_KEY;
@@ -48,6 +49,13 @@ const espn = axios.create({
   validateStatus: (s) => s < 500,
 });
 const TOP_N = 10;
+
+// The value from the row being inserted, for ON CONFLICT DO UPDATE (quotes camelCase names)
+const fromExcluded = (column: AnyPgColumn) =>
+  sql`excluded.${sql.identifier(column.name)}`;
+// keeps the stored value when the new one is null
+const fromExcludedOrKeep = (column: AnyPgColumn) =>
+  sql`coalesce(excluded.${sql.identifier(column.name)}, ${column})`;
 
 // NOTE: RUN UPDATEMATCHSERVICE FIRST THEN UPDATESTANDINGSSERVICE
 
@@ -299,110 +307,11 @@ export const updateH2HService = async (teamA: string, teamB: string) => {
   );
 };
 
-// update recent form from last 5 away/home/total matches using matchStats db
-export const updateRecentFormService = async (team: string, season: number) => {
-  return await withSpan(
-    "management.updateRecentForm",
-    { "management.team": team, "management.season": season },
-    async (span) => {
-      // get season matches from a team - update recent_gf, recent_ga, form in standings table
-      try {
-        const startDate = new Date(Date.UTC(season, 7, 1)); // aug 1
-        const endDate = new Date(Date.UTC(season + 1, 6, 1)); // july 1
-        const matches = await withDbSpan("matchStats", async (dbSpan) => {
-          const result = await db
-            .select({
-              HomeTeam: matchStats.homeTeam,
-              AwayTeam: matchStats.awayTeam,
-              FTHG: matchStats.fthg,
-              FTAG: matchStats.ftag,
-              MatchDate: matchStats.matchDate,
-            })
-            .from(matchStats)
-            .where(
-              and(
-                or(
-                  eq(matchStats.homeTeam, team),
-                  eq(matchStats.awayTeam, team),
-                ),
-                gt(matchStats.matchDate, startDate.toISOString()),
-                lt(matchStats.matchDate, endDate.toISOString()),
-              ),
-            )
-            .orderBy(desc(matchStats.matchDate));
-          dbSpan.setAttribute("db.response.returned_rows", result.length);
-          return result;
-        });
-        span.setAttribute("management.matches", matches.length);
-        if (!matches.length) return;
-
-        const homeMatches = matches
-          .filter((m) => m.HomeTeam === team)
-          .slice(0, 5);
-        const awayMatches = matches
-          .filter((m) => m.AwayTeam === team)
-          .slice(0, 5);
-        const totalMatches = matches.slice(0, 5);
-
-        const calcForm = async (games: typeof matches, type: string) => {
-          if (!games.length) return;
-          let gf = 0,
-            ga = 0,
-            form = "";
-          for (const m of games) {
-            if (m.FTHG == null || m.FTAG == null) continue;
-            const isHome = m.HomeTeam === team;
-            gf += isHome ? m.FTHG : m.FTAG;
-            ga += isHome ? m.FTAG : m.FTHG;
-            if (m.FTHG === m.FTAG) form += "D";
-            else if (
-              (isHome && m.FTHG > m.FTAG) ||
-              (!isHome && m.FTAG > m.FTHG)
-            )
-              form += "W";
-            else form += "L";
-          }
-          await withDbSpan(
-            "standings",
-            async () => {
-              await db
-                .update(standings)
-                .set({
-                  recentGf: gf,
-                  recentGa: ga,
-                  form: form.split("").reverse().join(""),
-                })
-                .where(
-                  and(
-                    eq(standings.name, team),
-                    eq(standings.season, String(season)),
-                    eq(standings.type, type),
-                  ),
-                );
-            },
-            "UPDATE",
-          );
-        };
-
-        await calcForm(totalMatches, "TOTAL");
-        await calcForm(homeMatches, "HOME");
-        await calcForm(awayMatches, "AWAY");
-
-        console.log(`Updated recent form for ${team}`);
-      } catch (err: any) {
-        console.log(`Error updating recent form for ${team}, `, err);
-        throw err;
-      }
-    },
-  );
-};
-
 // updates standings for a league/season, gives home standings, away standings, total standings
 export const updateStandingsService = async (
   league: string,
   season: string,
 ) => {
-  // Fetch all matches for this league + season
   const startDate = new Date(Date.UTC(Number(season), 7, 1)); // aug 1
   const endDate = new Date(Date.UTC(Number(season) + 1, 6, 1)); // july 1
 
@@ -415,6 +324,7 @@ export const updateStandingsService = async (
       "management.season_end": endDate.toISOString(),
     },
     async (span) => {
+      // Fetch all matches for this league + season
       const seasonMatches = await withDbSpan("matchStats", async (dbSpan) => {
         const result = await db
           .select()
@@ -530,104 +440,118 @@ export const updateStandingsService = async (
         }
       }
 
+      // Newest first, for recent form (ISO dates sort correctly as text)
+      const newestFirst = [...seasonMatches].sort((a, b) =>
+        (b.matchDate ?? "").localeCompare(a.matchDate ?? ""),
+      );
+
+      // One row per team and type, with its position and recent form
+      const rows: (typeof standings.$inferInsert)[] = [];
+      for (const type of ["HOME", "AWAY", "TOTAL"] as const) {
+        // Sort by points, then goal difference, then goals for (same order as before)
+        const teamsInOrder = Object.keys(table).sort((teamA, teamB) => {
+          const a = table[teamA][type];
+          const b = table[teamB][type];
+          if (b.points !== a.points) return b.points - a.points;
+          const differenceA = a.goalsFor - a.goalsAgainst;
+          const differenceB = b.goalsFor - b.goalsAgainst;
+          if (differenceB !== differenceA) return differenceB - differenceA;
+          if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+          // Level on everything -> sort lexicographically for deterministic return
+          return teamA.localeCompare(teamB);
+        });
+
+        teamsInOrder.forEach((team, index) => {
+          const row = table[team][type];
+
+          // The team's last 5 matches of this type, newest first
+          const games: typeof seasonMatches = [];
+          for (const match of newestFirst) {
+            if (games.length === 5) break;
+            const isHome = match.homeTeam === team;
+            const isAway = match.awayTeam === team;
+            if (type === "HOME" && !isHome) continue;
+            if (type === "AWAY" && !isAway) continue;
+            if (type === "TOTAL" && !isHome && !isAway) continue;
+            games.push(match);
+          }
+
+          // Recent goals and form, same rules as before
+          let gf = 0;
+          let ga = 0;
+          let form = "";
+          for (const m of games) {
+            if (m.fthg == null || m.ftag == null) continue;
+            const isHome = m.homeTeam === team;
+            gf += isHome ? m.fthg : m.ftag;
+            ga += isHome ? m.ftag : m.fthg;
+            if (m.fthg === m.ftag) form += "D";
+            else if (
+              (isHome && m.fthg > m.ftag) ||
+              (!isHome && m.ftag > m.fthg)
+            )
+              form += "W";
+            else form += "L";
+          }
+          // No matches of this type: null, so the upsert keeps what's stored (as before)
+          const hasGames = games.length > 0;
+
+          rows.push({
+            name: team,
+            league: league,
+            season: season,
+            type: type,
+            position: index + 1,
+            played: row.played,
+            won: row.won,
+            draw: row.draw,
+            lost: row.lost,
+            goalsFor: row.goalsFor,
+            goalsAgainst: row.goalsAgainst,
+            goalDifference: row.goalsFor - row.goalsAgainst,
+            points: row.points,
+            form: hasGames ? form.split("").reverse().join("") : null,
+            recentGf: hasGames ? gf : null,
+            recentGa: hasGames ? ga : null,
+          });
+        });
+      }
+
       span.setAttribute("management.matches", seasonMatches.length);
       span.setAttribute("management.teams", Object.keys(table).length);
+      span.setAttribute("management.rows", rows.length);
 
-      // Insert into DB per type (one statement per row, so one batch span for the loop)
+      // No matches yet this season: nothing to save (an empty insert is an error)
+      if (rows.length === 0) return { success: true };
+
+      // Every row in one statement
       await withDbSpan(
         "standings",
-        async (dbSpan) => {
-          let statements = 0;
-          for (const [team, stats] of Object.entries(table)) {
-            for (const type of ["HOME", "AWAY", "TOTAL"] as const) {
-              const row = stats[type];
-              await db
-                .insert(standings)
-                .values({
-                  name: team,
-                  league: league,
-                  season: season,
-                  type: type,
-                  position: 0, // temp val
-                  played: row.played,
-                  won: row.won,
-                  draw: row.draw,
-                  lost: row.lost,
-                  goalsFor: row.goalsFor,
-                  goalsAgainst: row.goalsAgainst,
-                  goalDifference: row.goalsFor - row.goalsAgainst,
-                  points: row.points,
-                })
-                .onConflictDoUpdate({
-                  target: [standings.name, standings.season, standings.type],
-                  set: {
-                    played: row.played,
-                    won: row.won,
-                    draw: row.draw,
-                    lost: row.lost,
-                    goalsFor: row.goalsFor,
-                    goalsAgainst: row.goalsAgainst,
-                    goalDifference: row.goalsFor - row.goalsAgainst,
-                    points: row.points,
-                  },
-                });
-              statements++;
-            }
-          }
-          dbSpan.setAttribute("db.operation.batch.size", statements);
+        async () => {
+          await db
+            .insert(standings)
+            .values(rows)
+            .onConflictDoUpdate({
+              target: [standings.name, standings.season, standings.type],
+              set: {
+                position: fromExcluded(standings.position),
+                played: fromExcluded(standings.played),
+                won: fromExcluded(standings.won),
+                draw: fromExcluded(standings.draw),
+                lost: fromExcluded(standings.lost),
+                goalsFor: fromExcluded(standings.goalsFor),
+                goalsAgainst: fromExcluded(standings.goalsAgainst),
+                goalDifference: fromExcluded(standings.goalDifference),
+                points: fromExcluded(standings.points),
+                form: fromExcludedOrKeep(standings.form),
+                recentGf: fromExcludedOrKeep(standings.recentGf),
+                recentGa: fromExcludedOrKeep(standings.recentGa),
+              },
+            });
         },
         "INSERT",
       );
 
-      for (const type of ["TOTAL", "AWAY", "HOME"]) {
-        const standingsRows = await withDbSpan("standings", async (dbSpan) => {
-          const result = await db
-            .select()
-            .from(standings)
-            .where(
-              and(
-                eq(standings.league, league),
-                eq(standings.season, season),
-                eq(standings.type, type),
-              ),
-            );
-          dbSpan.setAttribute("db.response.returned_rows", result.length);
-          return result;
-        });
-        // Sort and update positions
-        standingsRows.sort((a, b) => {
-          if (b.points !== a.points) return b.points - a.points;
-          if (b.goalDifference !== a.goalDifference)
-            return b.goalDifference - a.goalDifference;
-          return b.goalsFor - a.goalsFor;
-        });
-
-        await withDbSpan(
-          "standings",
-          async (dbSpan) => {
-            dbSpan.setAttribute(
-              "db.operation.batch.size",
-              standingsRows.length,
-            );
-            await Promise.all(
-              standingsRows.map((row, i) =>
-                db
-                  .update(standings)
-                  .set({ position: i + 1 })
-                  .where(eq(standings.id, row.id)),
-              ),
-            );
-          },
-          "UPDATE",
-        );
-      }
-
-      // update every teams recent form
-      await Promise.all(
-        Object.keys(table).map((team) =>
-          updateRecentFormService(team, Number(season)),
-        ),
-      );
       return { success: true };
     },
   );
