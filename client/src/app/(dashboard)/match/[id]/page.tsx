@@ -29,7 +29,6 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 const LINEUPS_POLL_MS = 5 * 60 * 1000;
-const NARROW = "mx-auto w-full max-w-6xl px-4 sm:px-6";
 
 function isTabKey(value: string | null): value is TabKey {
   return TABS.some((tab) => tab.key === value);
