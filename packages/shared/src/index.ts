@@ -10,3 +10,4 @@ export * from "./top-players";
 export * from "./squad";
 export * from "./h2h";
 export * from "./live-match";
+export * from "./deductions";
