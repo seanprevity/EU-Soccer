@@ -1,4 +1,6 @@
 import { cn } from "@/lib/utils";
+import { PointDeduction } from "@epl/shared";
+import { describeDeduction } from "./deductions";
 
 // Relegation or European football, decided by place in the league table
 export type Zone =
@@ -70,24 +72,43 @@ export function zonesInTable(teamCount: number, league: string): Zone[] {
 export function ZoneLegend({
   teamCount,
   league,
+  deductions = [],
 }: {
   teamCount: number;
   league: string;
+  deductions?: PointDeduction[];
 }) {
   const zones = zonesInTable(teamCount, league);
-  if (zones.length === 0) return null;
+  if (zones.length === 0 && deductions.length === 0) return null;
 
   return (
-    <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-600 dark:text-gray-300">
-      {zones.map((zone) => (
-        <li key={zone} className="flex items-center gap-1.5">
-          <span
-            aria-hidden
-            className={cn("h-2 w-2 shrink-0 rounded-full", ZONES[zone].color)}
-          />
-          {ZONES[zone].label}
-        </li>
-      ))}
-    </ul>
+    <>
+      {zones.length > 0 && (
+        <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-600 dark:text-gray-300">
+          {zones.map((zone) => (
+            <li key={zone} className="flex items-center gap-1.5">
+              <span
+                aria-hidden
+                className={cn(
+                  "h-2 w-2 shrink-0 rounded-full",
+                  ZONES[zone].color,
+                )}
+              />
+              {ZONES[zone].label}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {deductions.length > 0 && (
+        <ul className="mt-2 space-y-0.5 text-xs text-gray-600 dark:text-gray-300">
+          {deductions.map((d) => (
+            <li key={d.team}>
+              * {d.team}: {describeDeduction(d)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }

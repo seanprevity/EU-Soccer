@@ -13,8 +13,9 @@ import {
 } from "@/state/api";
 import Image from "next/image";
 import Link from "next/link";
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { zoneFor, ZoneLegend, ZONES } from "@/lib/zones";
+import { applyDeductions, describeDeduction } from "@/lib/deductions";
 
 const TYPE_OPTIONS = [
   { key: "TOTAL", label: "Total" },
@@ -106,13 +107,21 @@ const TeamTable = ({
     refetch: refetchStandings,
   } = useGetStandingsQuery({ league, season }, { skip: isRecentLoading });
 
-  // In table order
-  const tableRows = useMemo(() => {
-    if (!standings) return [];
-    return standings
+  // In table order, with any upheld points deductions applied
+  const { rows: tableRows, deductions } = useMemo(() => {
+    if (!standings) return { rows: [], deductions: [] };
+    const rows = standings
       .filter((t) => t.type === type)
       .sort((a, b) => a.position - b.position);
+    const first = rows[0];
+    if (!first) return { rows, deductions: [] };
+    return applyDeductions(rows, first.league, first.season, type);
   }, [standings, type]);
+
+  const deductedTeams = useMemo(
+    () => new Map(deductions.map((d) => [d.team, d])),
+    [deductions],
+  );
 
   const teamNames = useMemo(
     () => tableRows.map((t) => t.name).sort(),
@@ -342,6 +351,16 @@ const TeamTable = ({
                         </div>
                         <span className="whitespace-nowrap text-black dark:text-gray-200">
                           {team.name}
+                          {deductedTeams.has(team.name) && (
+                            <span
+                              className="text-black dark:text-gray-300"
+                              title={describeDeduction(
+                                deductedTeams.get(team.name)!,
+                              )}
+                            >
+                              *
+                            </span>
+                          )}
                         </span>
                         {team.live && <LiveScore live={team.live} />}
                       </div>
@@ -380,7 +399,11 @@ const TeamTable = ({
           </tbody>
         </table>
       </div>
-      <ZoneLegend teamCount={sortedTeams.length} league={league} />
+      <ZoneLegend
+        teamCount={sortedTeams.length}
+        league={league}
+        deductions={deductions}
+      />
     </div>
   );
 };

@@ -10,6 +10,7 @@ import { Standing } from "@epl/shared";
 import { StandingType, useLiveStandings } from "@/lib/liveStandings";
 import { LiveDot, LiveScore, Movement } from "@/components/liveBadges";
 import { zoneFor, ZoneLegend, ZONES } from "@/lib/zones";
+import { applyDeductions, describeDeduction } from "@/lib/deductions";
 
 // No expected position on the league table
 const LEAGUE_HEADERS = HEADER_CONFIG.filter(
@@ -46,15 +47,25 @@ export default function LeagueTable({
   const {
     data: teams,
     isLoading,
+    isFetching,
     refetch,
   } = useGetStandingsQuery({ league, season });
 
-  const filteredTeams = useMemo(() => {
-    if (!teams) return [];
-    return teams
+  const { rows: filteredTeams, deductions } = useMemo(() => {
+    if (!teams) return { rows: [], deductions: [] };
+    const rows = teams
       .filter((t) => t.type === type)
       .sort((a, b) => a.position - b.position);
+    // The league and season of the rows themselves: while a new season loads, RTK Query
+    // still returns the previous one, and its deductions must stay with it
+    const first = rows[0];
+    if (!first) return { rows, deductions: [] };
+    return applyDeductions(rows, first.league, first.season, type);
   }, [teams, type]);
+  const deductedTeams = useMemo(
+    () => new Map(deductions.map((d) => [d.team, d])),
+    [deductions],
+  );
 
   const isCurrentSeason = season === genCurrentSeason();
   const liveTeams = useLiveStandings(
@@ -103,7 +114,12 @@ export default function LeagueTable({
         </p>
       )}
 
-      <div className="w-full overflow-x-auto rounded-lg">
+      <div
+        className={cn(
+          "w-full overflow-x-auto rounded-lg transition-opacity",
+          isFetching && "opacity-50",
+        )}
+      >
         <table className="w-full border-collapse text-[0.65rem] shadow-sm sm:text-[0.75rem] md:text-[0.85rem] lg:text-[0.9rem]">
           <thead className="sticky top-0 z-10 bg-[#38003c] text-white dark:bg-gray-900">
             <tr>
@@ -185,6 +201,16 @@ export default function LeagueTable({
                           </div>
                           <span className="whitespace-nowrap text-black dark:text-gray-200">
                             {team.name}
+                            {deductedTeams.has(team.name) && (
+                              <span
+                                className="text-black dark:text-gray-300"
+                                title={describeDeduction(
+                                  deductedTeams.get(team.name)!,
+                                )}
+                              >
+                                *
+                              </span>
+                            )}
                           </span>
                           {team.live && <LiveScore live={team.live} />}
                         </div>
@@ -208,7 +234,11 @@ export default function LeagueTable({
         </table>
       </div>
 
-      <ZoneLegend teamCount={sortedTeams.length} league={league} />
+      <ZoneLegend
+        teamCount={sortedTeams.length}
+        league={league}
+        deductions={deductions}
+      />
     </>
   );
 }

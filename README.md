@@ -140,7 +140,7 @@ GitHub Actions, Dependabot, ESLint
 ```text
 client/          Next.js frontend
 server/          Express API, live and update workers, database schema (Drizzle)
-shared/          Types shared by the client and server (@epl/shared)
+packages/shared/ Types shared by the client and server (@epl/shared)
 infra/grafana/   Terraform for the Grafana dashboard, alerts, and contact point
 load-test/       k6 load test
 docs/images/     README screenshots
